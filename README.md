@@ -82,3 +82,13 @@ npm run library:enrich # Open Library lookup + cover upload for the library
 
 Deployed on Vercel. Media (book covers, the food gallery) is served from Cloudflare
 R2 behind `media.husayngokal.com`.
+
+## License
+
+The **code** in this repository is released under the MIT License (see
+[LICENSE](./LICENSE)). Use it, learn from it, build on it.
+
+The **content and brand** are not. The written work (essays, the life plan, notes,
+reviews), the photographs, and the "husayn gokal." name and visual identity remain
+copyright Husayn Gokal and are not covered by the MIT License. Please build your own
+thing rather than republishing this site as your own.
