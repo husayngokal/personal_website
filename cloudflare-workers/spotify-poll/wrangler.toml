@@ -1,0 +1,35 @@
+# Cloudflare Worker — Spotify polling cron for husayngokal.com.
+#
+# Fires every minute, POSTs to https://husayngokal.com/api/spotify/poll
+# with Authorization: Bearer ${SPOTIFY_POLL_TOKEN}. The endpoint reads
+# the currently-playing track from Spotify and upserts it into the
+# current_state Postgres row; Supabase Realtime then pushes to any
+# connected homepage.
+#
+# Free tier headroom: Workers Free allows 100,000 requests/day. One
+# request per minute = 1,440 requests/day. We are 1.5% of the cap.
+#
+# To deploy from this directory:
+#   npm install -D wrangler
+#   npx wrangler login
+#   npx wrangler secret put SPOTIFY_POLL_TOKEN   # paste token when prompted
+#   npx wrangler deploy
+
+name = "husayngokal-spotify-poll"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+# 1-minute cron. CFW supports cron triggers on the free tier with no
+# practical floor — */1 is fine and reliable (unlike GHA's "best effort").
+[triggers]
+crons = ["* * * * *"]
+
+# The poll URL is a non-secret config value; SPOTIFY_POLL_TOKEN goes in
+# via `wrangler secret put` so it isn't checked into the repo.
+[vars]
+POLL_URL = "https://husayngokal.com/api/spotify/poll"
+
+# observability is on by default for cron triggers; explicit here so
+# scheduled-event errors show up in the Cloudflare dashboard's Logs tab.
+[observability]
+enabled = true

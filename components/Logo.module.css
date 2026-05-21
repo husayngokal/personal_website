@@ -1,0 +1,29 @@
+/*
+ * Specifications from BRIEF.md Part II:
+ *   lowercase, Source Serif 4, font-weight 600, letter-spacing -0.01em,
+ *   period rendered in the orange brand color via CSS, no space between
+ *   "gokal" and the period.
+ */
+
+.logo {
+  display: inline-flex;
+  align-items: baseline;
+  font-family: var(--font-serif);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-strong);
+  text-decoration: none;
+  line-height: 1;
+}
+
+.logo:hover { color: var(--text-strong); }
+
+.wordmark {
+  /* lowercase forced regardless of source casing */
+  text-transform: lowercase;
+}
+
+.dot {
+  color: var(--accent);
+  margin-left: 0;
+}

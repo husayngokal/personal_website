@@ -1,0 +1,30 @@
+/*
+ * Top nav layout — logo flush left, status pulse + Menu pushed
+ * right. Surfaces live in MenuDrawer now, so the bar stays clean.
+ */
+
+.header {
+  width: 100%;
+  background: var(--bg-page);
+  border-bottom: 1px solid var(--border);
+}
+
+.inner {
+  max-width: var(--page-wide);
+  margin: 0 auto;
+  padding: var(--space-m) var(--space-l);
+  display: flex;
+  align-items: center;
+  gap: var(--space-l);
+}
+
+.right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-m);
+}
+
+@media (max-width: 600px) {
+  .inner { padding: var(--space-m); gap: var(--space-m); }
+}

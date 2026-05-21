@@ -1,0 +1,45 @@
+.wrap {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-s);
+  color: var(--text-muted);
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-s);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.line {
+  position: relative;
+  width: 1px;
+  height: 32px;
+  background: var(--text-muted);
+  opacity: 0.45;
+  display: inline-block;
+}
+
+.dot {
+  position: absolute;
+  left: -2.5px;
+  top: -3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: dropDown 2200ms var(--ease) infinite;
+}
+
+@keyframes dropDown {
+  0%   { transform: translateY(0);   opacity: 0; }
+  15%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translateY(32px); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot { animation: none; opacity: 1; transform: translateY(13px); }
+}

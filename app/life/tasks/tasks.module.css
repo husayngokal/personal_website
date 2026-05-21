@@ -1,0 +1,237 @@
+/* Tasks surface — list of in-flight work, grouped by scope, filterable
+   by status. Editorial register: cards with status pills, no chrome,
+   built to be skimmable from top of viewport. */
+
+.kicker {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-s);
+  margin-bottom: var(--space-m);
+}
+.kicker a { color: var(--text-muted); text-decoration: none; }
+.kicker a:hover { color: var(--accent); }
+
+.title {
+  font-size: var(--type-display-l);
+  line-height: var(--type-display-l-lh);
+  color: var(--text-strong);
+  margin: 0 0 var(--space-m);
+}
+
+.dek {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--type-body-l);
+  line-height: var(--type-body-l-lh);
+  color: var(--text-body);
+  max-width: 60ch;
+  margin: 0 0 var(--space-2xl);
+}
+
+/* Filter pills — small monospace tags above the list */
+.filterRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s);
+  margin-bottom: var(--space-m);
+}
+
+/* Secondary filter row — category pills sit below the status pills
+   so the two axes of filtering don't compete for the eye. The label
+   on the left makes the row's purpose obvious. */
+.filterRowSecondary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-s);
+  align-items: baseline;
+  margin-bottom: var(--space-2xl);
+  padding-bottom: var(--space-l);
+  border-bottom: 1px solid var(--border);
+}
+.filterRowLabel {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-s);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-right: var(--space-xs);
+}
+
+.filterPill {
+  display: inline-flex;
+  gap: var(--space-xs);
+  align-items: baseline;
+  padding: var(--space-xs) var(--space-m);
+  border-radius: 999px;
+  background: var(--bg-raised);
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  color: var(--text-body);
+  text-decoration: none;
+  border: 1px solid transparent;
+  transition: all var(--hover-ms) var(--ease);
+}
+.filterPill:hover {
+  border-color: var(--border);
+  color: var(--text-strong);
+}
+.filterPillActive {
+  background: var(--text-strong);
+  color: #ffffff;
+}
+.filterPillActive .filterCount { color: #ffffff; opacity: 0.7; }
+.filterCount {
+  font-size: var(--type-mono-s);
+  color: var(--text-muted);
+}
+
+/* Scope groups — section per scope (today, week, ..., lifetime) */
+.scopeSection {
+  margin-bottom: var(--space-2xl);
+}
+
+.scopeLabel {
+  font-family: var(--font-mono);
+  font-size: var(--type-ui);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  font-weight: 500;
+  margin: 0 0 var(--space-m);
+  padding-bottom: var(--space-s);
+  border-bottom: 1px solid var(--border);
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-m);
+}
+
+.item {
+  padding: var(--space-m) var(--space-l);
+  background: var(--bg-raised);
+  border-radius: 4px;
+  border-left: 3px solid var(--border);
+  transition: border-color var(--hover-ms) var(--ease);
+}
+.item:target {
+  border-left-color: var(--accent);
+  background: #FBF6E8;
+}
+
+/* Status-specific left border accents — orange for in-progress
+   (the only color that moves), muted for everything else. */
+.status-open        { border-left-color: var(--text-muted); }
+.status-in-progress { border-left-color: var(--accent); }
+.status-done        { border-left-color: #6FA070; opacity: 0.85; }
+.status-blocked     { border-left-color: #B55F44; }
+.status-dropped     { border-left-color: var(--border); opacity: 0.55; }
+
+.itemHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s);
+  flex-wrap: wrap;
+}
+
+.checkbox {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  width: 22px;
+  text-align: center;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.status-in-progress .checkbox { color: var(--accent); }
+.status-done .checkbox        { color: #6FA070; }
+.status-blocked .checkbox     { color: #B55F44; }
+
+.itemTitle {
+  font-family: var(--font-serif);
+  font-size: var(--type-body-m);
+  line-height: 1.4;
+  color: var(--text-strong);
+  flex: 1;
+  min-width: 200px;
+}
+.status-done .itemTitle {
+  color: var(--text-muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--border);
+}
+
+.priorityFlag {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-s);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+/* Recurrence badge — small monospace chip with the cron arrow glyph.
+   Orange because cron-style routines are the most "alive" tasks on
+   the surface (they're the ones that keep coming back). */
+.recurrenceBadge {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-s);
+  letter-spacing: 0.04em;
+  color: var(--accent);
+  padding: 2px 6px;
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  background: rgba(242, 107, 31, 0.06);
+}
+
+/* Category badge — neutral, sits beside the recurrence/status chips.
+   The 9 Part-15 artifact domains all use this. */
+.categoryBadge {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-s);
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+}
+
+.itemMeta {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  color: var(--text-muted);
+  margin: var(--space-xs) 0 0 calc(22px + var(--space-s));
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+.metaSep { color: var(--border); }
+.projectLink {
+  color: var(--text-body);
+  text-decoration: none;
+  border-bottom: 1px dotted var(--border);
+}
+.projectLink:hover { color: var(--accent); border-bottom-color: var(--accent); }
+
+.itemNotes {
+  font-family: var(--font-serif);
+  font-size: var(--type-body-s);
+  line-height: 1.55;
+  color: var(--text-body);
+  margin: var(--space-s) 0 0 calc(22px + var(--space-s));
+}
+.itemNotes p { margin: 0 0 var(--space-s); }
+.itemNotes p:last-child { margin-bottom: 0; }
+
+.empty {
+  font-family: var(--font-serif);
+  font-style: italic;
+  color: var(--text-muted);
+  padding: var(--space-2xl) 0;
+  text-align: center;
+}
+
+@media (max-width: 540px) {
+  .itemMeta, .itemNotes { margin-left: 0; }
+}

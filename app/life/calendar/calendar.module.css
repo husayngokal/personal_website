@@ -1,0 +1,60 @@
+/* /life/calendar — page-level layout for the grid + counters + epitaph */
+
+.head { margin-bottom: var(--space-2xl); }
+
+.title {
+  font-size: var(--type-display-l);
+  line-height: var(--type-display-l-lh);
+  margin: var(--space-s) 0 var(--space-m);
+  color: var(--text-strong);
+}
+
+.dek {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--type-body-l);
+  color: var(--text-body);
+  max-width: 60ch;
+  line-height: 1.55;
+}
+
+.counters {
+  margin-top: var(--space-2xl);
+  padding-top: var(--space-l);
+  border-top: 1px solid var(--border);
+}
+
+.countersLabel {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-s);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-l);
+}
+
+.footer {
+  margin-top: var(--space-2xl);
+  padding-top: var(--space-l);
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+
+.epitaph {
+  font-family: var(--font-serif);
+  font-style: italic;
+  color: var(--text-muted);
+  font-size: var(--type-body-m);
+  max-width: 56ch;
+  margin: 0 auto var(--space-l);
+  line-height: 1.55;
+}
+
+.mori {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  letter-spacing: 0.16em;
+  color: var(--accent);
+  text-transform: lowercase;
+  margin: 0;
+}

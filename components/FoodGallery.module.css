@@ -1,0 +1,146 @@
+/* Food gallery — masonry of labelled dish photos + lightbox.
+   Paper register: cream tiles on page beige, mono captions, orange the
+   only colour that moves (the lightbox controls pick it up on hover). */
+
+.masonry {
+  /* CSS columns give a masonry flow with no JS layout pass. The count
+     steps down with the viewport. */
+  column-count: 4;
+  column-gap: var(--space-m);
+}
+@media (max-width: 1000px) { .masonry { column-count: 3; } }
+/* Two columns even on phones: 162 photos in one column is a very long
+   scroll, and ~160px tiles still read well. */
+@media (max-width: 680px)  { .masonry { column-count: 2; column-gap: var(--space-s); } }
+
+.item {
+  break-inside: avoid;
+  margin: 0 0 var(--space-l);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s);
+  /* Clear the sticky nav band when jumped to via #food-NNN. */
+  scroll-margin-top: 84px;
+}
+
+.tile {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: var(--bg-raised);
+  border-radius: 4px;
+  overflow: hidden;
+  line-height: 0;
+  cursor: pointer;
+}
+
+.img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  border-radius: 4px;
+  /* Settle in as thumbnails decode, rather than popping. */
+  transition: opacity var(--hover-ms) var(--ease), transform var(--hover-ms) var(--ease);
+}
+.tile:hover .img { transform: scale(1.015); opacity: 0.96; }
+.tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+.label {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* -- Lightbox ------------------------------------------------------ */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* A warm scrim, not pure black, so it stays in the paper register. */
+  background: rgba(31, 28, 22, 0.86);
+  padding: var(--space-xl);
+  animation: lb-fade 200ms var(--ease) both;
+}
+
+@keyframes lb-fade { from { opacity: 0; } to { opacity: 1; } }
+
+.stage {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-m);
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.full {
+  max-width: min(1100px, 92vw);
+  max-height: 82vh;
+  width: auto;
+  height: auto;
+  border-radius: 4px;
+  object-fit: contain;
+}
+
+.fullLabel {
+  font-family: var(--font-mono);
+  font-size: var(--type-ui);
+  letter-spacing: 0.04em;
+  color: #F8F2E3;
+  text-align: center;
+}
+
+/* Controls — quiet by default, orange on hover (the moving colour). */
+.close,
+.nav {
+  position: fixed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(248, 242, 227, 0.10);
+  color: #F8F2E3;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background var(--hover-ms) var(--ease), color var(--hover-ms) var(--ease);
+}
+.close:hover,
+.nav:hover { background: var(--accent); color: #F8F2E3; }
+.close:focus-visible,
+.nav:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.close {
+  top: var(--space-l);
+  right: var(--space-l);
+  width: 40px;
+  height: 40px;
+}
+
+.nav {
+  top: 50%;
+  transform: translateY(-50%);
+  width: 48px;
+  height: 48px;
+}
+.prev { left: var(--space-l); }
+.next { right: var(--space-l); }
+
+@media (max-width: 680px) {
+  .nav { width: 40px; height: 40px; }
+  .prev { left: var(--space-s); }
+  .next { right: var(--space-s); }
+  .lightbox { padding: var(--space-m); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lightbox { animation: none; }
+  .img { transition: none; }
+  .tile:hover .img { transform: none; }
+}

@@ -1,0 +1,290 @@
+/* -- Eyebrow -------------------------------------------------------- */
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-s);
+  line-height: 1.3;
+  letter-spacing: 0.12em;
+  color: var(--text-body);
+  text-transform: uppercase;
+  margin: 0 0 var(--space-m) 0;
+}
+.eyebrowNumber { color: var(--accent); font-weight: 500; }
+.eyebrowSep    { color: var(--text-muted); }
+
+/* -- Chip ----------------------------------------------------------- */
+.chip {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  line-height: 1;
+  color: var(--text-body);
+  background: var(--bg-page);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 2px 6px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color var(--hover-ms) var(--ease), border-color var(--hover-ms) var(--ease);
+}
+a.chip:hover { color: var(--text-strong); border-color: var(--text-muted); }
+.chipAccent { color: var(--accent); border-color: rgba(242,107,31,0.4); }
+
+/* -- Status pill ---------------------------------------------------- */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-family: var(--font-sans);
+  font-size: var(--type-ui-s);
+  letter-spacing: 0.03em;
+  color: var(--text-body);
+  text-transform: lowercase;
+}
+.pillDot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+.pillDotActive   { background: var(--accent); }
+.pillDotInactive { background: var(--border); }
+.pillDotLive     { background: var(--accent); animation: pillPulse var(--pulse-ms) var(--ease) infinite; }
+
+@keyframes pillPulse {
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%      { opacity: 0.45; transform: scale(0.8); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pillDotLive { animation: none; }
+}
+
+/* -- Card ----------------------------------------------------------- */
+.card {
+  background: var(--bg-raised);
+  border-radius: 4px;
+  /* No hover elevation. The site does not pretend to be material design. */
+}
+
+/* -- Manifesto callout ---------------------------------------------- */
+.manifesto {
+  background: var(--bg-raised);
+  border-left: 2px solid var(--accent);
+  padding: var(--space-xl);
+  margin: var(--space-2xl) 0;
+}
+.manifestoLabel {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-s);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 var(--space-m) 0;
+  font-weight: 500;
+}
+.manifestoBody {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--type-body-m);
+  line-height: var(--type-body-m-lh);
+  color: var(--text-strong);
+}
+.manifestoBody p:last-child { margin-bottom: 0; }
+
+/* -- Pull quote ----------------------------------------------------- */
+.pullQuote {
+  width: 90%;
+  margin: var(--space-2xl) auto;
+  padding: var(--space-m) 0;
+  border-top: 1px solid var(--accent);
+  border-bottom: 1px solid var(--accent);
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 24px;
+  line-height: 1.4;
+  color: var(--text-strong);
+  text-align: left;
+}
+.pullQuote p { margin: 0; }
+
+/* -- Sidenote ------------------------------------------------------- */
+.sidenoteRef {
+  font-family: var(--font-mono);
+  font-size: 0.62em;
+  color: var(--accent);
+  font-weight: 500;
+  margin-left: 1px;
+  cursor: pointer;
+  vertical-align: super;
+}
+.sidenote {
+  font-family: var(--font-sans);
+  font-size: var(--type-body-s);
+  line-height: 1.5;
+  color: var(--text-muted);
+  display: block;
+  padding-left: var(--space-l);
+  border-left: 1px solid var(--border);
+  margin: var(--space-m) 0;
+}
+.sidenoteN {
+  font-family: var(--font-mono);
+  color: var(--accent);
+  margin-right: var(--space-xs);
+  font-size: 0.85em;
+}
+@media (min-width: 1100px) {
+  /* Floats into right gutter on wide viewports where layout supports it */
+  .sidenote {
+    float: right;
+    clear: right;
+    width: 220px;
+    margin-right: -260px;
+    margin-top: -0.4em;
+    padding-left: var(--space-m);
+  }
+}
+
+/* -- Decision log entry --------------------------------------------- */
+.decision {
+  padding: var(--space-l) 0;
+  border-bottom: 1px solid var(--border);
+}
+.decision:last-child { border-bottom: none; }
+.decisionDate {
+  font-family: var(--font-mono);
+  font-size: var(--type-body-s);
+  color: var(--text-muted);
+  margin: 0 0 var(--space-s) 0;
+}
+.decisionTitle {
+  font-family: var(--font-serif);
+  font-size: var(--type-body-m);
+  font-weight: 600;
+  color: var(--text-strong);
+  margin: 0 0 var(--space-s) 0;
+}
+.decisionBody {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--type-body-m);
+  line-height: var(--type-body-m-lh);
+  color: var(--text-body);
+}
+.decisionBody p:last-child { margin-bottom: 0; }
+
+/* -- Timeline entry ------------------------------------------------- */
+.timeline {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: var(--space-l);
+  padding: var(--space-l) 0;
+  border-bottom: 1px solid var(--border);
+}
+.timeline:last-child { border-bottom: none; }
+.timelineDate {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.timelineTitle {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--type-body-m);
+  color: var(--text-strong);
+  margin: 0 0 var(--space-s) 0;
+}
+.timelineReflection {
+  font-family: var(--font-serif);
+  font-size: var(--type-body-m);
+  line-height: var(--type-body-m-lh);
+  color: var(--text-body);
+}
+@media (max-width: 600px) {
+  .timeline { grid-template-columns: 1fr; gap: var(--space-s); }
+}
+
+/* -- Progress bar ---------------------------------------------------
+   Rendered with spans (phrasing content) so it can sit safely inside a
+   <p>. inline-flex / inline-block reproduce the block-like geometry. */
+.progressRow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-s);
+  vertical-align: middle;
+}
+.progressTrack {
+  display: inline-block;
+  /* 6px — 3px (original) was below the visual perception threshold at
+     normal reading distance, and at 50% fill the orange disappeared
+     into a sliver. 6px reads as an actual bar. */
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  vertical-align: middle;
+}
+.progressFill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transform-origin: left;
+}
+.progressFillAnimate {
+  animation: fillIn 1200ms var(--ease) both;
+}
+@keyframes fillIn {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+.progressLabel {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  color: var(--accent);
+}
+
+/* -- Cross-link strip ---------------------------------------------- */
+.strip {
+  margin: var(--space-2xl) 0;
+  padding-top: var(--space-l);
+  border-top: 1px solid var(--border);
+}
+.stripTitle {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-s);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-m) 0;
+}
+.stripList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-l);
+}
+.stripItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-decoration: none;
+  color: var(--text-body);
+}
+.stripItemLabel {
+  font-family: var(--font-serif);
+  font-size: var(--type-body-m);
+  color: var(--text-strong);
+}
+.stripItem:hover .stripItemLabel { text-decoration: underline; }
+.stripItemSub {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  color: var(--text-muted);
+}
+
+/* -- Section rule --------------------------------------------------- */
+.sectionRule {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: var(--space-2xl) 0;
+}

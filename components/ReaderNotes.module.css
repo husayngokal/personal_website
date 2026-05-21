@@ -1,0 +1,52 @@
+/* Reader notes — accepted comments below a Notebook post. */
+
+.section {
+  margin-top: var(--space-2xl);
+  padding-top: var(--space-2xl);
+  border-top: 1px solid var(--border);
+}
+
+.heading {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  margin: 0 0 var(--space-l);
+  color: var(--text-strong);
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xl);
+}
+
+.note {
+  border-left: 2px solid var(--accent);
+  padding-left: var(--space-l);
+}
+
+.meta {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-s);
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-s) 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.author { color: var(--text-strong); font-weight: 600; }
+.dot    { color: var(--text-muted); }
+
+.body {
+  font-family: var(--font-serif);
+  font-size: var(--type-body-m);
+  line-height: 1.65;
+  color: var(--text-body);
+}
+
+.body p { margin: 0 0 var(--space-m) 0; }
+.body p:last-child { margin-bottom: 0; }

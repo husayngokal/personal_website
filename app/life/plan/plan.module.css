@@ -1,0 +1,195 @@
+/* Master Plan — TOC + detail styling. The Life Plan layout already
+   provides the warmer paper register and generous breathing room; this
+   adds the table-of-contents listing and detail-page header treatment. */
+
+.kicker {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-s);
+  letter-spacing: 0.04em;
+  margin-bottom: var(--space-m);
+}
+.kicker a {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+.kicker a:hover { color: var(--accent); }
+
+.title {
+  font-size: var(--type-display-l);
+  line-height: var(--type-display-l-lh);
+  color: var(--text-strong);
+  margin: 0 0 var(--space-m);
+}
+
+.dek {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--type-body-l);
+  line-height: var(--type-body-l-lh);
+  color: var(--text-body);
+  max-width: 60ch;
+  margin: 0 0 var(--space-2xl);
+}
+
+/* The TOC list — numbered, generously spaced. Reads as a table of
+   contents in a Phaidon-style monograph; the number is the editorial
+   anchor, the title is the read-this, the summary is the editor's
+   note. */
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border-top: 1px solid var(--border);
+}
+
+.item {
+  margin: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.link {
+  display: grid;
+  grid-template-columns: 80px 1fr;
+  gap: var(--space-l);
+  align-items: baseline;
+  padding: var(--space-l) 0;
+  text-decoration: none;
+  color: inherit;
+  transition: background var(--hover-ms) var(--ease);
+}
+.link:hover { background: rgba(242, 107, 31, 0.04); }
+
+.num {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  color: var(--accent);
+  letter-spacing: 0.08em;
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.partTitle {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 22px;
+  line-height: 1.3;
+  color: var(--text-strong);
+}
+
+.partSummary {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--type-body-m);
+  color: var(--text-body);
+  line-height: 1.5;
+}
+
+@media (max-width: 600px) {
+  .link {
+    grid-template-columns: 60px 1fr;
+    gap: var(--space-m);
+  }
+  .partTitle { font-size: 20px; }
+}
+
+/* ============= Detail page ============= */
+
+.detailMeta {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  margin: 0 0 var(--space-s);
+}
+
+.detailTitle {
+  font-size: var(--type-display-l);
+  line-height: var(--type-display-l-lh);
+  color: var(--text-strong);
+  margin: 0 0 var(--space-2xl);
+}
+
+/* Long-form body — markdown rendered through the standard pipeline.
+   Tight measure, generous line height, paragraph spacing inherited
+   from the Life Plan layout. */
+.body {
+  font-family: var(--font-serif);
+  font-size: var(--type-body-l);
+  line-height: var(--type-body-l-lh);
+  color: var(--text-body);
+}
+
+.body h1, .body h2, .body h3 {
+  color: var(--text-strong);
+  margin-top: var(--space-2xl);
+  margin-bottom: var(--space-m);
+}
+.body h2 {
+  font-size: var(--type-display-s);
+  line-height: var(--type-display-s-lh);
+  padding-top: var(--space-l);
+  border-top: 1px solid var(--border);
+}
+.body h3 { font-size: 22px; }
+
+.body p { margin: 0 0 var(--space-l); }
+
+.body ul, .body ol {
+  margin: 0 0 var(--space-l);
+  padding-left: var(--space-l);
+}
+.body li { margin-bottom: var(--space-s); }
+
+.body blockquote {
+  margin: var(--space-l) 0;
+  padding-left: var(--space-l);
+  border-left: 3px solid var(--accent);
+  font-style: italic;
+  color: var(--text-strong);
+}
+
+.body code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  background: var(--bg-code);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+}
+
+.body strong { color: var(--text-strong); font-weight: 600; }
+
+/* Inline navigation between Parts at the bottom of the detail page —
+   prev / next links for sequential reading. */
+.partNav {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-l);
+  margin-top: var(--space-3xl);
+  padding-top: var(--space-l);
+  border-top: 1px solid var(--border);
+}
+.partNavLink {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  color: var(--text-muted);
+  text-decoration: none;
+  max-width: 45%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.partNavLink:hover { color: var(--accent); }
+.partNavLinkLabel { color: var(--text-muted); }
+.partNavLinkTitle {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--type-body-m);
+  color: var(--text-body);
+  text-decoration: none;
+}
+.partNavLink:hover .partNavLinkTitle { color: var(--text-strong); }
+.partNavLinkRight { text-align: right; align-items: flex-end; }

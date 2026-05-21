@@ -1,0 +1,35 @@
+/* MementoLine — site-wide footer; the doctrine spoken plainly.
+   Mono, lowercase, centred. Quiet but unmissable on every page. */
+
+.footer {
+  width: 100%;
+  padding: var(--space-xl) var(--space-l) var(--space-2xl);
+  margin-top: var(--space-2xl);
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+
+.line {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  letter-spacing: 0.10em;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.contact {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-s);
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin: var(--space-s) 0 0;
+}
+
+.link {
+  color: inherit;
+  text-decoration: none;
+  transition: color var(--hover-ms) var(--ease);
+}
+.link:hover {
+  color: var(--accent);
+}

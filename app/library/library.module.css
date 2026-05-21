@@ -1,0 +1,153 @@
+.head { margin-bottom: var(--space-2xl); }
+.title {
+  font-size: var(--type-display-l);
+  line-height: var(--type-display-l-lh);
+  margin: var(--space-s) 0 var(--space-m);
+}
+.dek {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--type-body-l);
+  color: var(--text-body);
+  max-width: 64ch;
+}
+
+/* Plan bar */
+.plan {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: var(--space-l);
+  margin-bottom: var(--space-2xl);
+  padding-bottom: var(--space-l);
+  border-bottom: 1px solid var(--border);
+}
+.planLeft { display: flex; align-items: center; }
+.planBody { display: flex; flex-direction: column; gap: var(--space-s); }
+.planYear {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  letter-spacing: 0.06em;
+  color: var(--text-strong);
+  margin: 0;
+}
+.planCount {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  color: var(--text-muted);
+  margin: 0;
+}
+.planNum { color: var(--accent); }
+.planSep { color: var(--border); margin: 0 6px; }
+
+/* Layout: sidebar + grid */
+.layout {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: var(--space-2xl);
+}
+@media (max-width: 860px) {
+  .layout { grid-template-columns: 1fr; gap: var(--space-l); }
+  .sidebar { order: 2; }
+}
+
+.sidebar {
+  position: sticky;
+  top: var(--space-l);
+  align-self: start;
+}
+
+/* On mobile, drop sticky AND move sidebar below the grid (order: 2).
+   The override must follow the base rule to win at equal specificity.
+   Without this, the sidebar would re-emerge at viewport top when
+   scrolled past, reading as a jump. */
+@media (max-width: 860px) {
+  .sidebar { position: static; top: auto; }
+}
+.sidebarLabel {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-s);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-s) 0;
+}
+.filterList { list-style: none; padding: 0; margin: 0; }
+.filterItem {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-serif);
+  font-size: var(--type-body-s);
+  color: var(--text-body);
+  padding: var(--space-xs) 0;
+  border-bottom: 1px solid var(--border);
+}
+.filterCount {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  color: var(--text-muted);
+}
+
+/* Book grid */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-l);
+}
+@media (max-width: 760px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .grid { grid-template-columns: 1fr; } }
+
+.bookCard {
+  display: flex;
+  gap: var(--space-m);
+  background: var(--bg-raised);
+  border-radius: 4px;
+  padding: var(--space-m);
+  text-decoration: none;
+  color: inherit;
+  align-items: flex-start;
+  /* min-width:0 lets a flex item shrink below its content's intrinsic
+     size — without it, a long unbreakable title (e.g. underscored
+     filenames like Roger_James_Hamilton_-_The_Millionaire_Master_Plan)
+     forces the card wider than its grid column and the whole layout
+     overflows the mobile viewport. */
+  min-width: 0;
+}
+.bookCard:hover { background: #FBF6E8; }
+
+.bookSpineWrap { flex-shrink: 0; }
+
+.bookMeta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+.bookTitle {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: var(--type-body-m);
+  color: var(--text-strong);
+  margin: 0;
+  line-height: 1.25;
+  /* Break long unbreakable strings (underscored filenames, URLs, ISBNs)
+     mid-token rather than forcing the parent grid column wide. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.bookAuthor {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.bookAuthor {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  color: var(--text-muted);
+  margin: 0;
+}
+.bookStatus {
+  margin: var(--space-xs) 0 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.bookProgress { display: inline-flex; }

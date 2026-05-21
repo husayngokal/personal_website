@@ -1,0 +1,48 @@
+/*
+ * Typewriter typography — display-medium serif (36px) per Part V, scaling
+ * down on mobile (32px). The caret is a pulsing orange bar that matches
+ * the unified orange-motion vocabulary.
+ *
+ * Min-height locks the layout so display does not shift during animation.
+ */
+
+.typewriter {
+  font-family: var(--font-serif);
+  font-size: var(--type-display-m);
+  line-height: var(--type-display-m-lh);
+  font-weight: 600;
+  color: var(--text-strong);
+  letter-spacing: -0.005em;
+  margin: 0 0 var(--space-m) 0;
+  min-height: calc(var(--type-display-m) * var(--type-display-m-lh) * 2);
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.caret {
+  display: inline-block;
+  width: 2px;
+  height: 0.95em;
+  background: var(--accent);
+  margin-left: 4px;
+  align-self: center;
+  animation: blink 1100ms steps(2, start) infinite;
+}
+
+@keyframes blink {
+  to { visibility: hidden; }
+}
+
+@media (max-width: 720px) {
+  .typewriter {
+    font-size: 32px;
+    line-height: 1.12;
+    min-height: calc(32px * 1.12 * 2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .caret { display: none; }
+}

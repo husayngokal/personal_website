@@ -1,0 +1,125 @@
+.rails {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--space-xl);
+  margin-top: var(--space-2xl);
+  padding-top: var(--space-l);
+  border-top: 1px solid var(--border);
+}
+
+@media (max-width: 860px) {
+  .rails { grid-template-columns: 1fr; gap: var(--space-l); }
+}
+
+.rail {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-m);
+  text-decoration: none;
+  color: inherit;
+  padding: var(--space-s) 0;
+  transition: opacity var(--hover-ms) var(--ease);
+}
+.rail:hover { opacity: 0.85; }
+
+.railBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.railLabel {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-s);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-body);
+  margin: 0;
+}
+
+.railTitle {
+  font-family: var(--font-serif);
+  font-size: var(--type-body-m);
+  color: var(--text-strong);
+  margin: 0;
+  line-height: 1.3;
+  /* Prevent two-line titles from wrecking the rail height alignment */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.railMeta {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  color: var(--text-muted);
+  margin: var(--space-xs) 0 0 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+.railSub { color: var(--text-body); }
+.railDot { color: var(--border); margin: 0 4px; }
+
+.branchChip {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  color: var(--text-body);
+  background: var(--bg-page);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.livePulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: inline-block;
+  animation: railPulse var(--pulse-ms) var(--ease) infinite;
+  margin: 0 4px;
+}
+
+/* Brighter, faster pulse when a Realtime update just landed. ~2s flash. */
+.livePulseFlash {
+  animation: railFlash 600ms var(--ease) 3;
+  box-shadow: 0 0 8px rgba(242, 107, 31, 0.7);
+}
+
+@keyframes railPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.5; transform: scale(0.85); }
+}
+
+@keyframes railFlash {
+  0%, 100% { opacity: 1; transform: scale(1.2); }
+  50%      { opacity: 0.8; transform: scale(1.4); }
+}
+
+/* Small inline indicator that appears next to the rail label when the
+   underlying signal just changed. Disappears after ~2s. */
+.flashIndicator {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-left: var(--space-xs);
+  animation: railFlash 600ms var(--ease) 3;
+  vertical-align: middle;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .livePulse { animation: none; }
+  .livePulseFlash { animation: none; box-shadow: none; }
+  .flashIndicator { animation: none; }
+}
+
+.railCommitTime { color: var(--accent); }
+
+.daysOrange { color: var(--accent); font-weight: 500; }

@@ -1,0 +1,312 @@
+/* Writeups index — list layout (not card grid). Each row a small
+   masthead with platform chip, difficulty pill, OS, then title and
+   technique line. Filters live in the left sidebar.
+
+   Detail page styles further down. */
+
+.head { margin-bottom: var(--space-2xl); }
+.title {
+  font-size: var(--type-display-l);
+  line-height: var(--type-display-l-lh);
+  margin: var(--space-s) 0 var(--space-m);
+}
+.dek {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--type-body-l);
+  color: var(--text-body);
+  max-width: 64ch;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: var(--space-2xl);
+}
+@media (max-width: 860px) {
+  .layout { grid-template-columns: 1fr; gap: var(--space-l); }
+}
+
+.sidebar { position: sticky; top: var(--space-l); align-self: start; }
+
+/* Drop sticky on mobile — see credentials.module.css. The override
+   must follow the base rule to win at equal specificity. */
+@media (max-width: 860px) {
+  .sidebar { position: static; top: auto; }
+}
+.filterGroup { margin-bottom: var(--space-xl); }
+.sidebarLabel {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-s);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-s);
+}
+
+.filterList { list-style: none; padding: 0; margin: 0; }
+.filterItem { margin: 0; }
+.filterLink {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-family: var(--font-serif);
+  font-size: var(--type-body-s);
+  color: var(--text-body);
+  text-decoration: none;
+  padding: var(--space-xs) 0;
+  border-bottom: 1px solid var(--border);
+  transition: color var(--hover-ms) var(--ease);
+}
+.filterLink:hover     { color: var(--text-strong); }
+.filterLinkActive     { color: var(--accent); }
+.filterCount {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  color: var(--text-muted);
+}
+
+/* List of writeup cards (single column inside the right area) */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-m);
+}
+
+.card {
+  display: block;
+  background: var(--bg-raised);
+  border-radius: 4px;
+  padding: var(--space-l);
+  text-decoration: none;
+  color: inherit;
+  transition: background var(--hover-ms) var(--ease);
+}
+.card:hover { background: #FBF6E8; }
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s);
+  margin-bottom: var(--space-s);
+}
+.spacer { flex: 1; }
+
+.osMark {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-s);
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.cardTitle {
+  font-family: var(--font-serif);
+  font-size: var(--type-display-s);
+  line-height: 1.3;
+  color: var(--text-strong);
+  margin: 0 0 var(--space-xs);
+}
+
+.cardTech {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  color: var(--text-muted);
+  margin: 0 0 var(--space-xs);
+}
+
+.cardMeta {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-s);
+  color: var(--text-muted);
+  margin: 0;
+  display: inline-flex;
+  gap: var(--space-xs);
+}
+.cardSep { color: var(--border); }
+
+.empty {
+  font-family: var(--font-serif);
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+/* ============= Detail page ============= */
+
+.detailHead { margin-bottom: var(--space-2xl); }
+.detailKicker {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-s);
+  margin-bottom: var(--space-l);
+}
+.detailKicker a {
+  color: var(--text-muted);
+  text-decoration: none;
+}
+.detailKicker a:hover { color: var(--accent); }
+
+.detailTitle {
+  font-size: var(--type-display-l);
+  line-height: var(--type-display-l-lh);
+  color: var(--text-strong);
+  margin: 0 0 var(--space-m);
+}
+
+.detailMetaRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-s);
+  margin-bottom: var(--space-l);
+}
+
+.detailFacts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  column-gap: var(--space-l);
+  row-gap: var(--space-s);
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  color: var(--text-body);
+  padding: var(--space-l) 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--space-2xl);
+}
+.factsLabel {
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: var(--type-mono-s);
+}
+.factsValue { color: var(--text-strong); }
+
+.body {
+  font-family: var(--font-serif);
+  font-size: var(--type-body-m);
+  line-height: 1.7;
+  color: var(--text-body);
+  max-width: 70ch;
+}
+.body h2 {
+  font-family: var(--font-serif);
+  font-size: var(--type-display-s);
+  color: var(--text-strong);
+  margin: var(--space-2xl) 0 var(--space-m);
+}
+.body h3 {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  color: var(--text-strong);
+  margin: var(--space-xl) 0 var(--space-s);
+}
+.body p { margin: 0 0 var(--space-m); }
+.body pre {
+  background: var(--bg-code);
+  padding: var(--space-m);
+  border-radius: 4px;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  line-height: 1.55;
+}
+.body code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--bg-code);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+}
+.body pre code {
+  background: none;
+  padding: 0;
+}
+
+/* ----- Markdown table styling -----------------------------------
+   GFM tables come through remarkGfm with no semantic class hooks,
+   so we style raw <table>/<thead>/<tbody>/<tr>/<th>/<td> inside .body.
+   Editorial register: serif body text, thin orange-tinted top rule,
+   alternating subtle row tint for scannability without becoming a
+   spreadsheet. */
+.body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: var(--space-l) 0;
+  font-family: var(--font-serif);
+  font-size: var(--type-body-s);
+  line-height: 1.5;
+  overflow-x: auto;
+  display: table;
+}
+.body thead {
+  border-top: 1.5px solid var(--accent);
+  border-bottom: 1px solid var(--border);
+}
+.body th {
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-s);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: var(--space-s) var(--space-m) var(--space-s) 0;
+  font-weight: 600;
+}
+.body td {
+  padding: var(--space-s) var(--space-m) var(--space-s) 0;
+  color: var(--text-body);
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.body tbody tr:nth-child(even) td {
+  background: rgba(242, 107, 31, 0.025);
+}
+
+/* ----- Images ----------------------------------------------------
+   Markdown images render as block-level, full-width-to-measure,
+   centered, with a soft caption below if an alt is supplied. */
+.body img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: var(--space-l) auto;
+  border-radius: 3px;
+}
+
+/* Placeholder for unresolved Obsidian image embeds — see
+   lib/markdown.ts. Keeps the page intact while flagging that the
+   image asset isn't hosted yet. `:global` so CSS Modules doesn't
+   hash a class name that's emitted unhashed by the markdown
+   renderer. */
+.body :global(.embed-missing) {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-s);
+  color: var(--text-muted);
+  padding: var(--space-m);
+  border: 1px dashed var(--border);
+  border-radius: 3px;
+  text-align: center;
+  margin: var(--space-l) 0;
+}
+
+/* Headings inside body — first heading shouldn't have a giant gap */
+.body > h2:first-child,
+.body > h3:first-child { margin-top: 0; }
+
+/* Blockquotes — restrained, orange left rule */
+.body blockquote {
+  border-left: 2px solid var(--accent);
+  padding: var(--space-xs) var(--space-l);
+  margin: var(--space-l) 0;
+  font-style: italic;
+  color: var(--text-body);
+}
+.body blockquote p:last-child { margin-bottom: 0; }
+
+/* Lists — tighter spacing than paragraphs */
+.body ul, .body ol {
+  margin: var(--space-m) 0;
+  padding-left: var(--space-l);
+}
+.body li { margin-bottom: var(--space-xs); }
+.body li > p { margin-bottom: var(--space-xs); }

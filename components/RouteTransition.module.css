@@ -1,0 +1,47 @@
+/* Route transitions — two variants.
+   - .fade     : default surface (Notebook, Library, Projects, …)
+   - .fadeLife : Life Plan surface, slower + breathier release.
+
+   Both animations include a subtle translate so the eye reads the
+   change as "the page arrived" rather than "opacity flickered".
+   Reduced-motion users skip the animation entirely. */
+
+.fade {
+  /* 180ms — fast enough that the user perceives the new page as
+     "already there" rather than "arriving". Combined with native View
+     Transition's 220ms crossfade on supporting browsers, the
+     navigation reads as a soft settle. Opacity-only — no translate or
+     blur — keeps it GPU-cheap and lets the browser composite without
+     paint work. */
+  animation: fade-in 180ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.fadeLife {
+  /* 320ms — Life Plan keeps a slower register but no longer drags.
+     The earlier 800ms+blur read as "loading" rather than "calm". */
+  animation: fade-in-life 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes fade-in {
+  /* Opacity-only crossfade. The translate that lived here before
+     forced a full-tree composite every frame and was the largest
+     source of "jitter" on real hardware. */
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes fade-in-life {
+  /* Two-stop opacity ramp, no transform, no blur. The Life Plan's
+     "breath" register survives via the slower 500ms duration and
+     softer curve, but the earlier blur+translate burned too much
+     paint on mobile devices. */
+  0%   { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade,
+  .fadeLife {
+    animation: none;
+  }
+}

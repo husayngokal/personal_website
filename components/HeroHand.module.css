@@ -1,0 +1,41 @@
+/*
+ * The manicule sits in its own hero column. Floats vertically on a slow
+ * loop; the float is decorative motion, so it's orange-adjacent (lives
+ * inside the family of subtle decorative motion permitted by Part III).
+ */
+
+.handWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  pointer-events: none;
+}
+
+.hand {
+  /* Noto Sans Symbols 2 renders ☜ as a typographic glyph; system fallback
+     would otherwise hand the codepoint off to the OS emoji font, which
+     breaks the editorial register. The cascade is explicit on purpose. */
+  font-family: var(--font-symbols), 'Apple Symbols', serif;
+  font-feature-settings: normal;
+  font-variant-emoji: text;            /* force text presentation */
+  font-size: 88px;
+  line-height: 1;
+  color: var(--text-strong);
+  display: inline-block;
+  animation: heroFloat var(--decorative-ms) ease-in-out infinite;
+}
+
+@keyframes heroFloat {
+  0%, 100% { transform: translateY(-8px); }
+  50%      { transform: translateY(8px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hand { animation: none; transform: none; }
+}
+
+/* Hide on narrow viewports — no clean middle slot when the hero stacks */
+@media (max-width: 880px) {
+  .handWrap { display: none; }
+}

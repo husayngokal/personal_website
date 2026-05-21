@@ -1,0 +1,27 @@
+/* Food surface head — matches the editorial register of the other
+   index pages (eyebrow, display title, italic dek). */
+
+.head { margin-bottom: var(--space-2xl); }
+
+.title {
+  font-size: var(--type-display-l);
+  line-height: var(--type-display-l-lh);
+  margin: var(--space-s) 0 var(--space-m);
+}
+
+.dek {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--type-body-l);
+  color: var(--text-body);
+  max-width: 60ch;
+  margin: 0;
+}
+
+.count {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  margin: var(--space-m) 0 0;
+}

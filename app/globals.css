@@ -1,0 +1,391 @@
+/*
+ * husayngokal.com — design system foundations
+ *
+ * Tokens transcribed from BRIEF.md Appendices A, B, C. These are the
+ * single source of truth; surface stylesheets reference these variables
+ * and do not introduce new color / type / spacing values.
+ *
+ * The site is set on paper. Beige page, cream raised surfaces, ink-on-cream
+ * type. No dark mode — see Part III, "the no-dark-mode posture".
+ */
+
+:root {
+  /* ---- Appendix A — Color tokens ----------------------------------- */
+
+  /* Backgrounds */
+  --bg-page:        #EFE7D7;   /* page beige (every surface) */
+  --bg-raised:      #F8F2E3;   /* cream raised (cards, callouts) */
+  --bg-life:        #F5EFE0;   /* warmer cream (Life Plan only) */
+  --bg-code:        #F0E8D6;   /* code blocks */
+
+  /* Structure */
+  --border:         #DDD2BD;   /* divider beige (rules, tracks) */
+
+  /* Text */
+  --text-body:      #6B6B6B;   /* body and links */
+  --text-strong:    #111111;   /* headings, display, emphasis */
+  --text-muted:     #888888;   /* metadata, captions */
+
+  /* Accent — the only color that moves */
+  --accent:         #F26B1F;   /* orange (used sparingly) */
+
+  /* Functional surfaces */
+  --link-color:        var(--text-body);
+  --link-decoration:   underline;
+
+  /* ---- Appendix B — Typography scale (1.250 modular ratio) --------- */
+
+  /* Display */
+  --type-display-xl:    64px;
+  --type-display-xl-lh: 1.05;
+  --type-display-l:     48px;
+  --type-display-l-lh:  1.08;
+  --type-display-m:     36px;
+  --type-display-m-lh:  1.15;
+  --type-display-s:     28px;
+  --type-display-s-lh:  1.2;
+
+  /* Body */
+  --type-body-l:        19px;
+  --type-body-l-lh:     1.7;
+  --type-body-m:        17px;
+  --type-body-m-lh:     1.65;
+  --type-body-s:        15px;
+  --type-body-s-lh:     1.55;
+
+  /* UI */
+  --type-ui:            14px;
+  --type-ui-lh:         1.4;
+  --type-ui-s:          12px;
+  --type-ui-s-lh:       1.4;
+
+  /* Mono */
+  --type-mono-m:        12px;
+  --type-mono-s:        10px;
+  --type-code:          14px;
+  --type-code-lh:       1.5;
+
+  /* Families — free stack (Part II). Switch to paid stack when budget
+     allows; see "the paid-upgrade trigger" in BRIEF.md. */
+  --font-serif: var(--font-source-serif), Georgia, 'Times New Roman', serif;
+  --font-sans:  var(--font-plex-sans), system-ui, -apple-system, sans-serif;
+  --font-mono:  var(--font-plex-mono), ui-monospace, 'SF Mono', monospace;
+
+  /* ---- Appendix C — Spacing tokens (4px base) ---------------------- */
+
+  --space-xs:   4px;
+  --space-s:    8px;
+  --space-m:    16px;
+  --space-l:    24px;
+  --space-xl:   32px;
+  --space-2xl:  48px;
+  --space-3xl:  64px;
+  --space-4xl:  96px;
+  --space-5xl:  128px;
+
+  /* Measure (characters per line) */
+  --measure-tight:    60ch;
+  --measure-default:  68ch;
+  --measure-wide:     78ch;
+
+  /* Page widths */
+  --page-content:     780px;
+  --page-wide:        1100px;
+  --page-life:        720px;
+
+  /* ---- Motion (Part III) ------------------------------------------- */
+  --ease:           cubic-bezier(0.4, 0, 0.2, 1);
+  --hover-ms:       200ms;
+  --pulse-ms:       1600ms;
+  --decorative-ms:  3400ms;   /* hand wave, scroll drop */
+  --page-fade-ms:   300ms;
+}
+
+/* -------------------------------------------------------------------- */
+/* Base reset — minimal, deliberate. The site does not use a reset      */
+/* library; the editorial register requires the cascade behave honestly.*/
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  /* Anchor jumps clear the sticky / fixed top-nav band so the target
+     heading isn't lodged under it. Matches the nav band height plus
+     a small breathing margin. */
+  scroll-padding-top: 72px;
+  -webkit-text-size-adjust: 100%;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg-page);
+  color: var(--text-body);
+  font-family: var(--font-serif);
+  font-size: var(--type-body-m);
+  line-height: var(--type-body-m-lh);
+  font-weight: 400;
+  font-feature-settings: 'kern', 'liga', 'onum';
+}
+
+/* The Life Plan ships its own warmer page color. Other surfaces inherit
+   page beige; see Part XI on the surface's intentional shift. */
+body[data-surface='life'] {
+  background-color: var(--bg-life);
+}
+
+/* Headings — display register, strong color, no italic at display per the
+   "display sizes never get italic" rule in Part III. */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-serif);
+  color: var(--text-strong);
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: -0.005em;
+}
+
+h1 { font-size: var(--type-display-m); line-height: var(--type-display-m-lh); }
+h2 { font-size: var(--type-display-s); line-height: var(--type-display-s-lh); }
+h3 { font-size: 22px;                 line-height: 1.3; }
+h4 { font-size: 18px;                 line-height: 1.35; }
+
+p {
+  margin: 0 0 var(--space-l) 0;   /* 24px between paragraphs per Part III */
+}
+p:last-child { margin-bottom: 0; }
+
+/* Links — gray, underlined. The underline is the affordance; the gray
+   is the body register. Breaks the colored-link convention deliberately
+   to honor editorial print register. (Part III) */
+a {
+  color: var(--link-color);
+  text-decoration: var(--link-decoration);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+  transition: color var(--hover-ms) var(--ease);
+}
+a:hover { color: var(--text-strong); }
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* -------------------------------------------------------------------- */
+/* Custom cursor — interactive elements get the brand's orange dot      */
+/* instead of the OS pointer. Same orange as the period in              */
+/* "husayn gokal." and as the moving things in the editorial palette.   */
+/*                                                                       */
+/* The hotspot (10 10) is the center of the 20x20 SVG so the click      */
+/* lands exactly under the dot. The `pointer` fallback ensures the      */
+/* affordance still reads on browsers that refuse the custom image      */
+/* (and on touch, where there's no cursor at all).                       */
+/*                                                                       */
+/* Honors the brief: "orange is the only colour that moves." The        */
+/* cursor moves with the user — it should be orange.                    */
+
+a,
+button,
+[role='button'],
+summary,
+label[for],
+input[type='submit'],
+input[type='button'],
+input[type='checkbox'],
+input[type='radio'] {
+  cursor: url('/cursor-dot.svg') 10 10, pointer;
+}
+
+strong, b { color: var(--text-strong); font-weight: 600; }
+em, i { font-style: italic; }
+
+/* Lists — proper semantic indentation, not bulleted bullet-points */
+ul, ol {
+  margin: 0 0 var(--space-l) 0;
+  padding-left: var(--space-l);
+}
+li { margin-bottom: var(--space-s); }
+
+/* Horizontal rule — divider beige, thin */
+hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: var(--space-2xl) 0;
+}
+
+/* Inline code */
+code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  background: var(--bg-code);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+}
+
+/* Code blocks — Plex Mono, code-cream bg, no syntax highlighting */
+pre {
+  font-family: var(--font-mono);
+  font-size: var(--type-body-s);
+  line-height: var(--type-code-lh);
+  background: var(--bg-code);
+  padding: var(--space-m);
+  border-radius: 4px;
+  overflow-x: auto;
+  margin: var(--space-l) 0;
+}
+pre code {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  font-size: inherit;
+}
+
+/* Selection — subtle warm tint, not the saturated orange */
+::selection {
+  background: rgba(242, 107, 31, 0.15);
+  color: var(--text-strong);
+}
+
+/* Focus outline default — orange so it integrates with brand language
+   rather than reads as an accessibility bolt-on (Part III). */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* Images sit directly on the page. No frames, no shadows. */
+img, svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Global safety net against horizontal overflow from long unbreakable
+   tokens (underscored filenames, URLs, ISBNs, code-style identifiers).
+   Browsers don't break on `_` or long `-` runs by default, which
+   means an auto-imported title like `Roger_James_Hamilton_-_The_...`
+   will force its grid column wider than the viewport on mobile and
+   produce horizontal scroll across the whole page. Per-component
+   CSS modules should add this explicitly where they care; this rule
+   is the backstop for anywhere that forgot. */
+html {
+  overflow-wrap: break-word;
+}
+
+/* Buttons — only used where a button is genuinely needed.
+   The editorial register prefers linked text. */
+button {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* Form controls — plain by default, surfaces style as needed */
+input, textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--text-strong);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: var(--space-s) var(--space-m);
+  width: 100%;
+}
+input:focus, textarea:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+
+/* -------------------------------------------------------------------- */
+/* Reduced motion — honored absolutely per Part III.                    */
+/* Typewriter disabled, all pulses become static, hand stops waving,    */
+/* scroll-drop dot disappears. The site still works fully.              */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* -------------------------------------------------------------------- */
+/* Page arrival animation is handled entirely by RouteTransition (a     */
+/* CSS opacity fade keyed on pathname). The browser-native View         */
+/* Transitions API hook was removed: it intercepted every link click,   */
+/* froze the outgoing page as a snapshot while the next route's data    */
+/* loaded, and produced a "url changed but the page is stuck" feel on   */
+/* slower / uncached routes. Native Next.js navigation (prefetch-aware) */
+/* plus the lightweight fade is faster and never blocks the click.      */
+
+/* -------------------------------------------------------------------- */
+/* Loading splash — gate-marked. While the inline head script has set   */
+/* html[data-splash='showing'], hide everything underneath the splash   */
+/* so the not-yet-hydrated body content doesn't peek through during the */
+/* React mount. The LoadingSplash component itself uses position:fixed  */
+/* and z-index:9999, so it sits in front anyway; this is belt-and-braces*/
+/* against a one-frame flash on slow devices.                           */
+
+html[data-splash='showing'] body > *:not(script):not([data-splash-self]) {
+  visibility: hidden;
+}
+html[data-splash='showing'] body {
+  /* The splash mounts above, so the visible page is whatever the      */
+  /* splash overlay is. Keep scroll locked to the top while it runs.   */
+  overflow: hidden;
+}
+
+/* -------------------------------------------------------------------- */
+/* Skip link — hidden until keyboard-focused                            */
+
+.skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  background: var(--bg-raised);
+  color: var(--text-strong);
+  border: 2px solid var(--accent);
+  padding: var(--space-s) var(--space-m);
+  font-family: var(--font-sans);
+  font-size: var(--type-ui);
+  text-decoration: none;
+  z-index: 100;
+}
+.skip-link:focus,
+.skip-link:focus-visible {
+  left: var(--space-m);
+  top: var(--space-m);
+}
+
+/* -------------------------------------------------------------------- */
+/* Layout helpers (small, semantic — no Tailwind utility classes)       */
+
+.page {
+  max-width: var(--page-content);
+  margin: 0 auto;
+  padding: 0 var(--space-l);
+}
+.page--wide { max-width: var(--page-wide); }
+.page--life { max-width: var(--page-life); }
+
+@media (max-width: 720px) {
+  .page,
+  .page--wide,
+  .page--life {
+    padding: 0 var(--space-m);
+  }
+}

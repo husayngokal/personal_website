@@ -1,0 +1,7 @@
+Drop your background-removed portrait at /public/hero.png
+(PNG with alpha channel. Recommended size: 440×564, 2× the 220×282 display box.)
+
+Until then, the homepage shows a dashed placeholder. The placeholder
+disappears the moment a real hero.png file exists at this path.
+
+See BRIEF.md Part V for the cut-out / rembg pipeline reference.

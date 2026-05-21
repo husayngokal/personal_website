@@ -1,0 +1,30 @@
+/*
+ * Portrait container — 220×282 desktop. The inner relative wrapper hosts
+ * the cartoon hand absolutely positioned at 56% portrait height (Part V).
+ *
+ * On mobile the portrait scales to a smaller box; the hand reposition
+ * recomputes at the breakpoint rather than scaling.
+ */
+
+.portraitWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.portraitInner {
+  position: relative;
+  width: 220px;
+  height: 282px;
+}
+
+.portrait {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+@media (max-width: 720px) {
+  .portraitInner { width: 180px; height: 230px; }
+}

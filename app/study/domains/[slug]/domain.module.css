@@ -1,0 +1,28 @@
+.kicker {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  margin: 0 0 var(--space-l) 0;
+}
+.kicker a { color: var(--text-muted); text-decoration: none; }
+.kicker a:hover { color: var(--text-strong); }
+
+.title {
+  font-size: var(--type-display-m);
+  margin: 0 0 var(--space-m);
+  color: var(--text-strong);
+}
+.meta { margin: 0 0 var(--space-l) 0; }
+.rule {
+  border: 0;
+  border-top: 1px solid var(--accent);
+  width: 60px;
+  margin: 0 0 var(--space-2xl);
+}
+.body {
+  font-family: var(--font-serif);
+  font-size: var(--type-body-m);
+  line-height: var(--type-body-m-lh);
+  color: var(--text-body);
+  max-width: var(--measure-default);
+  margin: 0;
+}

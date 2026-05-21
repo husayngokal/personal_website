@@ -1,0 +1,56 @@
+name: Spotify poll (backup)
+
+# Primary poller is a Cloudflare Worker on a 1-minute cron — see
+# cloudflare-workers/spotify-poll/. GitHub Actions is kept here as a
+# belt-and-braces fallback, but at the every-5-minutes cadence GHA
+# free tier actually fires roughly once an hour, sometimes once every
+# two hours — exactly the staleness problem that pushed us to CFW.
+# The redundancy still helps: if the Worker is paused or rate-limited,
+# the next GHA tick will at least refresh the row eventually.
+#
+# Auth: the endpoint now requires Authorization: Bearer
+# ${SPOTIFY_POLL_TOKEN}; both this workflow and the Worker pass the
+# same token. Without the secret configured, the workflow exits 0
+# instead of failing red.
+
+on:
+  schedule:
+    - cron: '*/15 * * * *'      # GHA drops sub-15-min schedules anyway
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Hit /api/spotify/poll
+        env:
+          SPOTIFY_POLL_TOKEN: ${{ secrets.SPOTIFY_POLL_TOKEN }}
+        run: |
+          if [[ -z "$SPOTIFY_POLL_TOKEN" ]]; then
+            echo "SPOTIFY_POLL_TOKEN repo secret is not set — skipping."
+            exit 0
+          fi
+          response=$(curl -sS -o /tmp/body -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer $SPOTIFY_POLL_TOKEN" \
+            https://husayngokal.com/api/spotify/poll || echo "000")
+          echo "status: $response"
+          cat /tmp/body
+          echo
+
+          # Transient upstream issues (Spotify auth blips, Vercel cold-start
+          # timeouts) surface here as 502/504. They are not actionable — the
+          # next 15-minute tick succeeds. Don't email about them.
+          # Hard fail only on genuine problems we'd want to know about:
+          #   - 401/403: token has rotted or is misconfigured
+          #   - 500/501/505: my endpoint is genuinely broken
+          # Everything else (including 502/503/504 and 2xx) exits 0.
+          case "$response" in
+            401|403)         echo "Auth failure — token may be expired."; exit 1 ;;
+            500|501|505)     echo "Endpoint error — investigate /api/spotify/poll."; exit 1 ;;
+            *)               echo "OK or transient upstream issue, not alerting."; exit 0 ;;
+          esac

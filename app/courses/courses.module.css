@@ -1,0 +1,141 @@
+.head { margin-bottom: var(--space-2xl); }
+.title {
+  font-size: var(--type-display-l);
+  line-height: var(--type-display-l-lh);
+  margin: var(--space-s) 0 var(--space-m);
+}
+.dek {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--type-body-l);
+  color: var(--text-body);
+  max-width: 64ch;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: var(--space-2xl);
+}
+@media (max-width: 860px) {
+  .layout { grid-template-columns: 1fr; gap: var(--space-l); }
+}
+
+.sidebar { position: sticky; top: var(--space-l); align-self: start; }
+
+/* Drop sticky on mobile — see credentials.module.css. The override
+   must follow the base rule to win at equal specificity. */
+@media (max-width: 860px) {
+  .sidebar { position: static; top: auto; }
+}
+.sidebarLabel {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-s);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-s);
+}
+.filterList { list-style: none; padding: 0; margin: 0; }
+.filterItem {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-serif);
+  font-size: var(--type-body-s);
+  color: var(--text-body);
+  padding: var(--space-xs) 0;
+  border-bottom: 1px solid var(--border);
+}
+.filterCount {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  color: var(--text-muted);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-l);
+}
+@media (max-width: 1000px) { .grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 500px)  { .grid { grid-template-columns: 1fr; } }
+
+.card {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-raised);
+  border-radius: 4px;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  transition: background var(--hover-ms) var(--ease);
+}
+.card:hover { background: #FBF6E8; }
+
+.banner {
+  aspect-ratio: 16 / 9;
+  background: var(--bg-code);
+  position: relative;
+  overflow: hidden;
+}
+.banner img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.bannerPlaceholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 22px;
+  color: var(--text-muted);
+  text-align: center;
+  padding: var(--space-m);
+}
+
+.cardBody {
+  padding: var(--space-l);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s);
+}
+
+.cardMeta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-s);
+  flex-wrap: wrap;
+  margin: 0;
+}
+.code {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  color: var(--text-muted);
+}
+
+.cardTitle {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: var(--type-body-m);
+  color: var(--text-strong);
+  margin: 0;
+  line-height: 1.3;
+  min-height: 2.6em;
+}
+
+.cardMetaBottom {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-m);
+  margin: 0;
+}
+.hoursChip {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  color: var(--accent);
+}

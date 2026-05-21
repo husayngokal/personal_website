@@ -1,0 +1,184 @@
+/*
+ * Loading splash — first-paint overlay shown once per session on the
+ * homepage. Three-stage timeline:
+ *
+ *   1. wordmark fades + scales in              (0    → 600 ms)
+ *   2. orange rule below + "loading" caps fade (600  → 1400 ms)
+ *   3. hold                                    (1400 → 2000 ms)
+ *   4. overlay fades out                       (2000 → 2500 ms)
+ *
+ * Gated by sessionStorage('hg-loaded'). Inline script in <head> (see
+ * LoadingSplashGate) sets html[data-splash] so the overlay paints
+ * before React hydrates, killing any first-paint flash.
+ *
+ * Reduced-motion users skip the entire splash; the inline gate never
+ * marks the document, the component renders nothing.
+ *
+ * Orange is the only color that moves. The line uses --accent; the
+ * dot of "husayn gokal." sits in --accent already.
+ */
+
+/* The overlay markup is always in the DOM (so server and client render
+   identically — no hydration mismatch). It's invisible by default and
+   only shown while the gate has set html[data-splash='showing']. That
+   attribute is set during body parse, so on a first '/' load the splash
+   paints on the very first frame, before hydration. */
+.overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: var(--bg-page);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity 500ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+:global(html[data-splash='showing']) .overlay {
+  display: flex;
+}
+
+.overlay[data-stage='exit'] {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Wordmark — same type as the brand mark in TopNav but display-scale.
+   Server-rendered so it's painted on first frame, before the React
+   hydration completes. */
+.wordmark {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  font-size: clamp(32px, 6vw, 56px);
+  line-height: 1;
+  color: var(--text-strong);
+  text-transform: lowercase;
+  display: inline-flex;
+  align-items: baseline;
+  opacity: 0;
+  transform: scale(0.96);
+  animation: splash-wordmark-in 600ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+.dot {
+  color: var(--accent);
+}
+
+/* Rule — thin horizontal line with an orange-gradient sweep. Scales
+   from the center out so the motion reads as a "fill" rather than
+   a "draw". */
+.rule {
+  width: clamp(96px, 18vw, 168px);
+  height: 1px;
+  margin-top: var(--space-l);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--accent) 50%,
+    transparent 100%
+  );
+  transform: scaleX(0);
+  transform-origin: center;
+  opacity: 0;
+}
+.overlay[data-stage='line'] .rule,
+.overlay[data-stage='hold'] .rule,
+.overlay[data-stage='exit'] .rule {
+  animation: splash-rule-in 600ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* Caption — tracked-out mono caps, the same register as the Eyebrow
+   primitive elsewhere on the site. */
+.caption {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-s);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-top: var(--space-m);
+  opacity: 0;
+  transform: translateY(6px);
+}
+.overlay[data-stage='line'] .caption,
+.overlay[data-stage='hold'] .caption,
+.overlay[data-stage='exit'] .caption {
+  animation: splash-caption-in 400ms 200ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+/* Tiny orange dot just left of the caption; the one element that's
+   actually orange-moving inside the splash (per the "orange is the
+   only color that moves" rule). Pulses while loading. */
+.captionRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s);
+}
+
+.pulse {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: 0;
+  animation: splash-pulse-in 400ms 200ms cubic-bezier(0.22, 0.61, 0.36, 1) both,
+             splash-pulse 1600ms 600ms ease-in-out infinite;
+}
+.overlay:not([data-stage='line']):not([data-stage='hold']):not([data-stage='exit']) .pulse {
+  animation: none;
+  opacity: 0;
+}
+
+@keyframes splash-wordmark-in {
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes splash-rule-in {
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+@keyframes splash-caption-in {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes splash-pulse-in {
+  to { opacity: 1; }
+}
+
+@keyframes splash-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.35; }
+}
+
+/* Reduced-motion users get nothing — the inline gate never marks the
+   document so this component renders null, but belt-and-braces in
+   case the gate is bypassed. */
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .wordmark,
+  .rule,
+  .caption,
+  .pulse {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* The "hide everything else while splash is up" rule lives in
+   globals.css since CSS Modules requires every selector to scope at
+   least one local class or id. The relevant snippet:
+     html[data-splash='showing'] body > *:not(script):not([data-splash-self])
+       { visibility: hidden; }
+*/

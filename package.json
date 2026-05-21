@@ -1,0 +1,46 @@
+{
+  "name": "husayngokal",
+  "version": "0.1.0",
+  "private": true,
+  "description": "husayngokal.com, a personal encyclopedia at editorial design grade.",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "seed": "tsx --env-file=.env scripts/seed.ts",
+    "spotify:poll": "tsx --env-file=.env scripts/spotify-poll.ts",
+    "vault:export": "tsx --env-file=.env scripts/export-vault.ts",
+    "vault:sync": "tsx --env-file=.env scripts/vault-sync.ts",
+    "derive": "tsx --env-file=.env scripts/derive-now.ts",
+    "remarkable:import": "tsx scripts/remarkable-import.ts",
+    "library:enrich": "tsx scripts/library-enrich.ts",
+    "library:dedup": "tsx scripts/library-dedup.ts",
+    "linkedin:import": "tsx scripts/linkedin-import.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.105.4",
+    "gray-matter": "^4.0.3",
+    "next": "^15.0.3",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "remark": "^15.0.1",
+    "remark-gfm": "^4.0.0",
+    "remark-html": "^16.0.1",
+    "resend": "^6.12.3",
+    "server-only": "^0.0.1",
+    "ws": "^8.20.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.22.0",
+    "typescript": "^5.5.4"
+  }
+}

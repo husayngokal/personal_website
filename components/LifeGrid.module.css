@@ -1,0 +1,66 @@
+/* Life grid — 90 rows × 52 cells. Each cell ~10px on desktop,
+   scales down on narrower screens so the grid stays one whole
+   visual unit (not wrapped). */
+
+.gridWrap {
+  margin: var(--space-2xl) auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: 720px;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: repeat(52, 1fr);
+  gap: 3px;
+  align-items: center;
+  position: relative;
+}
+
+.cell {
+  aspect-ratio: 1;
+  width: 100%;
+  border: 1px solid var(--border);
+  background: transparent;
+  border-radius: 1px;
+}
+
+/* Lived weeks — filled in ink, no border (cleaner contrast). */
+.cellLived {
+  background: var(--text-strong);
+  border-color: var(--text-strong);
+}
+
+/* Current week — orange pulse. The only moving cell in the grid. */
+.cellCurrent {
+  background: var(--accent);
+  border-color: var(--accent);
+  animation: pulse var(--pulse-ms) var(--ease) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%      { opacity: 0.55; transform: scale(0.82); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cellCurrent { animation: none; }
+}
+
+/* Tiny year-decade marker, off to the right of every 10th row. */
+.decadeLabel {
+  position: absolute;
+  right: -28px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-s);
+  color: var(--text-muted);
+}
+
+@media (max-width: 640px) {
+  .gridWrap { max-width: 100%; }
+  .decadeLabel { display: none; }
+  .cell { border-width: 0.5px; }
+}

@@ -1,0 +1,74 @@
+/*
+ * Status pulse — pulsing orange dot (5px), city, separator, local time.
+ * The dot inherits the unified motion vocabulary: orange equals live.
+ * (Part V — "the orange dot as unified affordance")
+ */
+
+.status {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-xs);
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  color: var(--text-muted);
+  text-transform: lowercase;
+  white-space: nowrap;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  background: var(--accent);
+  border-radius: 50%;
+  display: inline-block;
+  align-self: center;
+  margin-right: var(--space-xs);
+  animation: pulse var(--pulse-ms) var(--ease) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1;   transform: scale(1); }
+  50%      { opacity: 0.5; transform: scale(0.86); }
+}
+
+.city      { color: var(--text-body); }
+.sep       { color: var(--border); }
+.time      { color: var(--text-muted); }
+
+/* Week-of-life — the memento mori counter. Same mono register as
+   the time, intentionally quiet; the link to /life/calendar makes
+   the number tap-able without making it shout. */
+.week {
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: color var(--hover-ms) var(--ease);
+}
+.week:hover { color: var(--accent); }
+
+/* Mobile breakpoint: hide the week counter once we already
+   hide the time (saves horizontal room). */
+@media (max-width: 520px) {
+  .week { display: none; }
+}
+
+/* Celestial mark (sun/moon) inherits text-muted; sits with a hairline
+   of breathing room around it so it doesn't crowd the city or time. */
+.celestial {
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  margin: 0 3px;
+  align-self: center;
+  line-height: 0;
+}
+
+/* Mobile: hide the time to save horizontal space (Part V) */
+@media (max-width: 520px) {
+  .sep, .time { display: none; }
+}
+
+/* prefers-reduced-motion already collapses the animation via globals.css.
+   Belt + suspenders: pin opacity solid here too. */
+@media (prefers-reduced-motion: reduce) {
+  .dot { animation: none; opacity: 1; transform: none; }
+}

@@ -1,0 +1,111 @@
+/* SearchButton — two variants: compact for the TopNav (small chip,
+   keyboard hint visible on wide enough screens), wide for the menu
+   drawer (full-width button with the label centered). */
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-s);
+  padding: var(--space-xs) var(--space-m);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-body);
+  font-family: var(--font-mono);
+  font-size: var(--type-ui);
+  cursor: pointer;
+  transition: all var(--hover-ms) var(--ease);
+}
+.trigger:hover {
+  color: var(--text-strong);
+  border-color: var(--text-muted);
+  background: #FBF6E8;
+}
+.trigger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.label {
+  font-family: var(--font-sans);
+  font-size: var(--type-ui);
+  font-weight: 500;
+  line-height: 1;
+}
+
+.hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding-left: var(--space-xs);
+  border-left: 1px solid var(--border);
+  margin-left: var(--space-xs);
+}
+.hint kbd {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-s);
+  color: var(--text-muted);
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--bg-page);
+  border: 1px solid var(--border);
+  min-width: 16px;
+  text-align: center;
+}
+
+/* Hide the keyboard hint on narrow viewports — no keyboard there.
+   Phone users see just the mark + "Search" label. Scoped to the
+   compact trigger so the wide variant inside the menu drawer keeps
+   its label + hint at every viewport. */
+@media (max-width: 720px) {
+  .trigger .hint { display: none; }
+  .trigger .label { font-size: var(--type-ui-s); }
+  .trigger { padding: var(--space-xs) var(--space-s); }
+}
+
+/* On very narrow viewports the compact trigger collapses to
+   icon-only to keep room for the status pulse + Menu trigger. The
+   wide trigger keeps everything visible because it's inside the
+   menu drawer panel where there's plenty of horizontal room. */
+@media (max-width: 480px) {
+  .trigger .label { display: none; }
+  .trigger { padding: 6px 8px; }
+}
+
+/* ----- Wide variant: full-width button in the menu drawer ----- */
+.triggerWide {
+  display: flex;
+  align-items: center;
+  gap: var(--space-s);
+  width: 100%;
+  padding: var(--space-m) var(--space-l);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-body);
+  font-family: var(--font-sans);
+  font-size: var(--type-body-m);
+  cursor: pointer;
+  transition: all var(--hover-ms) var(--ease);
+  text-align: left;
+}
+.triggerWide:hover {
+  color: var(--text-strong);
+  border-color: var(--accent);
+  background: #FBF6E8;
+}
+.triggerWide:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.triggerWide .label {
+  font-family: var(--font-sans);
+  font-size: var(--type-body-m);
+  font-weight: 500;
+  flex: 1;
+}
+.triggerWide .hint {
+  border-left: 0;
+  padding-left: 0;
+  margin-left: auto;
+}

@@ -1,0 +1,262 @@
+/* -- Hero -------------------------------------------------------- */
+.heroSection {
+  /* Tighter top breathing room — 96px → 48px. The nav already adds
+     visual height; an extra 96px on top of that was the single biggest
+     source of "lots of dead space" feedback. */
+  padding: var(--space-2xl) 0 var(--space-xl);
+}
+
+.heroInner {
+  max-width: var(--page-wide);
+  margin: 0 auto;
+  padding: 0 var(--space-l);
+}
+
+.heroInner + .heroInner { margin-top: var(--space-l); }
+
+.heroInner {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-2xl);
+}
+
+/* Three-column hero on desktop: text · pointing hand · portrait.
+   The hand sits in its own gutter slot and floats vertically rather than
+   being attached to the body — see HeroHand.tsx for the manicule design. */
+@media (min-width: 880px) {
+  .heroSection .heroInner:first-of-type {
+    grid-template-columns: minmax(0, 1fr) 150px 260px;
+    align-items: center;
+    gap: var(--space-2xl);
+  }
+}
+
+.heroText {
+  display: flex;
+  flex-direction: column;
+  max-width: 620px;
+}
+
+.heroHandSlot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* On mobile the slot collapses to zero and the hand hides via its own CSS */
+}
+@media (max-width: 880px) {
+  .heroHandSlot { display: none; }
+}
+
+.heroPortrait {
+  display: flex;
+  justify-content: flex-end;
+}
+@media (max-width: 880px) {
+  .heroPortrait { justify-content: flex-start; }
+}
+
+.heroSubtitle {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--type-body-m);
+  line-height: var(--type-body-m-lh);
+  color: var(--text-muted);
+  margin: var(--space-s) 0 0 0;
+}
+
+.thinRule {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: var(--space-xl) auto 0;
+  max-width: var(--page-wide);
+  width: calc(100% - 2 * var(--space-l));
+}
+
+.scrollIndicator {
+  display: flex;
+  justify-content: center;
+  padding-top: var(--space-m);
+}
+
+/* -- Generic section ------------------------------------------- */
+.section {
+  padding: var(--space-xl) 0;
+}
+.section + .section { padding-top: var(--space-l); }
+
+.sectionInner {
+  max-width: var(--page-wide);
+  margin: 0 auto;
+  padding: 0 var(--space-l);
+}
+
+.sectionHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-m);
+  margin-bottom: var(--space-l);
+}
+
+.sectionLink {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  color: var(--accent);
+  text-decoration: none;
+  letter-spacing: 0.02em;
+}
+.sectionLink:hover { text-decoration: underline; }
+
+/* -- Notebook strip -------------------------------------------- */
+.notebookStrip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-l);
+}
+
+@media (max-width: 1000px) { .notebookStrip { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px)  { .notebookStrip { grid-template-columns: 1fr; } }
+
+.featuredCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s);
+  background: var(--bg-raised);
+  border-radius: 4px;
+  padding: var(--space-l);
+  text-decoration: none;
+  color: inherit;
+  transition: background var(--hover-ms) var(--ease);
+}
+.featuredCard:hover { background: #FBF6E8; }
+
+.cardKind {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-s);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0;
+}
+.cardTitle {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 19px;
+  line-height: 1.3;
+  color: var(--text-strong);
+  margin: 0;
+}
+.cardDek {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--type-body-s);
+  color: var(--text-body);
+  margin: 0;
+  line-height: 1.5;
+}
+.cardMeta {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  color: var(--text-muted);
+  margin: var(--space-s) 0 0 0;
+}
+.cardSep { color: var(--border); margin: 0 4px; }
+.cardThread { color: var(--text-body); }
+
+/* -- Threads --------------------------------------------------- */
+.threadGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-l);
+}
+@media (max-width: 800px) { .threadGrid { grid-template-columns: 1fr; } }
+
+.threadCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s);
+  padding: var(--space-l);
+  background: var(--bg-raised);
+  border-radius: 4px;
+  text-decoration: none;
+  color: inherit;
+}
+.threadCard:hover { background: #FBF6E8; }
+
+.threadName {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 20px;
+  color: var(--text-strong);
+  margin: 0;
+}
+.threadSummary {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--type-body-m);
+  color: var(--text-body);
+  margin: 0;
+  line-height: 1.5;
+}
+.threadMeta {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  color: var(--accent);
+  margin: var(--space-xs) 0 0 0;
+}
+
+/* -- Across-the-site ----------------------------------------- */
+.acrossGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--space-l);
+}
+@media (max-width: 1000px) { .acrossGrid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 540px)  { .acrossGrid { grid-template-columns: 1fr; } }
+
+.acrossItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-m) 0;
+  text-decoration: none;
+  color: inherit;
+  border-top: 1px solid var(--border);
+}
+.acrossLabel {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-s);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.acrossTitle {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: var(--type-body-m);
+  color: var(--text-strong);
+  line-height: 1.35;
+}
+.acrossSub {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--type-body-s);
+  color: var(--text-body);
+  line-height: 1.4;
+}
+
+/* -- Footnote ----------------------------------------------- */
+.footnote {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--type-body-m);
+  color: var(--text-body);
+  text-align: center;
+  padding: var(--space-l) 0 var(--space-2xl);
+  margin: 0;
+}
+.footnote a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+}

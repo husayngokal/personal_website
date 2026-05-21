@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20">
+  <!-- Orange dot — the brand's signature mark, used as the cursor
+       on interactive elements. Same colour as the period in
+       "husayn gokal." and as the moving things in the editorial
+       palette. -->
+  <circle cx="10" cy="10" r="5" fill="#F26B1F" />
+  <!-- Soft outer ring at lower opacity for a hairline of weight -->
+  <circle cx="10" cy="10" r="7" fill="none" stroke="#F26B1F" stroke-opacity="0.35" stroke-width="1.4" />
+</svg>
