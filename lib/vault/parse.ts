@@ -208,6 +208,7 @@ export function parseFile(relPath: string, content: string): ParsedFile | null {
       earned:   strOrNull(fm.earned),
       pending:  fm.pending === true,
       expires:  strOrNull(fm.expires),
+      exam_date: strOrNull(fm['exam-date']),
       depth:    pick(fm, 'depth',
         ['dabbled','learning','working-in','teaching-from','decayed'], relPath),
       last_assessed: requireStr(fm, 'last-assessed', relPath),

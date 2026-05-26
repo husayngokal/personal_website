@@ -26,9 +26,13 @@
  *                        - fallback: updated in the last 30 days
  *                        - fallback: most recently published notebook_post
  *
- *   currently_studying — pending ICS credential, two registers: before
- *                        the exam date "studying", after it but still
- *                        pending "awaiting results"
+ *   currently_studying — the next pending study_credential with an
+ *                        exam_date. Two registers: "studying" while the
+ *                        exam is ahead, "awaiting results" once it's
+ *                        sat but the credential is still marked pending.
+ *                        Multiple pending rows resolve to the soonest
+ *                        upcoming exam; if none are upcoming, the most
+ *                        recent past pending exam drives awaiting-results.
  *                        - fallback: courses.status=studying, most recent
  *
  *   currently_exploring — separate slot, sourced from ideas. The newest
@@ -50,10 +54,6 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 const SEVEN_DAYS_MS  = 7  * 24 * 60 * 60 * 1000;
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
-
-/* Hard-coded until study_credentials carries an exam_date frontmatter. */
-const ICS_EXAM_DATE = '2026-05-20';
-const ICS_CRED_SLUG = 'ics-marine-insurance';
 
 export interface DeriveResult {
   written: Record<string, object | null>;
@@ -204,23 +204,30 @@ export async function deriveAndWriteLiveState(db: SupabaseClient): Promise<Deriv
   /* -- Studying — concrete things with a date or a syllabus -------- */
   let studyingValue: Record<string, unknown> = {};
 
-  /* Primary: the pending ICS credential, until its exam date passes. */
+  /* Pull every pending credential with an exam date, in ascending order
+     so the next upcoming exam comes first. The two registers — "studying"
+     for an exam still ahead, "awaiting results" for one that's sat but
+     not yet earned — both come from the same set: if any pending row's
+     exam is still in the future, that one wins ("currently studying for
+     the next thing"); otherwise the most recent past pending row drives
+     the awaiting-results phrase. */
   const { data: credRows } = await db
     .from('study_credentials')
-    .select('slug, title')
-    .eq('slug', ICS_CRED_SLUG)
+    .select('slug, title, exam_date')
     .eq('pending', true)
-    .limit(1);
+    .not('exam_date', 'is', null)
+    .order('exam_date', { ascending: true });
 
-  const cred = credRows?.[0];
-  const examPassed = Date.now() >= new Date(ICS_EXAM_DATE).getTime();
-  if (cred && !examPassed) {
-    studyingValue = { slug: cred.slug, title: cred.title, examDate: ICS_EXAM_DATE };
-  } else if (cred) {
-    /* Exam sat, results not yet in (credential still pending). Honest
-       interim so the slot stays truthful instead of going silent. The
-       credential leaves this slot once it's marked earned in the vault. */
-    studyingValue = { slug: cred.slug, title: cred.title, examDate: ICS_EXAM_DATE, awaitingResults: true };
+  const today = new Date().toISOString().slice(0, 10);
+  const pending = (credRows ?? []) as { slug: string; title: string; exam_date: string }[];
+  const upcoming = pending.find((c) => c.exam_date >= today);
+  const cred = upcoming ?? [...pending].reverse().find((c) => c.exam_date < today);
+
+  if (cred) {
+    const awaiting = cred.exam_date < today;
+    studyingValue = awaiting
+      ? { slug: cred.slug, title: cred.title, examDate: cred.exam_date, awaitingResults: true }
+      : { slug: cred.slug, title: cred.title, examDate: cred.exam_date };
   } else {
     /* Fallback: a currently-studying course, most recently touched.
        No idea fallback here; ideas have their own slot below. */

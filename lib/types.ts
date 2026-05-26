@@ -115,6 +115,7 @@ export interface StudyCredential {
   earned?: string;
   pending?: boolean;
   expires?: string;
+  examDate?: string;
   depth: DepthIndicator;
   lastAssessed: string;
   tags?: string[];
