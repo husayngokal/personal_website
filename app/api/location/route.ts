@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { timingSafeEqual } from 'node:crypto';
 import { getServerAdminClient } from '@/lib/supabase';
 
@@ -61,6 +62,13 @@ export async function POST(req: NextRequest) {
   if (error) {
     return NextResponse.json({ ok: false, error: 'db-write-failed', reason: error.message }, { status: 500 });
   }
+  /* The root layout server-renders the city via getCurrentLocation(),
+     and there's no Realtime subscriber for current_location (unlike the
+     typewriter keys). Without an explicit revalidate, the cached HTML
+     keeps showing whatever city was current at build / last-revalidate
+     time. 'layout' scope invalidates every page that uses the root
+     layout, which is every page. */
+  revalidatePath('/', 'layout');
   return NextResponse.json({ ok: true, location: { city, country, timezone } });
 }
 
