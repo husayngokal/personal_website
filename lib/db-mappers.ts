@@ -20,7 +20,7 @@ import type {
   MentalModel,
   StudyCredential, StudyDomain, Publication, Conference,
   LifePrinciple, JourneyEntry, LifeGoal, ChangedMyMindEntry, StoryVignette,
-  MasterPlanPart, Task, TaskStatus, TaskScope, TaskRecurrence,
+  MasterPlanPart, LivingEntry, Task, TaskStatus, TaskScope, TaskRecurrence,
   Idea, IdeaStatus,
   Course, CourseStatus,
   Writeup, WriteupKind, WriteupPlatform, WriteupDifficulty, WriteupOS, WriteupStatus,
@@ -310,6 +310,14 @@ export const fromRow = {
     title: r.title as string,
     body: r.body as string,
     summary: (r.summary as string) ?? undefined,
+  }),
+  livingEntry: (r: Row): LivingEntry => ({
+    slug: r.slug as string,
+    title: r.title as string,
+    summary: (r.summary as string) ?? undefined,
+    body: r.body as string,
+    orderIdx: (r.order_idx as number) ?? 99,
+    lastEditedAt: (r.last_edited_at as string) ?? undefined,
   }),
   idea: (r: Row): Idea => ({
     slug: r.slug as string,

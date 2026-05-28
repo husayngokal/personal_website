@@ -255,7 +255,7 @@ export async function syncVault(opts: SyncOptions = {}): Promise<SyncResult> {
       'mental_models', 'courses', 'writeups', 'credentials',
       'study_credentials', 'study_domains',
       'life_principles', 'life_story_vignettes', 'life_changed_mind',
-      'life_goals', 'life_master_plan', 'tasks', 'ideas',
+      'life_goals', 'life_master_plan', 'tasks', 'ideas', 'living_entries',
     ];
     for (const t of SLUG_TABLES_WITH_DELETE) {
       if (byTable.has(t)) continue;          // already handled above

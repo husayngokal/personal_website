@@ -316,6 +316,16 @@ export interface Course {
   body?: string;
 }
 
+/* -- Living (group surfaces: bucket list, field atlas, etc.) ------ */
+export interface LivingEntry {
+  slug: string;
+  title: string;
+  summary?: string;
+  body: string;
+  orderIdx: number;
+  lastEditedAt?: string;
+}
+
 export interface ChangedMyMindEntry {
   slug: string;
   title: string;

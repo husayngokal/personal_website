@@ -1,0 +1,117 @@
+/* Living entry view — shared styles for /bucket-list, /field-atlas
+   and any future page in the Living menu group. Editorial register
+   matches the long-form Master Plan body: serif body, generous
+   measure, paragraph spacing, accent rule under each h2. */
+
+.page {
+  max-width: 72ch;
+  margin: 0 auto;
+  padding: var(--space-2xl) var(--space-l) var(--space-3xl);
+}
+
+.kicker {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-s);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-s);
+}
+
+.title {
+  font-size: var(--type-display-l);
+  line-height: var(--type-display-l-lh);
+  color: var(--text-strong);
+  margin: 0 0 var(--space-m);
+}
+
+.dek {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--type-body-l);
+  line-height: var(--type-body-l-lh);
+  color: var(--text-body);
+  margin: 0 0 var(--space-2xl);
+}
+
+/* Long-form body — markdown rendered through the standard pipeline. */
+.body {
+  font-family: var(--font-serif);
+  font-size: var(--type-body-l);
+  line-height: var(--type-body-l-lh);
+  color: var(--text-body);
+}
+
+.body h1, .body h2, .body h3, .body h4 {
+  color: var(--text-strong);
+  margin-top: var(--space-2xl);
+  margin-bottom: var(--space-m);
+}
+.body h2 {
+  font-size: var(--type-display-s);
+  line-height: var(--type-display-s-lh);
+  padding-top: var(--space-l);
+  border-top: 1px solid var(--border);
+}
+.body h3 { font-size: 22px; }
+.body h4 { font-size: 18px; }
+
+.body p { margin: 0 0 var(--space-l); }
+
+.body ul, .body ol {
+  margin: 0 0 var(--space-l);
+  padding-left: var(--space-l);
+}
+.body li { margin-bottom: var(--space-s); }
+
+.body blockquote {
+  margin: var(--space-l) 0;
+  padding-left: var(--space-l);
+  border-left: 3px solid var(--accent);
+  font-style: italic;
+  color: var(--text-strong);
+}
+
+.body code {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  background: var(--bg-code);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+}
+
+.body strong { color: var(--text-strong); font-weight: 600; }
+.body em     { font-style: italic; }
+
+.body hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: var(--space-2xl) 0;
+}
+
+/* Tables — Field Atlas leans on these. Editorial weight without
+   making the body feel like a spreadsheet. */
+.body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: var(--space-l) 0;
+  font-family: var(--font-sans);
+  font-size: 15px;
+}
+.body th, .body td {
+  text-align: left;
+  padding: var(--space-s) var(--space-m);
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.body th {
+  color: var(--text-strong);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+@media (max-width: 600px) {
+  .page { padding: var(--space-l) var(--space-m) var(--space-2xl); }
+  .body table { font-size: 14px; }
+  .body th, .body td { padding: var(--space-xs) var(--space-s); }
+}

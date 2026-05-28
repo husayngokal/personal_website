@@ -379,6 +379,17 @@ export function parseFile(relPath: string, content: string): ParsedFile | null {
     return wrap('tasks', taskSlug, row);
   }
 
+  /* ---- Living entries (group surfaces: bucket list, field atlas, etc.) ---- */
+  if (relPath.startsWith('living/')) {
+    return wrap('living_entries', slug, {
+      slug,
+      title: requireStr(fm, 'title', relPath),
+      summary: strOrNull(fm.summary),
+      body,
+      order_idx: numOrNull(fm.order) ?? 99,
+    });
+  }
+
   /* ---- Life: master plan parts ---- */
   if (relPath.startsWith('life/master-plan/')) {
     /* Filename: 01-master-architecture.md → partNumber=1, slug=master-architecture */

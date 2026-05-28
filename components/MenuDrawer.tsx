@@ -63,7 +63,9 @@ const GROUPS: Group[] = [
   {
     label: 'Living',
     surfaces: [
-      { href: '/food', label: 'Food' },
+      { href: '/field-atlas', label: 'Field Atlas' },
+      { href: '/bucket-list', label: 'The List' },
+      { href: '/food',        label: 'Food' },
     ],
   },
 ];
