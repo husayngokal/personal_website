@@ -379,6 +379,20 @@ export function parseFile(relPath: string, content: string): ParsedFile | null {
     return wrap('tasks', taskSlug, row);
   }
 
+  /* ---- Research topics (live-bookmarks surface) ---- */
+  if (relPath.startsWith('research/')) {
+    return wrap('research_topics', slug, {
+      slug,
+      title: requireStr(fm, 'title', relPath),
+      summary: strOrNull(fm.summary),
+      status: pick(fm, 'status',
+        ['gathering','exploring','writing','shipped','dormant'], relPath),
+      started: strOrNull(fm.started),
+      tags: arrOrNull(fm.tags),
+      body,
+    });
+  }
+
   /* ---- Living entries (group surfaces: bucket list, field atlas, etc.) ---- */
   if (relPath.startsWith('living/')) {
     return wrap('living_entries', slug, {

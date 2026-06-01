@@ -21,6 +21,7 @@ import { getLifePrinciples, getChangedMyMind } from './life';
 import { getMasterPlanParts } from './master-plan';
 import { getTasks } from './tasks';
 import { getIdeas } from './ideas';
+import { getResearchTopics } from './research';
 import { getLivingEntries } from './living';
 import { FOOD_ITEMS } from './food';
 /* Mental Models + Study remain archived. */
@@ -36,6 +37,7 @@ export type SurfaceKey =
   | 'credentials'
   | 'life'
   | 'ideas'
+  | 'research'
   | 'living'
   | 'food';
 
@@ -50,12 +52,12 @@ export interface SearchItem {
 export const getSearchIndex = cache(async (): Promise<SearchItem[]> => {
   const [
     posts, threads, books, projects, courses, writeups, credentials,
-    principles, changed, masterPlanParts, tasks, ideas, livingEntries,
+    principles, changed, masterPlanParts, tasks, ideas, researchTopics, livingEntries,
   ] = await Promise.all([
     getNotebookPosts(), getNotebookThreads(),
     getBooks(), getProjects(), getCourses(), getWriteups(), getCredentials(),
     getLifePrinciples(), getChangedMyMind(),
-    getMasterPlanParts(), getTasks(), getIdeas(), getLivingEntries(),
+    getMasterPlanParts(), getTasks(), getIdeas(), getResearchTopics(), getLivingEntries(),
   ]);
 
   const items: SearchItem[] = [];
@@ -146,6 +148,16 @@ export const getSearchIndex = cache(async (): Promise<SearchItem[]> => {
     title: i.title,
     subtitle: `idea · ${i.status}`,
     body: i.summary,
+  });
+  /* Research topics — live-bookmarks surface. Title + summary lead
+     the index; a slice of the body covers the actual resources and
+     working notes for full-text matches. */
+  for (const r of researchTopics) items.push({
+    surface: 'research',
+    href: `/research/${r.slug}`,
+    title: r.title,
+    subtitle: `research · ${r.status}`,
+    body: r.summary ? `${r.summary}\n\n${r.body.slice(0, 600)}` : r.body.slice(0, 600),
   });
   /* Living entries — single-doc surfaces. Each is a top-level route,
      and the body is long enough that a slice of it is useful for the

@@ -7,6 +7,7 @@ import { getWriteups } from '@/lib/content/writeups';
 import { getCredentials } from '@/lib/content/credentials';
 import { getMasterPlanParts } from '@/lib/content/master-plan';
 import { getIdeas } from '@/lib/content/ideas';
+import { getResearchTopics } from '@/lib/content/research';
 /* Mental Models + Study remain archived — re-introduce alongside
    the index loop entries + the menu drawer + the search index:
    import { getMentalModels } from '@/lib/content/mental-models';
@@ -43,6 +44,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE}/writeups`,       lastModified: now, changeFrequency: 'weekly',  priority: 0.8 },
     { url: `${BASE}/credentials`,    lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
     { url: `${BASE}/ideas`,          lastModified: now, changeFrequency: 'weekly',  priority: 0.7 },
+    { url: `${BASE}/research`,       lastModified: now, changeFrequency: 'weekly',  priority: 0.8 },
     { url: `${BASE}/field-atlas`,    lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
     { url: `${BASE}/bucket-list`,    lastModified: now, changeFrequency: 'monthly', priority: 0.7 },
     { url: `${BASE}/food`,           lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
@@ -54,11 +56,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const [
     posts, threads, books, projects, courses, writeups, credentials,
-    masterPlanParts, ideas,
+    masterPlanParts, ideas, researchTopics,
   ] = await Promise.all([
     getNotebookPosts(), getNotebookThreads(),
     getBooks(), getProjects(), getCourses(), getWriteups(), getCredentials(),
-    getMasterPlanParts(), getIdeas(),
+    getMasterPlanParts(), getIdeas(), getResearchTopics(),
   ]);
 
   const detailRoutes: MetadataRoute.Sitemap = [];
@@ -71,6 +73,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   for (const c of credentials)  detailRoutes.push({ url: `${BASE}/credentials/${c.slug}`,         lastModified: now });
   for (const m of masterPlanParts) detailRoutes.push({ url: `${BASE}/life/plan/${m.slug}`,        lastModified: now });
   for (const i of ideas)        detailRoutes.push({ url: `${BASE}/ideas/${i.slug}`,             lastModified: i.proposed ? new Date(i.proposed) : now });
+  for (const r of researchTopics) detailRoutes.push({ url: `${BASE}/research/${r.slug}`,        lastModified: r.lastEditedAt ? new Date(r.lastEditedAt) : now });
 
   return [...indexRoutes, ...detailRoutes];
 }

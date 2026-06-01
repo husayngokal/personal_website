@@ -28,13 +28,14 @@ const SURFACE_LABEL: Record<SurfaceKey, string> = {
   credentials: 'Credentials',
   life: 'Life Plan',
   ideas: 'Ideas',
+  research: 'Research',
   living: 'Living',
   food: 'Food',
 };
 
 const SURFACE_ORDER: SurfaceKey[] = [
   'notebook', 'library', 'projects', 'mental-models',
-  'courses', 'writeups', 'credentials', 'study', 'life', 'ideas',
+  'courses', 'writeups', 'credentials', 'research', 'study', 'life', 'ideas',
   'living', 'food',
 ];
 
@@ -123,7 +124,7 @@ export function SearchPalette() {
     const grouped: Record<SurfaceKey, SearchItem[]> = {
       notebook: [], library: [], projects: [], 'mental-models': [],
       courses: [], writeups: [], study: [], credentials: [], life: [], ideas: [],
-      living: [], food: [],
+      research: [], living: [], food: [],
     };
     for (const r of ranked) grouped[r.surface].push(r);
     return SURFACE_ORDER

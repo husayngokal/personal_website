@@ -75,5 +75,26 @@ export async function renderMarkdown(src: string, sourceTable?: string): Promise
     .use(remarkGfm)
     .use(remarkHtml, { sanitize: false })
     .process(withLinks);
-  return String(file);
+  return openExternalLinksInNewTab(String(file));
+}
+
+/* External-link target rewrite: anchors with absolute http(s) hrefs
+   that don't point at husayngokal.com get `target="_blank"` plus
+   `rel="noopener noreferrer"` injected. Internal links (relative or
+   same-host absolute) are left alone so in-site navigation stays
+   inside the current tab and View Transitions still apply.
+   Particularly important for the /research surface, where each topic
+   page is essentially a curated bookmarks list and a click on a
+   resource should not abandon the page the visitor is reading. */
+const EXTERNAL_HOST_RE = /^https?:\/\/(?!(?:www\.)?husayngokal\.com)/i;
+function openExternalLinksInNewTab(html: string): string {
+  return html.replace(
+    /<a\b([^>]*)\shref="([^"]+)"([^>]*)>/gi,
+    (match, before: string, href: string, after: string) => {
+      if (!EXTERNAL_HOST_RE.test(href)) return match;
+      const attrs = `${before} ${after}`;
+      if (/\btarget=/i.test(attrs)) return match;
+      return `<a${before} href="${href}"${after} target="_blank" rel="noopener noreferrer">`;
+    },
+  );
 }

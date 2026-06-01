@@ -316,6 +316,20 @@ export interface Course {
   body?: string;
 }
 
+/* -- Research topics (live-bookmarks surface) --------------------- */
+export type ResearchStatus =
+  | 'gathering' | 'exploring' | 'writing' | 'shipped' | 'dormant';
+export interface ResearchTopic {
+  slug: string;
+  title: string;
+  summary?: string;
+  status: ResearchStatus;
+  started?: string;
+  tags?: string[];
+  body: string;
+  lastEditedAt?: string;
+}
+
 /* -- Living (group surfaces: bucket list, field atlas, etc.) ------ */
 export interface LivingEntry {
   slug: string;
