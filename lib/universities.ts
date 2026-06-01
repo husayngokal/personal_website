@@ -26,6 +26,7 @@ export const UNIVERSITIES: Record<string, University> = {
   cornell:   { slug: 'cornell',   name: 'Cornell University',                     short: 'Cornell' },
   nyu:       { slug: 'nyu',       name: 'New York University',                    short: 'NYU' },
   coursera:  { slug: 'coursera',  name: 'Coursera (mixed providers)',             short: 'Coursera' },
+  ens:       { slug: 'ens',       name: 'École Normale Supérieure',                short: 'ENS Paris' },
 };
 
 export function getUniversity(slug: string): University {
