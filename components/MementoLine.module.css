@@ -33,3 +33,35 @@
 .link:hover {
   color: var(--accent);
 }
+
+/* Elsewhere marks — GitHub + LinkedIn, sitting under the email.
+   Same muted register as the contact line so they don't shout;
+   each mark fills with currentColor and shifts to the accent
+   orange on hover, matching the site's only-orange-moves rule. */
+.elsewhere {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-m);
+  margin: var(--space-m) 0 0;
+}
+
+.markLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  line-height: 0;
+  transition: color var(--hover-ms) var(--ease),
+              transform var(--hover-ms) var(--ease);
+}
+.markLink:hover,
+.markLink:focus-visible {
+  color: var(--accent);
+  transform: translateY(-1px);
+}
+.markLink:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 2px;
+}
