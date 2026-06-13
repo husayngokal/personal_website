@@ -625,9 +625,17 @@ function titleFromSlug(slug: string): string {
    punctuation survives in the rendered title — only the slug is sanitised. */
 function sanitizeSlug(s: string): string {
   return s
-    /* URL-reserved + general nuisance chars. Keeps unicode letters intact
-       (Next.js handles them in routes; encodes at request time). */
-    .replace(/[?#&%/\\:*<>"|\s]+/g, '-')
+    /* Apostrophes and smart quotes — drop entirely so "aren't" collapses
+       to "arent" rather than the awkward "aren-t". Critical for the
+       U+2019 curly quote that Obsidian's autocorrect silently inserts:
+       leaving it in the slug breaks Vercel routing on the dynamic
+       `/<surface>/[slug]` paths (404s, intermittent failures). */
+    .replace(/['‘’‚‛ʼ′“”„‟"]/g, '')
+    /* URL-reserved + general nuisance chars, including `?` and `!`
+       which both look fine but cause routing edge cases. Keeps unicode
+       letters intact (Next.js handles them in routes; encodes at
+       request time). */
+    .replace(/[?#&%/\\:*<>|!\s]+/g, '-')
     /* Collapse repeated hyphens introduced above. */
     .replace(/-+/g, '-')
     /* Trim leading / trailing hyphens. */
