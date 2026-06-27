@@ -57,9 +57,7 @@ export function LiveRails({ initialState }: { initialState: LiveState }) {
             <p className={styles.railMeta}>
               <span className={styles.branchChip}>{state.building.branch}</span>
               <span className={`${styles.livePulse} ${flashing('currently_building') ? styles.livePulseFlash : ''}`} aria-hidden="true" />
-              <span className={styles.railCommitTime}>
-                active {relativeDayShort(state.building.lastActiveDate)}
-              </span>
+              <span className={styles.railCommitTime}>active now</span>
             </p>
           </div>
         </Link>
@@ -105,14 +103,4 @@ function StudyingRail({
 function FlashDot({ active }: { active: boolean }) {
   if (!active) return null;
   return <span className={styles.flashIndicator} aria-hidden="true" />;
-}
-
-function relativeDayShort(iso: string): string {
-  const then = new Date(iso).getTime();
-  const days = Math.floor((Date.now() - then) / 86_400_000);
-  if (days <= 0) return 'today';
-  if (days === 1) return 'yesterday';
-  if (days < 7)   return `${days}d ago`;
-  if (days < 30)  return `${Math.floor(days / 7)}w ago`;
-  return `${Math.floor(days / 30)}mo ago`;
 }
