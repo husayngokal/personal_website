@@ -1,9 +1,10 @@
 /*
  * Studio landing. Reached only with a valid session (the layout gates it).
- * This is the auth-foundation increment: it confirms sign-in works and shows
- * the error register from the OAuth callback. Create/edit surfaces land next.
+ * Lists the surfaces you can create right now. More types get added to the
+ * schema registry as the fan-out proceeds.
  */
 
+import { CONTENT_TYPES } from '@/lib/studio/schema';
 import styles from './studio.module.css';
 
 export const dynamic = 'force-dynamic';
@@ -27,13 +28,19 @@ export default async function StudioHome({
     <div>
       {error && <p className={styles.error}>{ERROR_COPY[error] ?? `Sign-in error: ${error}`}</p>}
       <h1 className={styles.h1}>Studio</h1>
-      <p className={styles.p}>
-        You are signed in. This is the authoring surface for the site: create and
-        edit any page from here, phone or desktop.
-      </p>
+      <p className={styles.p}>Create a new entry. It commits to the vault and goes live in about 30 seconds.</p>
+
+      <div className={styles.grid}>
+        {CONTENT_TYPES.map((t) => (
+          <a key={t.key} href={`/studio/new/${t.key}`} className={styles.card}>
+            <span className={styles.cardLabel}>{t.label}</span>
+            <span className={styles.cardFolder}>{t.folder}/</span>
+          </a>
+        ))}
+      </div>
+
       <p className={styles.pMuted}>
-        Auth is live. The create and edit forms for every surface are being built on
-        top of this and will appear here next.
+        More surfaces and editing existing entries are being added next.
       </p>
     </div>
   );

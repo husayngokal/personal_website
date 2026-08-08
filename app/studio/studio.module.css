@@ -96,10 +96,144 @@
 
 .error {
   padding: var(--space-s) var(--space-m);
-  margin: 0 0 var(--space-l) 0;
+  margin: var(--space-l) 0 0 0;
   border-left: 2px solid var(--accent);
   background: var(--bg-raised);
   font-family: var(--font-sans);
   font-size: var(--type-ui);
   color: var(--text-strong);
+}
+
+.ok {
+  padding: var(--space-s) var(--space-m);
+  margin: var(--space-l) 0 0 0;
+  border-left: 2px solid var(--accent);
+  background: var(--bg-raised);
+  font-family: var(--font-sans);
+  font-size: var(--type-ui);
+  color: var(--text-strong);
+}
+
+/* -- Landing grid of create options -- */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-m);
+  margin: var(--space-l) 0 var(--space-2xl) 0;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-l);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  text-decoration: none;
+  transition: border-color var(--hover-ms) var(--ease);
+}
+
+.card:hover { border-color: var(--accent); }
+
+.cardLabel {
+  font-family: var(--font-serif);
+  font-size: var(--type-body-l);
+  color: var(--text-strong);
+}
+
+.cardFolder {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  color: var(--text-muted);
+}
+
+/* -- Create form -- */
+.crumb {
+  font-family: var(--font-sans);
+  font-size: var(--type-ui-s);
+  color: var(--text-muted);
+  margin: 0 0 var(--space-m) 0;
+}
+
+.crumb a { color: var(--text-body); text-decoration: underline; }
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-l);
+  margin-top: var(--space-l);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.label {
+  font-family: var(--font-sans);
+  font-size: var(--type-ui);
+  color: var(--text-strong);
+}
+
+.req { color: var(--accent); }
+
+.input,
+.textarea {
+  width: 100%;
+  padding: var(--space-s) var(--space-m);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: var(--font-serif);
+  font-size: var(--type-body-m);
+  color: var(--text-strong);
+}
+
+.textarea {
+  resize: vertical;
+  line-height: var(--type-body-m-lh);
+}
+
+.input:focus,
+.textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.checkbox { width: 18px; height: 18px; accent-color: var(--accent); }
+
+.help {
+  font-family: var(--font-sans);
+  font-size: var(--type-ui-s);
+  color: var(--text-muted);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-l);
+  margin-top: var(--space-s);
+}
+
+.submit {
+  padding: var(--space-s) var(--space-xl);
+  background: var(--text-strong);
+  color: var(--bg-raised);
+  border: none;
+  border-radius: 6px;
+  font-family: var(--font-sans);
+  font-size: var(--type-ui);
+  cursor: pointer;
+}
+
+.submit:hover:not(:disabled) { background: var(--accent); }
+.submit:disabled { opacity: 0.6; cursor: default; }
+
+.cancel {
+  font-family: var(--font-sans);
+  font-size: var(--type-ui);
+  color: var(--text-muted);
+  text-decoration: underline;
 }
