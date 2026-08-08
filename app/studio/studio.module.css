@@ -248,3 +248,37 @@
   color: var(--text-muted);
   text-decoration: underline;
 }
+
+.inlineLink {
+  color: var(--text-body);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.inlineLink:hover { color: var(--accent); }
+
+/* -- Edit: file list -- */
+.list {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-l) 0 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.listItem {
+  display: block;
+  padding: var(--space-m);
+  background: var(--bg-raised);
+  font-family: var(--font-mono);
+  font-size: var(--type-body-s);
+  color: var(--text-strong);
+  text-decoration: none;
+}
+
+.listItem:hover { color: var(--accent); }

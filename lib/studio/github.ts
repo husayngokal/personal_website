@@ -36,6 +36,23 @@ export interface RepoFile {
   content: string;
 }
 
+/** List the .md files directly inside a folder (non-recursive), newest name
+ *  order left to the caller. README is skipped. Empty array if the folder
+ *  doesn't exist yet. */
+export async function listFolder(token: string, folder: string): Promise<{ name: string; path: string }[]> {
+  const { owner, name, branch } = repo();
+  const res = await fetch(
+    `${API}/repos/${owner}/${name}/contents/${encodePath(folder)}?ref=${branch}`,
+    { headers: headers(token), cache: 'no-store' },
+  );
+  if (res.status === 404) return [];
+  if (!res.ok) throw new Error(`listFolder ${res.status}: ${await res.text()}`);
+  const entries = (await res.json()) as Array<{ name: string; path: string; type: string }>;
+  return entries
+    .filter((e) => e.type === 'file' && e.name.endsWith('.md') && e.name !== 'README.md')
+    .map((e) => ({ name: e.name, path: e.path }));
+}
+
 /** Fetch a file's content + blob sha, or null if it doesn't exist. */
 export async function getFile(token: string, path: string): Promise<RepoFile | null> {
   const { owner, name, branch } = repo();

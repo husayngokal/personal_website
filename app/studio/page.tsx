@@ -37,7 +37,10 @@ export default async function StudioHome({
     <div>
       {error && <p className={styles.error}>{ERROR_COPY[error] ?? `Sign-in error: ${error}`}</p>}
       <h1 className={styles.h1}>Studio</h1>
-      <p className={styles.p}>Create a new entry. It commits to the vault and goes live in about 30 seconds.</p>
+      <p className={styles.p}>
+        Create a new entry, or <a className={styles.inlineLink} href="/studio/edit">edit an existing one</a>.
+        It commits to the vault and goes live in about 30 seconds.
+      </p>
 
       {groups.map(([group, types]) => (
         <section key={group} className={styles.group}>

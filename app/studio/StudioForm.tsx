@@ -13,13 +13,23 @@ import styles from './studio.module.css';
 export function StudioForm({
   type,
   initialValues,
+  mode = 'create',
+  editPath,
+  sha,
+  initialBody = '',
+  initialSections = {},
 }: {
   type: ContentType;
   initialValues: Record<string, string>;
+  mode?: 'create' | 'edit';
+  editPath?: string;
+  sha?: string;
+  initialBody?: string;
+  initialSections?: Record<string, string>;
 }) {
   const [values, setValues] = useState<Record<string, unknown>>(initialValues);
-  const [sections, setSections] = useState<Record<string, string>>({});
-  const [body, setBody] = useState('');
+  const [sections, setSections] = useState<Record<string, string>>(initialSections);
+  const [body, setBody] = useState(initialBody);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; msg: string; url?: string } | null>(null);
 
@@ -31,19 +41,31 @@ export function StudioForm({
     setResult(null);
     const payloadValues: Record<string, unknown> = { ...values };
     if (type.body.mode === 'freeform') payloadValues.body = body;
-    if (type.body.mode === 'sections') payloadValues.sections = sections;
+    if (type.body.mode === 'sections' || type.body.mode === 'split') payloadValues.sections = sections;
+
+    const endpoint = mode === 'edit' ? '/api/studio/update' : '/api/studio/create';
+    const requestBody =
+      mode === 'edit'
+        ? { type: type.key, path: editPath, sha, values: payloadValues }
+        : { type: type.key, values: payloadValues };
 
     try {
-      const res = await fetch('/api/studio/create', {
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: type.key, values: payloadValues }),
+        body: JSON.stringify(requestBody),
       });
       const j = await res.json();
       if (res.ok) {
-        setResult({ ok: true, msg: `Created ${j.path}. Live in ~30s.`, url: j.url });
+        setResult({
+          ok: true,
+          msg: `${mode === 'edit' ? 'Saved' : 'Created'} ${j.path}. Live in ~30s.`,
+          url: j.url,
+        });
       } else if (j.error === 'exists') {
         setResult({ ok: false, msg: `A file already exists at ${j.path}. Change the title.` });
+      } else if (j.error === 'conflict') {
+        setResult({ ok: false, msg: 'This entry changed elsewhere since you opened it. Reload and redo your edit.' });
       } else if (j.error === 'validation') {
         setResult({ ok: false, msg: (j.errors as string[]).join('. ') });
       } else {
@@ -124,7 +146,7 @@ export function StudioForm({
 
       <div className={styles.actions}>
         <button className={styles.submit} type="submit" disabled={busy}>
-          {busy ? 'Publishing…' : `Create ${type.label}`}
+          {busy ? 'Publishing…' : mode === 'edit' ? 'Save changes' : `Create ${type.label}`}
         </button>
         <a className={styles.cancel} href="/studio">Cancel</a>
       </div>

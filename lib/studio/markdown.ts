@@ -9,6 +9,7 @@
 
 import matter from 'gray-matter';
 import type { ContentType, Field } from './schema';
+import { sections as extractSections } from '../vault/sections';
 
 /* Mirrors sanitizeSlug() in lib/vault/parse.ts: lowercase, strip quotes,
    collapse nuisance/space runs to a hyphen, trim. Filenames the parser will
@@ -121,4 +122,44 @@ export function buildMarkdown(type: ContentType, values: Values): BuiltFile {
   const path = `${type.folder}/${filename}.md`;
   const url = `${type.route}/${slug}`;
   return { slug, path, content, url };
+}
+
+export interface LoadedEntry {
+  values: Record<string, string>;
+  body: string;
+  sections: Record<string, string>;
+}
+
+/* Reverse of buildMarkdown: turn an existing .md file into form-ready values
+   for the edit flow. Arrays become comma strings, booleans become 'true'/'',
+   js-yaml Date objects normalise to YYYY-MM-DD. Body is split back into its
+   freeform text / section map / split parts. */
+export function parseExisting(type: ContentType, raw: string): LoadedEntry {
+  const parsed = matter(raw);
+  const data = parsed.data as Record<string, unknown>;
+  const content = parsed.content.trim();
+
+  const values: Record<string, string> = {};
+  for (const f of type.fields) {
+    const v = data[f.name];
+    if (v === undefined || v === null) values[f.name] = '';
+    else if (v instanceof Date) values[f.name] = v.toISOString().slice(0, 10);
+    else if (Array.isArray(v)) values[f.name] = v.map(String).join(', ');
+    else if (typeof v === 'boolean') values[f.name] = v ? 'true' : '';
+    else values[f.name] = String(v);
+  }
+
+  let body = '';
+  const secs: Record<string, string> = {};
+  if (type.body.mode === 'freeform') {
+    body = content;
+  } else if (type.body.mode === 'sections') {
+    const map = extractSections(content);
+    for (const s of type.body.sections) secs[s] = map[s.toLowerCase()] ?? '';
+  } else if (type.body.mode === 'split') {
+    const parts = content.split(/\n+---\n+/);
+    type.body.parts.forEach((p, i) => (secs[p] = (parts[i] ?? '').trim()));
+  }
+
+  return { values, body, sections: secs };
 }
