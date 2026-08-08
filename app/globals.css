@@ -99,6 +99,15 @@
   --pulse-ms:       1600ms;
   --decorative-ms:  3400ms;   /* hand wave, scroll drop */
   --page-fade-ms:   300ms;
+
+  /* ---- Global scale ------------------------------------------------- */
+  /* The whole design system is px-based (type, spacing, page widths), so
+     a root font-size bump wouldn't scale it proportionally. Instead we
+     zoom the document, which reproduces browser zoom exactly: everything
+     grows together, layout reflows, media queries respond to the scaled
+     viewport, and viewers can still zoom further on top. 1.2 = the 120%
+     the author reads the site at. Tune here to rescale the entire site. */
+  --site-zoom: 1.2;
 }
 
 /* -------------------------------------------------------------------- */
@@ -112,6 +121,9 @@
 }
 
 html {
+  /* Global 120% scale — see --site-zoom. Reproduces browser zoom so the
+     whole site grows proportionally on top of the px token system. */
+  zoom: var(--site-zoom);
   scroll-behavior: smooth;
   /* Anchor jumps clear the sticky / fixed top-nav band so the target
      heading isn't lodged under it. Matches the nav band height plus
