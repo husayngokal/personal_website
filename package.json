@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.4",
+    "aws4fetch": "^1.0.20",
     "gray-matter": "^4.0.3",
     "next": "^15.0.3",
     "react": "^19.0.0",

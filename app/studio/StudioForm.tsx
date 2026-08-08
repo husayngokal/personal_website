@@ -35,6 +35,48 @@ export function StudioForm({
 
   const set = (name: string, v: unknown) => setValues((prev) => ({ ...prev, [name]: v }));
 
+  /* Image upload: track which text area is focused so an uploaded image's
+     markdown lands where the cursor was. */
+  const [activeTarget, setActiveTarget] = useState<{ kind: 'body' } | { kind: 'section'; name: string } | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadMsg, setUploadMsg] = useState<string | null>(null);
+
+  const appendMd = (existing: string, md: string) => (existing.trim() ? `${existing}\n\n${md}` : md);
+
+  function insertImage(url: string) {
+    const md = `![](${url})`;
+    if (activeTarget?.kind === 'section') {
+      const name = activeTarget.name;
+      setSections((prev) => ({ ...prev, [name]: appendMd(prev[name] ?? '', md) }));
+    } else if (type.body.mode === 'freeform') {
+      setBody((b) => appendMd(b, md));
+    } else if (type.body.mode === 'sections') {
+      const first = type.body.sections[0];
+      setSections((prev) => ({ ...prev, [first]: appendMd(prev[first] ?? '', md) }));
+    } else if (type.body.mode === 'split') {
+      const first = type.body.parts[0];
+      setSections((prev) => ({ ...prev, [first]: appendMd(prev[first] ?? '', md) }));
+    }
+  }
+
+  async function handleFiles(files: FileList) {
+    setUploading(true);
+    setUploadMsg(null);
+    for (const file of Array.from(files)) {
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await fetch('/api/studio/upload', { method: 'POST', body: fd });
+        const j = await res.json();
+        if (res.ok) { insertImage(j.url); setUploadMsg(`Inserted ${file.name}`); }
+        else { setUploadMsg(j.detail || j.error || 'Upload failed'); }
+      } catch (err) {
+        setUploadMsg((err as Error).message);
+      }
+    }
+    setUploading(false);
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -118,6 +160,22 @@ export function StudioForm({
         </label>
       ))}
 
+      {type.body.mode !== 'none' && (
+        <label className={styles.field}>
+          <span className={styles.label}>Images</span>
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            disabled={uploading}
+            onChange={(e) => e.target.files && e.target.files.length > 0 && handleFiles(e.target.files)}
+          />
+          <span className={styles.help}>
+            {uploading ? 'Uploading…' : uploadMsg ?? 'Uploads to the CDN and inserts markdown into the focused text area.'}
+          </span>
+        </label>
+      )}
+
       {type.body.mode === 'freeform' && (
         <label className={styles.field}>
           <span className={styles.label}>{type.body.label}</span>
@@ -126,6 +184,7 @@ export function StudioForm({
             rows={12}
             placeholder={type.body.placeholder}
             value={body}
+            onFocus={() => setActiveTarget({ kind: 'body' })}
             onChange={(e) => setBody(e.target.value)}
           />
         </label>
@@ -139,6 +198,7 @@ export function StudioForm({
               className={styles.textarea}
               rows={6}
               value={sections[s] ?? ''}
+              onFocus={() => setActiveTarget({ kind: 'section', name: s })}
               onChange={(e) => setSections((prev) => ({ ...prev, [s]: e.target.value }))}
             />
           </label>
