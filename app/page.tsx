@@ -3,10 +3,12 @@ import { Eyebrow, Chip } from '@/components/Primitives';
 import { LiveTypewriter } from '@/components/LiveTypewriter';
 import { HeroPortrait } from '@/components/HeroPortrait';
 import { HeroHand } from '@/components/HeroHand';
+import { WorkingNow } from '@/components/WorkingNow';
 import { LiveRails } from '@/components/LiveRails';
 import { NewsletterForm } from '@/components/NewsletterForm';
 import { ScrollDrop } from '@/components/marks/ScrollDrop';
 import { getLiveState } from '@/lib/content/state';
+import { getCurrentWorking } from '@/lib/content/working';
 import { getNotebookPosts, getNotebookThreads } from '@/lib/content/notebook';
 import { getBooks } from '@/lib/content/library';
 import { getProjects } from '@/lib/content/projects';
@@ -39,9 +41,10 @@ export const revalidate = 60;
 
 export default async function HomePage() {
   const [
-    initialState, NOTEBOOK_POSTS, NOTEBOOK_THREADS, BOOKS, PROJECTS, LIFE_PRINCIPLES, WRITEUPS,
+    initialState, working, NOTEBOOK_POSTS, NOTEBOOK_THREADS, BOOKS, PROJECTS, LIFE_PRINCIPLES, WRITEUPS,
   ] = await Promise.all([
     getLiveState(),
+    getCurrentWorking(),
     getNotebookPosts(), getNotebookThreads(),
     getBooks(), getProjects(), getLifePrinciples(), getWriteups(),
   ]);
@@ -79,6 +82,7 @@ export default async function HomePage() {
             <p className={styles.heroSubtitle}>
               Working files of one mind across eight domains. What I'm building, reading, writing, and studying; kept visible as the work moves, not waiting for it to be ready. Editorial in form, in-progress in substance.
             </p>
+            <WorkingNow working={working} />
           </div>
           <div className={styles.heroHandSlot}>
             <HeroHand />

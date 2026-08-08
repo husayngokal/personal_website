@@ -419,6 +419,26 @@ export function parseFile(relPath: string, content: string): ParsedFile | null {
     });
   }
 
+  /* ---- Now: current employment (single current_state row) ----
+     Vault-sourced "currently working" fact for the homepage now-line.
+     Maps to the current_state table (key/value), not a slug table, so
+     sync.ts handles it with a key-based upsert special-case. role is the
+     one required field. */
+  if (relPath === 'now/working.md') {
+    return wrap('current_state', 'current_working', {
+      key: 'current_working',
+      value: {
+        company:     strOrNull(fm.company),
+        url:         strOrNull(fm.url),
+        role:        requireStr(fm, 'role', relPath),
+        started:     strOrNull(fm.started),
+        location:    strOrNull(fm.location),
+        arrangement: strOrNull(fm.arrangement),
+        blurb:       strOrNull(fm.blurb),
+      },
+    });
+  }
+
   /* ---- Life: motto (single-active-row) ---- */
   if (relPath === 'life/motto.md') {
     return wrap('life_motto', 'motto', {

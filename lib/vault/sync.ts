@@ -204,6 +204,24 @@ export async function syncVault(opts: SyncOptions = {}): Promise<SyncResult> {
       continue;
     }
 
+    /* current_state rows (e.g. now/working.md → current_working) are
+       keyed by `key` and hold a JSON `value`; they must never be touched
+       by the slug-based delete sweep. Strip any last_edited_at the step-3
+       injector added — current_state has updated_at, not last_edited_at. */
+    if (table === 'current_state') {
+      const clean = rows.map((r) => ({
+        key: r.key as string,
+        value: (r.value ?? {}) as object,
+        updated_at: new Date().toISOString(),
+      }));
+      const { error } = await db
+        .from('current_state')
+        .upsert(clean, { onConflict: 'key' });
+      if (error) throw error;
+      result.upserted[table] = rows.length;
+      continue;
+    }
+
     /* Comments are keyed by `id` (uuid), not `slug`. Status changes
        round-trip through the vault — never delete rows missing from
        the vault, because the row appears in DB before the file lands
