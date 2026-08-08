@@ -1,0 +1,105 @@
+.shell {
+  min-height: 100vh;
+  background: var(--bg-page);
+}
+
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-m);
+  padding: var(--space-m) var(--space-l);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.dot { color: var(--accent); }
+
+.sub {
+  font-family: var(--font-sans);
+  font-size: var(--type-ui-s);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-left: 0.4em;
+}
+
+.who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-m);
+  font-family: var(--font-sans);
+  font-size: var(--type-ui);
+  color: var(--text-muted);
+}
+
+.logout {
+  color: var(--text-body);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.logout:hover { color: var(--accent); }
+
+.main {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: var(--space-3xl) var(--space-l);
+}
+
+.notice {
+  padding: var(--space-2xl) 0;
+}
+
+.h1 {
+  font-family: var(--font-serif);
+  font-size: var(--type-display-s);
+  line-height: var(--type-display-s-lh);
+  color: var(--text-strong);
+  margin: 0 0 var(--space-m) 0;
+}
+
+.p {
+  font-family: var(--font-serif);
+  font-size: var(--type-body-m);
+  line-height: var(--type-body-m-lh);
+  color: var(--text-body);
+  margin: 0 0 var(--space-m) 0;
+}
+
+.pMuted {
+  font-family: var(--font-sans);
+  font-size: var(--type-ui);
+  line-height: var(--type-ui-lh);
+  color: var(--text-muted);
+  margin: var(--space-l) 0 0 0;
+}
+
+.signin {
+  display: inline-block;
+  margin-top: var(--space-m);
+  padding: var(--space-s) var(--space-l);
+  background: var(--text-strong);
+  color: var(--bg-raised);
+  font-family: var(--font-sans);
+  font-size: var(--type-ui);
+  border-radius: 6px;
+  text-decoration: none;
+}
+
+.signin:hover { background: var(--accent); }
+
+.error {
+  padding: var(--space-s) var(--space-m);
+  margin: 0 0 var(--space-l) 0;
+  border-left: 2px solid var(--accent);
+  background: var(--bg-raised);
+  font-family: var(--font-sans);
+  font-size: var(--type-ui);
+  color: var(--text-strong);
+}
