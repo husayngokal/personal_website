@@ -4,6 +4,7 @@ import { TopNav } from '@/components/TopNav';
 import { MementoLine } from '@/components/MementoLine';
 import { RouteTransition } from '@/components/RouteTransition';
 import { SearchPalette } from '@/components/SearchPalette';
+import { ChromeGate } from '@/components/ChromeGate';
 import { LoadingSplash } from '@/components/LoadingSplash';
 import { LoadingSplashGate } from '@/components/LoadingSplashGate';
 import { getCurrentLocation } from '@/lib/content/location';
@@ -132,12 +133,16 @@ export default async function RootLayout({
         <a href="#main" className="skip-link">
           Skip to content
         </a>
-        <TopNav location={{ city: location.city, timezone: location.timezone }} />
+        <ChromeGate>
+          <TopNav location={{ city: location.city, timezone: location.timezone }} />
+        </ChromeGate>
         <main id="main">
           <RouteTransition>{children}</RouteTransition>
         </main>
-        <MementoLine />
-        <SearchPalette />
+        <ChromeGate>
+          <MementoLine />
+          <SearchPalette />
+        </ChromeGate>
         <LoadingSplash />
       </body>
     </html>
