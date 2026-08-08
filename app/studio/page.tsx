@@ -24,24 +24,36 @@ export default async function StudioHome({
 }) {
   const { error } = await searchParams;
 
+  /* Group the types by their `group` field, preserving first-seen order. */
+  const groupMap = new Map<string, typeof CONTENT_TYPES>();
+  for (const t of CONTENT_TYPES) {
+    const list = groupMap.get(t.group) ?? [];
+    list.push(t);
+    groupMap.set(t.group, list);
+  }
+  const groups = Array.from(groupMap.entries());
+
   return (
     <div>
       {error && <p className={styles.error}>{ERROR_COPY[error] ?? `Sign-in error: ${error}`}</p>}
       <h1 className={styles.h1}>Studio</h1>
       <p className={styles.p}>Create a new entry. It commits to the vault and goes live in about 30 seconds.</p>
 
-      <div className={styles.grid}>
-        {CONTENT_TYPES.map((t) => (
-          <a key={t.key} href={`/studio/new/${t.key}`} className={styles.card}>
-            <span className={styles.cardLabel}>{t.label}</span>
-            <span className={styles.cardFolder}>{t.folder}/</span>
-          </a>
-        ))}
-      </div>
+      {groups.map(([group, types]) => (
+        <section key={group} className={styles.group}>
+          <h2 className={styles.groupHead}>{group}</h2>
+          <div className={styles.grid}>
+            {types.map((t) => (
+              <a key={t.key} href={`/studio/new/${t.key}`} className={styles.card}>
+                <span className={styles.cardLabel}>{t.label}</span>
+                <span className={styles.cardFolder}>{t.folder}/</span>
+              </a>
+            ))}
+          </div>
+        </section>
+      ))}
 
-      <p className={styles.pMuted}>
-        More surfaces and editing existing entries are being added next.
-      </p>
+      <p className={styles.pMuted}>Editing existing entries is being added next.</p>
     </div>
   );
 }

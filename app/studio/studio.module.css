@@ -115,11 +115,22 @@
 }
 
 /* -- Landing grid of create options -- */
+.group { margin: var(--space-2xl) 0 0 0; }
+
+.groupHead {
+  font-family: var(--font-sans);
+  font-size: var(--type-ui-s);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-m) 0;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: var(--space-m);
-  margin: var(--space-l) 0 var(--space-2xl) 0;
+  margin: 0 0 var(--space-l) 0;
 }
 
 .card {

@@ -109,8 +109,8 @@ export function StudioForm({
         </label>
       )}
 
-      {type.body.mode === 'sections' &&
-        type.body.sections.map((s) => (
+      {(type.body.mode === 'sections' || type.body.mode === 'split') &&
+        (type.body.mode === 'sections' ? type.body.sections : type.body.parts).map((s) => (
           <label key={s} className={styles.field}>
             <span className={styles.label}>{s}</span>
             <textarea

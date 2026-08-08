@@ -95,12 +95,30 @@ export function buildMarkdown(type: ContentType, values: Values): BuiltFile {
     body = type.body.sections
       .map((s) => `## ${s}\n\n${(values.sections?.[s] ?? '').toString().trim()}`.trimEnd())
       .join('\n\n');
+  } else if (type.body.mode === 'split') {
+    /* Parts joined by a horizontal rule, no headings — e.g. a life
+       principle's manifesto and its explanation (see parse.ts). */
+    body = type.body.parts
+      .map((p) => (values.sections?.[p] ?? '').toString().trim())
+      .join('\n\n---\n\n')
+      .trim();
+  }
+
+  /* Filename: NN-slug for numeric-prefixed types (life plan parts, story
+     vignettes), otherwise just the slug. */
+  let filename = slug;
+  if (type.numberPrefix) {
+    const n = Number(values[type.numberPrefix.field]);
+    const prefix = Number.isFinite(n)
+      ? String(n).padStart(type.numberPrefix.pad, '0')
+      : '0'.repeat(type.numberPrefix.pad);
+    filename = `${prefix}-${slug}`;
   }
 
   /* gray-matter stringify -> ---\n<yaml>---\n<body>. Trailing newline for
      a tidy diff. */
   const content = matter.stringify(body ? `\n${body}\n` : '\n', fm);
-  const path = `${type.folder}/${slug}.md`;
+  const path = `${type.folder}/${filename}.md`;
   const url = `${type.route}/${slug}`;
   return { slug, path, content, url };
 }
