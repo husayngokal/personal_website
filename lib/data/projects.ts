@@ -1,32 +1,11 @@
 import type { ProjectPage } from '../types';
 
 /*
- * Projects per BRIEF.md Part XIV — Phase 4 commits to entries for
- * Slipwise, PawCare, Helm, DubaiSignal, ECE SaaS, and the brief itself
- * as a meta-project. Slipwise is treated as a more-skeleton-than-substance
- * page per Part VIII privacy considerations.
+ * Projects fallback, used only when Supabase is unconfigured. The live
+ * projects come from the vault. These remain as skeleton fallback entries.
  */
 
 export const PROJECTS: ProjectPage[] = [
-  {
-    slug: 'slipwise',
-    title: 'Slipwise',
-    tagline: 'AI-powered marine insurance technology platform.',
-    status: 'active',
-    started: '2026-04-01',
-    tags: ['marine-insurance', 'ai', 'regulated-tech'],
-    repo: 'private',
-    repoPrivate: true,
-    externalUrl: 'https://slipwise.ai',
-    lastActive: '2026-05-16',
-    // Currentstate / stuck / decisions deliberately empty per Part VIII —
-    // the substance lives outside the public site.
-    activity: [
-      { date: '2026-05-16T19:47', line: 'commit', branch: 'feat/event-store' },
-      { date: '2026-05-16T16:12', line: 'commit', branch: 'feat/event-store' },
-      { date: '2026-05-15T22:01', line: 'commit', branch: 'main' },
-    ],
-  },
   {
     slug: 'pawcare',
     title: 'PawCare',
