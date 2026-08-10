@@ -247,7 +247,32 @@
   font-size: var(--type-ui);
   color: var(--text-muted);
   text-decoration: underline;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
 }
+
+.deleteZone {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-m);
+}
+
+.deleteBtn {
+  background: none;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-family: var(--font-sans);
+  font-size: var(--type-ui);
+  padding: var(--space-s) var(--space-l);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.deleteBtn:hover:not(:disabled) { background: var(--accent); color: var(--bg-raised); }
+.deleteBtn:disabled { opacity: 0.6; cursor: default; }
 
 .inlineLink {
   color: var(--text-body);

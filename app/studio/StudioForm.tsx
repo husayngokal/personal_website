@@ -32,6 +32,8 @@ export function StudioForm({
   const [body, setBody] = useState(initialBody);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; msg: string; url?: string } | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const set = (name: string, v: unknown) => setValues((prev) => ({ ...prev, [name]: v }));
 
@@ -117,6 +119,28 @@ export function StudioForm({
       setResult({ ok: false, msg: (err as Error).message });
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function doDelete() {
+    if (!editPath || !sha) return;
+    setDeleting(true);
+    setResult(null);
+    try {
+      const res = await fetch('/api/studio/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: editPath, sha }),
+      });
+      const j = await res.json();
+      if (res.ok) setResult({ ok: true, msg: `Deleted ${j.path}. Removed in ~30s.` });
+      else if (j.error === 'conflict') setResult({ ok: false, msg: 'This entry changed elsewhere since you opened it. Reload before deleting.' });
+      else setResult({ ok: false, msg: j.detail || j.error || 'Delete failed.' });
+    } catch (err) {
+      setResult({ ok: false, msg: (err as Error).message });
+    } finally {
+      setDeleting(false);
+      setConfirmingDelete(false);
     }
   }
 
@@ -209,6 +233,20 @@ export function StudioForm({
           {busy ? 'Publishing…' : mode === 'edit' ? 'Save changes' : `Create ${type.label}`}
         </button>
         <a className={styles.cancel} href="/studio">Cancel</a>
+        {mode === 'edit' && (
+          <span className={styles.deleteZone}>
+            {confirmingDelete ? (
+              <>
+                <button type="button" className={styles.deleteBtn} onClick={doDelete} disabled={deleting}>
+                  {deleting ? 'Deleting…' : 'Confirm delete'}
+                </button>
+                <button type="button" className={styles.cancel} onClick={() => setConfirmingDelete(false)}>keep</button>
+              </>
+            ) : (
+              <button type="button" className={styles.deleteBtn} onClick={() => setConfirmingDelete(true)}>Delete</button>
+            )}
+          </span>
+        )}
       </div>
 
       {result && (

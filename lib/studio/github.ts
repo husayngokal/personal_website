@@ -67,6 +67,21 @@ export async function getFile(token: string, path: string): Promise<RepoFile | n
   return { sha: j.sha, content };
 }
 
+/** Delete a file by path + blob sha. Throws with the GitHub message on failure
+ *  (e.g. 409 sha mismatch if it changed since load). */
+export async function deleteFile(
+  token: string,
+  opts: { path: string; sha: string; message: string },
+): Promise<void> {
+  const { owner, name, branch } = repo();
+  const res = await fetch(`${API}/repos/${owner}/${name}/contents/${encodePath(opts.path)}`, {
+    method: 'DELETE',
+    headers: { ...headers(token), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: opts.message, sha: opts.sha, branch }),
+  });
+  if (!res.ok) throw new Error(`deleteFile ${res.status}: ${await res.text()}`);
+}
+
 /** Create or update a file. Pass sha to update (conflict-guarded); omit to
  *  create. Throws with the GitHub message on failure (e.g. 409 sha mismatch,
  *  422 already exists). */
