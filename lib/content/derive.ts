@@ -18,9 +18,10 @@
  *                        with no progress_pct renders as "currently
  *                        reading X" without a percentage.
  *
- *   currently_building — primary: projects.status=active, most recent
- *                        - fallback: top priority in-progress task
- *                        - fallback: most recently updated in-progress task
+ *   currently_building — projects.status=active, most recent. Project-only
+ *                        by design: no task fallback, so the slot is empty
+ *                        (rail + typewriter phrase hidden) when there is no
+ *                        active project.
  *
  *   currently_writing  — primary: notebook_posts updated in the last 7 days
  *                        - fallback: updated in the last 30 days
@@ -111,6 +112,10 @@ export async function deriveAndWriteLiveState(db: SupabaseClient): Promise<Deriv
     .order('last_active', { ascending: false })
     .limit(1);
 
+  /* No task fallback by design: "currently building" is a project-only
+     signal. When there's no active project the slot stays empty, so the
+     homepage building rail and the typewriter's building phrase simply do
+     not render (the other slots keep the typewriter alive). */
   if (projectRows?.[0]) {
     const p = projectRows[0];
     buildingValue = {
@@ -122,41 +127,6 @@ export async function deriveAndWriteLiveState(db: SupabaseClient): Promise<Deriv
       kind: 'project',
       href: `/projects/${p.slug}`,
     };
-  } else {
-    /* Fallback: top-priority in-progress task. */
-    const { data: taskRows } = await db
-      .from('tasks')
-      .select('slug, title, status, priority, last_edited_at')
-      .eq('status', 'in-progress')
-      .order('priority', { ascending: true, nullsFirst: false })
-      .order('last_edited_at', { ascending: false, nullsFirst: false })
-      .limit(1);
-    let task = taskRows?.[0];
-
-    /* Further fallback: any open task, most recently touched. The point
-       is to never report a dead build when there's clearly real work
-       happening on the tasks surface. */
-    if (!task) {
-      const { data: openTaskRows } = await db
-        .from('tasks')
-        .select('slug, title, status, priority, last_edited_at')
-        .eq('status', 'open')
-        .order('last_edited_at', { ascending: false, nullsFirst: false })
-        .limit(1);
-      task = openTaskRows?.[0];
-    }
-
-    if (task) {
-      buildingValue = {
-        slug: task.slug,
-        title: task.title,
-        branch: 'main',
-        lastActiveDate: task.last_edited_at ?? new Date().toISOString(),
-        private: false,
-        kind: 'task',
-        href: '/life/tasks',
-      };
-    }
   }
   await writeKey(db, 'currently_building', buildingValue);
   result.written['currently_building'] = Object.keys(buildingValue).length ? buildingValue : null;
