@@ -65,6 +65,9 @@ export default async function MasterPlanIndex() {
         published version is the same text, lightly edited for reading.
       </p>
 
+      {parts.length === 0 ? (
+        <p className="empty-note">No plan parts yet.</p>
+      ) : (
       <ol className={styles.list}>
         {parts.map((p) => (
           <li key={p.slug} className={styles.item}>
@@ -78,6 +81,7 @@ export default async function MasterPlanIndex() {
           </li>
         ))}
       </ol>
+      )}
     </div>
   );
 }

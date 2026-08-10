@@ -64,6 +64,7 @@ export default async function ModelsIndex() {
         </aside>
 
         <section className={styles.grid}>
+          {MENTAL_MODELS.length === 0 && <p className="empty-note">No mental models yet.</p>}
           {MENTAL_MODELS.map((m) => (
             <Link key={m.slug} href={`/mental-models/${m.slug}`} className={styles.card}>
               <div className={styles.markWrap}>

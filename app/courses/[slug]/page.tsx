@@ -81,7 +81,7 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
 
       {/* Professors + textbooks + prereqs in a metadata grid */}
       <section className={styles.metaGrid}>
-        {c.professors?.length && (
+        {!!c.professors?.length && (
           <div>
             <p className={styles.metaLabel}>Professor{c.professors.length === 1 ? '' : 's'}</p>
             <ul className={styles.profList}>
@@ -89,7 +89,7 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
             </ul>
           </div>
         )}
-        {c.textbooks?.length && (
+        {!!c.textbooks?.length && (
           <div>
             <p className={styles.metaLabel}>Textbook{c.textbooks.length === 1 ? '' : 's'}</p>
             <ul className={styles.bookList}>
@@ -140,7 +140,7 @@ export default async function CoursePage({ params }: { params: Promise<{ slug: s
       )}
 
       {/* Syllabus */}
-      {c.syllabus?.length && (
+      {!!c.syllabus?.length && (
         <section className={styles.syllabus}>
           <h2 className={styles.h2}>Syllabus</h2>
           <ol className={styles.syllabusList}>

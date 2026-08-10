@@ -37,23 +37,27 @@ export default async function ProjectsIndex() {
         </p>
       </header>
 
-      <ul className={styles.list}>
-        {sorted.map((p) => (
-          <li key={p.slug} className={styles.row}>
-            <Link href={`/projects/${p.slug}`} className={styles.rowLink}>
-              <div className={styles.rowLeft}>
-                <p className={styles.rowName}>{p.title}</p>
-                <p className={styles.rowTag}>{p.tagline}</p>
-              </div>
-              <div className={styles.rowRight}>
-                <StatusPill status={p.status} label={p.status} />
-                <span className={styles.rowDate}>{p.lastActive}</span>
-                {p.tags && p.tags[0] && <Chip>{p.tags[0]}</Chip>}
-              </div>
-            </Link>
-          </li>
-        ))}
-      </ul>
+      {sorted.length === 0 ? (
+        <p className="empty-note">No projects yet.</p>
+      ) : (
+        <ul className={styles.list}>
+          {sorted.map((p) => (
+            <li key={p.slug} className={styles.row}>
+              <Link href={`/projects/${p.slug}`} className={styles.rowLink}>
+                <div className={styles.rowLeft}>
+                  <p className={styles.rowName}>{p.title}</p>
+                  <p className={styles.rowTag}>{p.tagline}</p>
+                </div>
+                <div className={styles.rowRight}>
+                  <StatusPill status={p.status} label={p.status} />
+                  <span className={styles.rowDate}>{p.lastActive}</span>
+                  {p.tags && p.tags[0] && <Chip>{p.tags[0]}</Chip>}
+                </div>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

@@ -22,6 +22,7 @@ export default async function ChangedMyMindArchive() {
         Positions I have formally revised.
       </h1>
 
+      {CHANGED_MY_MIND.length === 0 && <p className="empty-note">No revisions logged yet.</p>}
       {CHANGED_MY_MIND.map((c) => (
         <div id={c.slug} key={c.slug}>
           <DecisionLogEntry date={c.dateChanged} title={c.title}>

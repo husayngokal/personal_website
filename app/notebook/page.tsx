@@ -37,21 +37,25 @@ export default async function NotebookIndex() {
 
       {/* Thread map */}
       <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>Active threads</h2>
-        <div className={styles.threadMap}>
-          {active.map((t) => {
-            const postCount = NOTEBOOK_POSTS.filter((p) => p.thread === t.slug).length;
-            return (
-              <Link key={t.slug} href={`/notebook/threads/${t.slug}`} className={styles.threadCard}>
-                <p className={styles.threadName}>{t.name}</p>
-                <p className={styles.threadSummary}>{t.summary}</p>
-                <p className={styles.threadMeta}>
-                  {postCount} {postCount === 1 ? 'post' : 'posts'}
-                </p>
-              </Link>
-            );
-          })}
-        </div>
+        {active.length > 0 && (
+          <>
+            <h2 className={styles.sectionTitle}>Active threads</h2>
+            <div className={styles.threadMap}>
+              {active.map((t) => {
+                const postCount = NOTEBOOK_POSTS.filter((p) => p.thread === t.slug).length;
+                return (
+                  <Link key={t.slug} href={`/notebook/threads/${t.slug}`} className={styles.threadCard}>
+                    <p className={styles.threadName}>{t.name}</p>
+                    <p className={styles.threadSummary}>{t.summary}</p>
+                    <p className={styles.threadMeta}>
+                      {postCount} {postCount === 1 ? 'post' : 'posts'}
+                    </p>
+                  </Link>
+                );
+              })}
+            </div>
+          </>
+        )}
         {dormant.length > 0 && (
           <>
             <h3 className={styles.subTitle}>Dormant threads</h3>
@@ -75,11 +79,17 @@ export default async function NotebookIndex() {
             </div>
           </>
         )}
+        {active.length === 0 && dormant.length === 0 && (
+          <p className="empty-note">No threads yet.</p>
+        )}
       </section>
 
       {/* Recent posts */}
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Recent</h2>
+        {recent.length === 0 ? (
+          <p className="empty-note">No posts yet.</p>
+        ) : (
         <ul className={styles.recentList}>
           {recent.map((p) => (
             <li key={p.slug} className={styles.recentItem}>
@@ -101,6 +111,7 @@ export default async function NotebookIndex() {
             </li>
           ))}
         </ul>
+        )}
       </section>
     </div>
   );

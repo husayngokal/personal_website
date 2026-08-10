@@ -56,6 +56,7 @@ export default async function StudyIndex() {
       </ManifestoCallout>
 
       {/* Credentials */}
+      {STUDY_CREDENTIALS.length > 0 && (
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Credentials</h2>
         <ul className={styles.credList}>
@@ -91,8 +92,10 @@ export default async function StudyIndex() {
           ))}
         </ul>
       </section>
+      )}
 
       {/* Domains */}
+      {STUDY_DOMAINS.length > 0 && (
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>The eight domains</h2>
         <ul className={styles.domainList}>
@@ -109,6 +112,7 @@ export default async function StudyIndex() {
           ))}
         </ul>
       </section>
+      )}
 
       {/* Publications */}
       {PUBLICATIONS.length > 0 && (

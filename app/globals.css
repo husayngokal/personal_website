@@ -146,6 +146,15 @@ body {
   font-feature-settings: 'kern', 'liga', 'onum';
 }
 
+/* Shared empty-state note for surfaces whose data can be entirely empty. */
+.empty-note {
+  font-family: var(--font-sans);
+  font-size: var(--type-ui);
+  color: var(--text-muted);
+  margin: var(--space-l) 0 0 0;
+  padding: 0;
+}
+
 /* The Life Plan ships its own warmer page color. Other surfaces inherit
    page beige; see Part XI on the surface's intentional shift. */
 body[data-surface='life'] {

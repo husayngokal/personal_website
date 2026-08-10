@@ -93,6 +93,7 @@ export default async function CoursesIndex() {
         </aside>
 
         <section className={styles.grid}>
+          {sorted.length === 0 && <p className="empty-note">No courses yet.</p>}
           {sorted.map((c) => (
             <Link key={c.slug} href={`/courses/${c.slug}`} className={styles.card}>
               <div className={styles.banner}>
