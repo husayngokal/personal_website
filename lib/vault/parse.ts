@@ -165,7 +165,7 @@ export function parseFile(relPath: string, content: string): ParsedFile | null {
       repo:    strOrNull(fm.repo),
       repo_private: fm['repo-private'] === true,
       external_url: strOrNull(fm['external-url']),
-      last_active:  requireStr(fm, 'last-active', relPath),
+      last_active:  strOrNull(fm['last-active']),
       current_state: currentState,
       stuck_on: stuckOn.length > 0 ? stuckOn : null,
       tasks: (fm.tasks as object) ?? null,

@@ -51,7 +51,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
         <p className={styles.meta}>
           <StatusPill status={project.status} label={project.status} />
           <span className={styles.metaDot}>·</span>
-          <span>last active {project.lastActive}</span>
+          <span>{project.lastActive ? `last active ${project.lastActive}` : 'active today'}</span>
           {project.externalUrl && (
             <>
               <span className={styles.metaDot}>·</span>

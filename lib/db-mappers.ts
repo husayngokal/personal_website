@@ -230,7 +230,7 @@ export const fromRow = {
     repo: (r.repo as string) ?? undefined,
     repoPrivate: (r.repo_private as boolean) ?? false,
     externalUrl: (r.external_url as string) ?? undefined,
-    lastActive: r.last_active as string,
+    lastActive: (r.last_active as string | null) ?? null,
     currentState: (r.current_state as string) ?? undefined,
     stuckOn: (r.stuck_on as string[]) ?? undefined,
     tasks: (r.tasks as ProjectPage['tasks']) ?? undefined,

@@ -50,7 +50,7 @@ export default async function ProjectsIndex() {
                 </div>
                 <div className={styles.rowRight}>
                   <StatusPill status={p.status} label={p.status} />
-                  <span className={styles.rowDate}>{p.lastActive}</span>
+                  <span className={styles.rowDate}>{p.lastActive ?? 'today'}</span>
                   {p.tags && p.tags[0] && <Chip>{p.tags[0]}</Chip>}
                 </div>
               </Link>

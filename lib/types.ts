@@ -75,7 +75,7 @@ export interface ProjectPage {
   repo?: string;
   repoPrivate?: boolean;
   externalUrl?: string;
-  lastActive: string;
+  lastActive: string | null;
   currentState?: string;
   stuckOn?: string[];
   tasks?: { backlog?: string[]; inProgress?: string[]; done?: string[] };

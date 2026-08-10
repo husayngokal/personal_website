@@ -122,7 +122,7 @@ export async function deriveAndWriteLiveState(db: SupabaseClient): Promise<Deriv
       slug: p.slug,
       title: p.title,
       branch: 'main',
-      lastActiveDate: p.last_edited_at ?? p.last_active,
+      lastActiveDate: p.last_edited_at ?? p.last_active ?? new Date().toISOString().slice(0, 10),
       private: p.repo_private,
       kind: 'project',
       href: `/projects/${p.slug}`,

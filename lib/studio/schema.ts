@@ -134,7 +134,7 @@ export const CONTENT_TYPES: ContentType[] = [
       { name: 'tagline', label: 'Tagline', type: 'text', required: true },
       { name: 'status', label: 'Status', type: 'select', required: true, options: PROJECT_STATUS, default: 'active' },
       { name: 'started', label: 'Started', type: 'date', default: '@today' },
-      { name: 'last-active', label: 'Last active', type: 'date', required: true, default: '@today' },
+      { name: 'last-active', label: 'Last active', type: 'date', help: 'Leave blank for "active today".' },
       { name: 'tags', label: 'Tags', type: 'tags' },
       { name: 'repo', label: 'Repo URL', type: 'text' },
       { name: 'external-url', label: 'External URL', type: 'text' },
