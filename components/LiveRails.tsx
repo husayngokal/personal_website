@@ -47,7 +47,7 @@ export function LiveRails({ initialState }: { initialState: LiveState }) {
       )}
 
       {state.building && (
-        <Link href={`/projects/${state.building.slug}`} className={styles.rail}>
+        <Link href={state.building.href ?? `/projects/${state.building.slug}`} className={styles.rail}>
           <div className={styles.railBody}>
             <p className={styles.railLabel}>
               currently building
@@ -55,7 +55,9 @@ export function LiveRails({ initialState }: { initialState: LiveState }) {
             </p>
             <p className={styles.railTitle}>{state.building.title}</p>
             <p className={styles.railMeta}>
-              <span className={styles.branchChip}>{state.building.branch}</span>
+              {state.building.kind !== 'task' && (
+                <span className={styles.branchChip}>{state.building.branch}</span>
+              )}
               <span className={`${styles.livePulse} ${flashing('currently_building') ? styles.livePulseFlash : ''}`} aria-hidden="true" />
               <span className={styles.railCommitTime}>active now</span>
             </p>

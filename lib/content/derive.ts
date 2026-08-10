@@ -119,6 +119,8 @@ export async function deriveAndWriteLiveState(db: SupabaseClient): Promise<Deriv
       branch: 'main',
       lastActiveDate: p.last_edited_at ?? p.last_active,
       private: p.repo_private,
+      kind: 'project',
+      href: `/projects/${p.slug}`,
     };
   } else {
     /* Fallback: top-priority in-progress task. */
@@ -151,6 +153,8 @@ export async function deriveAndWriteLiveState(db: SupabaseClient): Promise<Deriv
         branch: 'main',
         lastActiveDate: task.last_edited_at ?? new Date().toISOString(),
         private: false,
+        kind: 'task',
+        href: '/life/tasks',
       };
     }
   }

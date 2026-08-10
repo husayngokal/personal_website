@@ -29,6 +29,12 @@ export interface CurrentBuildingState {
   branch: string;
   lastActiveDate: string;      // ISO date; consumer formats as "today"/"yesterday"/etc.
   private: boolean;
+  /** Where the state came from — a project has a detail page; a task
+   *  (fallback when there's no active project) links to the tasks surface
+   *  and hides the git-branch chrome. */
+  kind?: 'project' | 'task';
+  /** Correct destination for the card link. */
+  href?: string;
 }
 
 export interface CurrentStudyingState {
