@@ -88,6 +88,19 @@ export function parseFile(relPath: string, content: string): ParsedFile | null {
     const date  = strOrNull(fm.date) || new Date().toISOString().slice(0, 10);
     return wrap('notebook_posts', slug, {
       slug,
+      /* `kind` and `thread` are dead columns kept alive only to satisfy
+         the constraints still on notebook_posts: kind is NOT NULL with a
+         CHECK of ('essay','note'), and thread carries an FK to the now
+         empty notebook_threads. Nothing reads either one. They are
+         write-only compatibility values, which is what lets this whole
+         change ship without a schema migration.
+
+         Migrations 0019 and 0020 drop all three objects. Run them when
+         dashboard access is back, then delete these two lines. Until
+         then the frontmatter `type:` field is ignored entirely: every
+         notebook file is an essay by construction. */
+      kind: 'essay',
+      thread: null,
       title,
       dek:   strOrNull(fm.dek),
       date,
