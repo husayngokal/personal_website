@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next';
-import { getNotebookPosts, getNotebookThreads } from '@/lib/content/notebook';
+import { getNotebookPosts } from '@/lib/content/notebook';
 import { getBooks } from '@/lib/content/library';
 import { getProjects } from '@/lib/content/projects';
 import { getCourses } from '@/lib/content/courses';
@@ -55,17 +55,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   const [
-    posts, threads, books, projects, courses, writeups, credentials,
+    posts, books, projects, courses, writeups, credentials,
     masterPlanParts, ideas, researchTopics,
   ] = await Promise.all([
-    getNotebookPosts(), getNotebookThreads(),
+    getNotebookPosts(),
     getBooks(), getProjects(), getCourses(), getWriteups(), getCredentials(),
     getMasterPlanParts(), getIdeas(), getResearchTopics(),
   ]);
 
   const detailRoutes: MetadataRoute.Sitemap = [];
   for (const p of posts)        detailRoutes.push({ url: `${BASE}/notebook/${p.slug}`,             lastModified: p.date ? new Date(p.date) : now });
-  for (const t of threads)      detailRoutes.push({ url: `${BASE}/notebook/threads/${t.slug}`,    lastModified: now });
   for (const b of books)        detailRoutes.push({ url: `${BASE}/library/${b.slug}`,             lastModified: b.finished ? new Date(b.finished) : now });
   for (const p of projects)     detailRoutes.push({ url: `${BASE}/projects/${p.slug}`,            lastModified: p.lastActive ? new Date(p.lastActive) : now });
   for (const c of courses)      detailRoutes.push({ url: `${BASE}/courses/${c.slug}`,             lastModified: now });

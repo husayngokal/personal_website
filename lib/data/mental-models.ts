@@ -182,9 +182,7 @@ export const MENTAL_MODELS: MentalModel[] = [
       'For systems you want to remain stable; you want a balancing loop there, not a reinforcing one.',
       'When the apparent acceleration is actually external — do not credit your loop for a tailwind.',
     ],
-    inTheWild: [
-      { href: '/notebook/threads/polymathy-in-practice', label: 'Polymathy in practice (thread)', sub: 'the writing → thinking → writing loop' },
-    ],
+    inTheWild: [],
     sources: [
       { label: 'Norbert Wiener — Cybernetics (1948)' },
       { label: 'Donella Meadows — Thinking in Systems (2008)' },

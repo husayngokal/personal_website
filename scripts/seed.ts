@@ -10,7 +10,7 @@
 import { getServerAdminClient } from '../lib/supabase';
 import { toRow } from '../lib/db-mappers';
 
-import { NOTEBOOK_POSTS, NOTEBOOK_THREADS } from '../lib/data/notebook';
+import { NOTEBOOK_POSTS } from '../lib/data/notebook';
 import { BOOKS } from '../lib/data/library';
 import { PROJECTS } from '../lib/data/projects';
 import { MENTAL_MODELS } from '../lib/data/mental-models';
@@ -55,7 +55,6 @@ async function main() {
   console.log('Seeding husayngokal.com Postgres from lib/data/* …\n');
 
   console.log('Notebook:');
-  await upsert('notebook_threads', NOTEBOOK_THREADS.map(toRow.notebookThread));
   await upsert('notebook_posts',   NOTEBOOK_POSTS.map(toRow.notebookPost));
 
   console.log('\nLibrary:');

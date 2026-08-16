@@ -130,14 +130,6 @@
 }
 .featuredCard:hover { background: #FBF6E8; }
 
-.cardKind {
-  font-family: var(--font-mono);
-  font-size: var(--type-mono-s);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--accent);
-  margin: 0;
-}
 .cardTitle {
   font-family: var(--font-serif);
   font-weight: 600;
@@ -161,49 +153,6 @@
   margin: var(--space-s) 0 0 0;
 }
 .cardSep { color: var(--border); margin: 0 4px; }
-.cardThread { color: var(--text-body); }
-
-/* -- Threads --------------------------------------------------- */
-.threadGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-l);
-}
-@media (max-width: 800px) { .threadGrid { grid-template-columns: 1fr; } }
-
-.threadCard {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-s);
-  padding: var(--space-l);
-  background: var(--bg-raised);
-  border-radius: 4px;
-  text-decoration: none;
-  color: inherit;
-}
-.threadCard:hover { background: #FBF6E8; }
-
-.threadName {
-  font-family: var(--font-serif);
-  font-weight: 600;
-  font-size: 20px;
-  color: var(--text-strong);
-  margin: 0;
-}
-.threadSummary {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: var(--type-body-m);
-  color: var(--text-body);
-  margin: 0;
-  line-height: 1.5;
-}
-.threadMeta {
-  font-family: var(--font-mono);
-  font-size: var(--type-mono-m);
-  color: var(--accent);
-  margin: var(--space-xs) 0 0 0;
-}
 
 /* -- Across-the-site ----------------------------------------- */
 .acrossGrid {

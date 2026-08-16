@@ -16,7 +16,7 @@ export const revalidate = 60; // ISR — regenerates every 60s in the background
 export const metadata = {
   title: 'Library',
   description:
-    'Reading log, year-long reading plan, notes, reviews, and threads that connect books to the rest of the site.',
+    'Reading log, year-long reading plan, notes, reviews, and essays that connect books to the rest of the site.',
 };
 
 const STATUS_FILTERS = [
@@ -78,7 +78,7 @@ export default async function LibraryIndex({
         <h1 className={styles.title}>Library</h1>
         <p className={styles.dek}>
           Every book read, in progress, planned, or abandoned. The year-long
-          plan is the spine; the notes, reviews, and threads are the substance.
+          plan is the spine; the notes, reviews, and essays are the substance.
         </p>
       </header>
 

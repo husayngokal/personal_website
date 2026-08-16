@@ -12,7 +12,7 @@ export const revalidate = 60; // ISR — regenerates every 60s in the background
 
 /*
  * Book detail (Part VII). Two-column on desktop — cover on left, metadata
- * on right. Below the header: notes, review, threads, passages. Each
+ * on right. Below the header: notes, review, essays, passages. Each
  * section is optional.
  */
 
@@ -35,9 +35,9 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
   const notesHtml  = book.notes  ? await renderMarkdown(book.notes,  'library_books') : null;
   const reviewHtml = book.review ? await renderMarkdown(book.review, 'library_books') : null;
 
-  // Threads from this book — find Notebook posts mentioning the book by slug/title
+  // Essays from this book — find Notebook posts mentioning the book by slug/title
   const allPosts = await getNotebookPosts();
-  const threadsFromBook = allPosts.filter((p) =>
+  const essaysFromBook = allPosts.filter((p) =>
     p.body.toLowerCase().includes(book.title.toLowerCase().split(':')[0].slice(0, 20))
   ).slice(0, 3);
 
@@ -112,10 +112,10 @@ export default async function BookPage({ params }: { params: Promise<{ slug: str
         </section>
       )}
 
-      {threadsFromBook.length > 0 && (
+      {essaysFromBook.length > 0 && (
         <CrossLinkStrip
-          title="Threads from this book"
-          items={threadsFromBook.map((t) => ({ href: `/notebook/${t.slug}`, label: t.title, sub: t.date }))}
+          title="Essays from this book"
+          items={essaysFromBook.map((t) => ({ href: `/notebook/${t.slug}`, label: t.title, sub: t.date }))}
         />
       )}
 

@@ -1,9 +1,16 @@
-import { NOTEBOOK_POSTS } from '@/lib/data/notebook';
+import { getNotebookPosts } from '@/lib/content/notebook';
 
 /*
  * RSS feed — the Notebook only. RSS is the only subscription mechanism
  * the site offers; email subscriptions are deferred per Part XVI.
+ *
+ * Reads the live getter, not lib/data. It used to import the static
+ * fallback module directly, which meant the public feed served six
+ * placeholder posts that were never on the site. Drafts are filtered by
+ * getNotebookPosts, so an unpublished essay never reaches a reader.
  */
+
+export const revalidate = 600;
 
 const BASE = 'https://husayngokal.com';
 
@@ -15,8 +22,10 @@ function escape(s: string): string {
     .replace(/"/g, '&quot;');
 }
 
-export function GET() {
-  const items = [...NOTEBOOK_POSTS]
+export async function GET() {
+  const posts = await getNotebookPosts();
+
+  const items = [...posts]
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 30)
     .map((p) => `
@@ -32,9 +41,9 @@ export function GET() {
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0">
   <channel>
-    <title>husayn gokal — Notebook</title>
+    <title>husayn gokal · Notebook</title>
     <link>${BASE}/notebook</link>
-    <description>Long-form essays, short notes, and named threads from husayngokal.com</description>
+    <description>Long-form essays from husayngokal.com</description>
     <language>en</language>
     ${items}
   </channel>

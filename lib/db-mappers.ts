@@ -14,7 +14,7 @@
  */
 
 import type {
-  NotebookPost, NotebookThread,
+  NotebookPost,
   Book,
   ProjectPage,
   MentalModel,
@@ -32,13 +32,10 @@ import type {
  * NOTEBOOK
  * ============================================================ */
 export const toRow = {
-  notebookThread: (t: NotebookThread) => ({
-    slug: t.slug, name: t.name, summary: t.summary, state: t.state,
-  }),
   notebookPost: (p: NotebookPost) => ({
-    slug: p.slug, kind: p.kind, title: p.title, dek: p.dek ?? null,
+    slug: p.slug, title: p.title, dek: p.dek ?? null,
     date: p.date, updated: p.updated ?? null,
-    thread: p.thread ?? null, tags: p.tags ?? null,
+    tags: p.tags ?? null,
     epistemic_status: p.epistemicStatus ?? null,
     draft: p.draft ?? false, word_count: p.wordCount ?? null,
     body: p.body,
@@ -178,20 +175,12 @@ export const toRow = {
 type Row = Record<string, unknown>;
 
 export const fromRow = {
-  notebookThread: (r: Row): NotebookThread => ({
-    slug:    r.slug as string,
-    name:    r.name as string,
-    summary: r.summary as string,
-    state:   r.state as NotebookThread['state'],
-  }),
   notebookPost: (r: Row): NotebookPost => ({
     slug: r.slug as string,
-    kind: r.kind as NotebookPost['kind'],
     title: r.title as string,
     dek: (r.dek as string) ?? undefined,
     date: r.date as string,
     updated: (r.updated as string) ?? undefined,
-    thread: (r.thread as string) ?? undefined,
     tags: (r.tags as string[]) ?? undefined,
     epistemicStatus: (r.epistemic_status as string) ?? undefined,
     draft: (r.draft as boolean) ?? false,

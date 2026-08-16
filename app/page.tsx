@@ -9,7 +9,7 @@ import { NewsletterForm } from '@/components/NewsletterForm';
 import { ScrollDrop } from '@/components/marks/ScrollDrop';
 import { getLiveState } from '@/lib/content/state';
 import { getCurrentWorking } from '@/lib/content/working';
-import { getNotebookPosts, getNotebookThreads } from '@/lib/content/notebook';
+import { getNotebookPosts } from '@/lib/content/notebook';
 import { getBooks } from '@/lib/content/library';
 import { getProjects } from '@/lib/content/projects';
 /* Mental Models still archived — re-introduce alongside acrossModel
@@ -41,21 +41,17 @@ export const revalidate = 60;
 
 export default async function HomePage() {
   const [
-    initialState, working, NOTEBOOK_POSTS, NOTEBOOK_THREADS, BOOKS, PROJECTS, LIFE_PRINCIPLES, WRITEUPS,
+    initialState, working, NOTEBOOK_POSTS, BOOKS, PROJECTS, LIFE_PRINCIPLES, WRITEUPS,
   ] = await Promise.all([
     getLiveState(),
     getCurrentWorking(),
-    getNotebookPosts(), getNotebookThreads(),
+    getNotebookPosts(),
     getBooks(), getProjects(), getLifePrinciples(), getWriteups(),
   ]);
 
   const recentEssays = [...NOTEBOOK_POSTS]
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 4);
-  const activeThreads = NOTEBOOK_THREADS.filter((t) => t.state === 'active').slice(0, 5).map((t) => ({
-    ...t,
-    postCount: NOTEBOOK_POSTS.filter((p) => p.thread === t.slug).length,
-  }));
 
   /* One item per surface for the across-the-site row. Mental Models
      is still archived; the row carries book + project + principle +
@@ -65,7 +61,7 @@ export default async function HomePage() {
   const acrossProject = PROJECTS.find((p) => p.status === 'active') ?? PROJECTS[0];
   // const acrossModel = MENTAL_MODELS.find((m) => m.slug === 'first-principles') ?? MENTAL_MODELS[0];
   const acrossPrinciple = LIFE_PRINCIPLES.find((p) => p.order === 1);
-  const acrossEssay = NOTEBOOK_POSTS.find((p) => p.kind === 'essay');
+  const acrossEssay = recentEssays[0];
   /* Latest writeup — getWriteups orders machines before techniques,
      then newest-first per the in-table sort. First element is the
      most recently surfaced item in the unified writeups feed. */
@@ -116,46 +112,16 @@ export default async function HomePage() {
           <div className={styles.notebookStrip}>
             {recentEssays.map((p) => (
               <Link key={p.slug} href={`/notebook/${p.slug}`} className={styles.featuredCard}>
-                <p className={styles.cardKind}>{p.kind}</p>
                 <p className={styles.cardTitle}>{p.title}</p>
                 {p.dek && <p className={styles.cardDek}>{p.dek}</p>}
                 <p className={styles.cardMeta}>
                   <span>{p.date}</span>
-                  {p.thread && (
+                  {p.wordCount && (
                     <>
                       <span className={styles.cardSep}>·</span>
-                      <span className={styles.cardThread}>
-                        {NOTEBOOK_THREADS.find((t) => t.slug === p.thread)?.name ?? p.thread}
-                      </span>
+                      <span>{p.wordCount.toLocaleString()} words</span>
                     </>
                   )}
-                </p>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* -- Active threads ------------------------------------------ */}
-      <section className={styles.section}>
-        <div className={styles.sectionInner}>
-          <div className={styles.sectionHead}>
-            <Eyebrow number="03">Active threads</Eyebrow>
-            <Link href="/notebook" className={styles.sectionLink}>
-              thread map →
-            </Link>
-          </div>
-          <div className={styles.threadGrid}>
-            {activeThreads.map((t) => (
-              <Link
-                key={t.slug}
-                href={`/notebook/threads/${t.slug}`}
-                className={styles.threadCard}
-              >
-                <p className={styles.threadName}>{t.name}</p>
-                <p className={styles.threadSummary}>{t.summary}</p>
-                <p className={styles.threadMeta}>
-                  {t.postCount} {t.postCount === 1 ? 'post' : 'posts'}
                 </p>
               </Link>
             ))}
@@ -166,7 +132,7 @@ export default async function HomePage() {
       {/* -- From across the site ------------------------------------ */}
       <section className={styles.section}>
         <div className={styles.sectionInner}>
-          <Eyebrow number="04">From across the site</Eyebrow>
+          <Eyebrow number="03">From across the site</Eyebrow>
           <div className={styles.acrossGrid}>
             {acrossBook && (
               <Link href={`/library/${acrossBook.slug}`} className={styles.acrossItem}>
@@ -215,7 +181,7 @@ export default async function HomePage() {
       {/* -- Newsletter ---------------------------------------------- */}
       <section className={styles.section}>
         <div className={styles.sectionInner}>
-          <Eyebrow number="05">The weekly email</Eyebrow>
+          <Eyebrow number="04">The weekly email</Eyebrow>
           <NewsletterForm />
         </div>
       </section>

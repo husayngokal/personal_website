@@ -11,7 +11,7 @@
 
 import 'server-only';
 import { cache } from 'react';
-import { getNotebookPosts, getNotebookThreads } from './notebook';
+import { getNotebookPosts } from './notebook';
 import { getBooks } from './library';
 import { getProjects } from './projects';
 import { getCourses } from './courses';
@@ -51,10 +51,10 @@ export interface SearchItem {
 
 export const getSearchIndex = cache(async (): Promise<SearchItem[]> => {
   const [
-    posts, threads, books, projects, courses, writeups, credentials,
+    posts, books, projects, courses, writeups, credentials,
     principles, changed, masterPlanParts, tasks, ideas, researchTopics, livingEntries,
   ] = await Promise.all([
-    getNotebookPosts(), getNotebookThreads(),
+    getNotebookPosts(),
     getBooks(), getProjects(), getCourses(), getWriteups(), getCredentials(),
     getLifePrinciples(), getChangedMyMind(),
     getMasterPlanParts(), getTasks(), getIdeas(), getResearchTopics(), getLivingEntries(),
@@ -66,15 +66,8 @@ export const getSearchIndex = cache(async (): Promise<SearchItem[]> => {
     surface: 'notebook',
     href: `/notebook/${p.slug}`,
     title: p.title,
-    subtitle: `${p.kind === 'essay' ? 'essay' : 'note'} · ${p.date}`,
+    subtitle: `essay · ${p.date}`,
     body: p.body,
-  });
-  for (const t of threads) items.push({
-    surface: 'notebook',
-    href: `/notebook/threads/${t.slug}`,
-    title: t.name,
-    subtitle: `thread · ${t.state}`,
-    body: t.summary,
   });
   for (const b of books) items.push({
     surface: 'library',

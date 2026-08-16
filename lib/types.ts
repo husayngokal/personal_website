@@ -14,26 +14,21 @@ export type SurfaceKey =
   | 'life';
 
 /* -- Notebook ------------------------------------------------------ */
-export type NotebookKind = 'essay' | 'note';
+/* The Notebook holds essays and nothing else. Notes and threads were
+   removed in August 2026: three ways to file a piece of writing meant
+   the author filed none of them. One surface, one kind. Drafts are the
+   only axis left, and they are a boolean, not a category. */
 export interface NotebookPost {
   slug: string;
-  kind: NotebookKind;
   title: string;
   dek?: string;
   date: string;            // ISO yyyy-mm-dd
   updated?: string;
-  thread?: string;         // thread slug (filename in /notebook/threads/)
   tags?: string[];
   epistemicStatus?: string;
   draft?: boolean;
   wordCount?: number;
   body: string;            // markdown
-}
-export interface NotebookThread {
-  slug: string;
-  name: string;            // display name
-  summary: string;
-  state: 'active' | 'dormant' | 'concluded';
 }
 
 /* -- Library ------------------------------------------------------- */

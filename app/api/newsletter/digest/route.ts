@@ -46,7 +46,7 @@ async function handle(req: NextRequest) {
 
   const { data: posts } = await db
     .from('notebook_posts')
-    .select('slug, title, dek, kind, last_edited_at')
+    .select('slug, title, dek, last_edited_at')
     .gte('last_edited_at', since)
     .eq('draft', false)
     .order('last_edited_at', { ascending: false });
@@ -55,7 +55,7 @@ async function handle(req: NextRequest) {
       heading: 'Notebook',
       items: posts.map((p) => ({
         title: p.title,
-        detail: p.dek ?? p.kind,
+        detail: p.dek ?? 'essay',
         href: `${site}/notebook/${p.slug}`,
       })),
     });

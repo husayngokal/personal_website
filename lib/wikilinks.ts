@@ -61,7 +61,6 @@ export interface SlugRegistryEntry {
 export function urlFor(table: string, slug: string): string | null {
   switch (table) {
     case 'notebook_posts':       return `/notebook/${slug}`;
-    case 'notebook_threads':     return `/notebook/threads/${slug}`;
     case 'library_books':        return `/library/${slug}`;
     case 'projects':             return `/projects/${slug}`;
     case 'mental_models':        return `/mental-models/${slug}`;

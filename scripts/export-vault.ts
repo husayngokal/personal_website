@@ -15,7 +15,7 @@ import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-import { NOTEBOOK_POSTS, NOTEBOOK_THREADS } from '../lib/data/notebook';
+import { NOTEBOOK_POSTS } from '../lib/data/notebook';
 import { BOOKS } from '../lib/data/library';
 import { PROJECTS } from '../lib/data/projects';
 import { MENTAL_MODELS } from '../lib/data/mental-models';
@@ -107,20 +107,15 @@ async function build() {
   await mkdir(OUT_DIR, { recursive: true });
 
   /* Notebook */
-  for (const t of NOTEBOOK_THREADS) {
-    await write(`notebook/threads/${t.slug}.md`, {
-      type: 'thread', name: t.name, state: t.state,
-    }, t.summary);
-  }
   for (const p of NOTEBOOK_POSTS) {
     await write(`notebook/${p.slug}.md`, {
-      type: p.kind, title: p.title, dek: p.dek,
-      date: p.date, thread: p.thread, tags: p.tags,
+      title: p.title, dek: p.dek,
+      date: p.date, tags: p.tags,
       'epistemic-status': p.epistemicStatus,
       'word-count': p.wordCount, draft: p.draft ?? false,
     }, p.body);
   }
-  console.log(`  notebook: ${NOTEBOOK_POSTS.length} posts + ${NOTEBOOK_THREADS.length} threads`);
+  console.log(`  notebook: ${NOTEBOOK_POSTS.length} essays`);
 
   /* Library */
   for (const b of BOOKS) {

@@ -170,14 +170,11 @@ export async function syncVault(opts: SyncOptions = {}): Promise<SyncResult> {
   const db = getServerAdminClient();
 
   /* Deterministic upsert order — parent tables before child tables so
-     FK references resolve. notebook_threads MUST come before
-     notebook_posts (posts.thread → threads.slug), and similarly any
-     future parent/child pairs go here. Tables not listed sort
-     alphabetically at the end. */
-  const UPSERT_ORDER = [
-    'notebook_threads',
-    'notebook_posts',
-  ];
+     FK references resolve. Empty today: the notebook_posts → threads FK
+     was the only parent/child pair and threads are gone. Kept because
+     the next FK pair will need it, and the sort below already handles
+     the empty case by falling through to alphabetical. */
+  const UPSERT_ORDER: string[] = [];
   const orderedEntries = Array.from(byTable.entries()).sort(([a], [b]) => {
     const ia = UPSERT_ORDER.indexOf(a);
     const ib = UPSERT_ORDER.indexOf(b);
@@ -269,7 +266,7 @@ export async function syncVault(opts: SyncOptions = {}): Promise<SyncResult> {
          errors), so a transient parser failure can't wipe content. */
   if (safeToDelete) {
     const SLUG_TABLES_WITH_DELETE = [
-      'notebook_posts', 'notebook_threads', 'library_books', 'projects',
+      'notebook_posts', 'library_books', 'projects',
       'mental_models', 'courses', 'writeups', 'credentials',
       'study_credentials', 'study_domains',
       'life_principles', 'life_story_vignettes', 'life_changed_mind',
@@ -326,7 +323,6 @@ export async function syncVault(opts: SyncOptions = {}): Promise<SyncResult> {
     const surfaces: { index: string; detail?: string }[] = [
       { index: '/',                    detail: undefined            },
       { index: '/notebook',            detail: '/notebook/[slug]'   },
-      { index: '/notebook',            detail: '/notebook/threads/[name]' },
       { index: '/library',             detail: '/library/[slug]'    },
       { index: '/projects',            detail: '/projects/[slug]'   },
       { index: '/mental-models',       detail: '/mental-models/[slug]' },
@@ -408,9 +404,10 @@ async function rebuildWikilinkGraph(
   result: SyncResult,
 ): Promise<void> {
   /* Build the slug → (table, title, url) registry from this run's
-     parsed rows. notebook_threads uses `name` instead of `title`; all
-     others fall back to slug if no title surface exists. Comments
-     are excluded — readers' wikilinks shouldn't pollute the graph. */
+     parsed rows. Tables that title their rows with `name` rather than
+     `title` are covered by the fallback below; anything with neither
+     falls back to slug. Comments are excluded — readers' wikilinks
+     shouldn't pollute the graph. */
   const flat: SlugRegistryEntry[] = [];
   for (const p of parsed) {
     if (!p.table || !p.slug || p.table === 'comments') continue;

@@ -4,7 +4,6 @@
  *
  * Each content type has its own parser. Path determines the dispatch:
  *
- *   notebook/threads/*.md           → notebook_threads
  *   notebook/*.md                   → notebook_posts
  *   library/*.md                    → library_books
  *   projects/*.md                   → projects
@@ -70,24 +69,12 @@ export function parseFile(relPath: string, content: string): ParsedFile | null {
      ParsedFile carries bodyText for downstream wikilink scanning. */
   wrap = (table, s, row) => ({ table, slug: s, row, bodyText: body });
 
-  /* ---- Notebook threads ---- */
-  if (relPath.startsWith('notebook/threads/')) {
-    return wrap('notebook_threads', slug, {
-      slug,
-      name:    requireStr(fm, 'name', relPath),
-      summary: body || requireStr(fm, 'summary', relPath),
-      state:   pick(fm, 'state', ['active', 'dormant', 'concluded'], relPath),
-    });
-  }
-
   /* ---- Notebook posts ---- */
+  /* The `/threads/` guard outlives the threads feature on purpose. The
+     folder is gone from the vault, but if one is ever recreated by hand
+     or by a stale Obsidian template, this stops four thread files from
+     silently becoming four published essays. */
   if (relPath.startsWith('notebook/') && !relPath.includes('/threads/')) {
-    /* `type:` is technically required but the templates leave it blank
-       sometimes; default to 'note' rather than block sync so a single
-       missing field doesn't poison the whole notebook upsert. */
-    const typeStr = strOrNull(fm.type)?.trim();
-    const kind: 'essay' | 'note' =
-      typeStr === 'essay' || typeStr === 'note' ? typeStr : 'note';
     /* Always compute word_count from body so it stays accurate as the
        post grows. The frontmatter `word-count` field is ignored if
        present (it would drift). */
@@ -101,12 +88,10 @@ export function parseFile(relPath: string, content: string): ParsedFile | null {
     const date  = strOrNull(fm.date) || new Date().toISOString().slice(0, 10);
     return wrap('notebook_posts', slug, {
       slug,
-      kind,
       title,
       dek:   strOrNull(fm.dek),
       date,
       updated: strOrNull(fm.updated),   // optional — author sets when revising
-      thread: strOrNull(fm.thread),
       tags:  arrOrNull(fm.tags),
       epistemic_status: strOrNull(fm['epistemic-status']),
       draft: fm.draft === true,

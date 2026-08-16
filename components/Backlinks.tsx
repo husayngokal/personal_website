@@ -14,7 +14,6 @@ import { getBacklinks } from '@/lib/content/links';
 
 const SURFACE_LABEL: Record<string, string> = {
   notebook_posts:       'Notebook',
-  notebook_threads:     'Notebook · thread',
   library_books:        'Library',
   projects:             'Projects',
   mental_models:        'Mental Models',

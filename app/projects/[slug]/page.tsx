@@ -18,7 +18,7 @@ export const revalidate = 60; // ISR — regenerates every 60s in the background
  *   - Task list (kanban, optional)
  *   - Recent activity (commit-like feed, redacted for private repos)
  *   - Decision log
- *   - Linked threads (cross-link strip)
+ *   - Linked essays (cross-link strip)
  */
 
 export async function generateStaticParams() {
@@ -37,11 +37,9 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
   const project = await getProject(slug);
   if (!project) notFound();
 
-  // Linked threads — any notebook posts mentioning the project tag
+  // Linked essays — any notebook posts tagged with the project slug
   const allPosts = await getNotebookPosts();
-  const linkedNotebook = allPosts.filter(
-    (p) => p.tags?.includes(project.slug) || p.thread === `building-${project.slug}-in-public`,
-  );
+  const linkedNotebook = allPosts.filter((p) => p.tags?.includes(project.slug));
 
   return (
     <div className="page" style={{ paddingTop: 'var(--space-l)', paddingBottom: 'var(--space-2xl)' }}>
@@ -156,7 +154,7 @@ export default async function ProjectPage({ params }: { params: Promise<{ slug: 
 
       {linkedNotebook.length > 0 && (
         <CrossLinkStrip
-          title="Linked threads"
+          title="Linked essays"
           items={linkedNotebook.map((p) => ({ href: `/notebook/${p.slug}`, label: p.title, sub: p.date }))}
         />
       )}

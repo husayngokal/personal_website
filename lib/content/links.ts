@@ -33,7 +33,6 @@ export interface Backlink {
    contributes { table, slug, title, url } to a single flat list. */
 const REGISTRY_TABLES = [
   { table: 'notebook_posts',       cols: 'slug, title' },
-  { table: 'notebook_threads',     cols: 'slug, name'  },
   { table: 'library_books',        cols: 'slug, title' },
   { table: 'projects',             cols: 'slug, title' },
   { table: 'mental_models',        cols: 'slug, title' },
@@ -73,7 +72,6 @@ function urlForTable(table: string, slug: string): string | null {
   // (wikilinks is also imported from sync.ts on the server-edge).
   switch (table) {
     case 'notebook_posts':       return `/notebook/${slug}`;
-    case 'notebook_threads':     return `/notebook/threads/${slug}`;
     case 'library_books':        return `/library/${slug}`;
     case 'projects':             return `/projects/${slug}`;
     case 'mental_models':        return `/mental-models/${slug}`;

@@ -1,12 +1,4 @@
 .head { margin-bottom: var(--space-2xl); }
-.kind {
-  font-family: var(--font-mono);
-  font-size: var(--type-mono-s);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--accent);
-  margin: 0 0 var(--space-m) 0;
-}
 .title {
   font-size: var(--type-display-m);
   line-height: var(--type-display-m-lh);

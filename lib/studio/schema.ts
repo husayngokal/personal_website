@@ -49,7 +49,6 @@ export interface ContentType {
 
 /* -- enum option sets, mirrored from parse.ts pick() calls -- */
 const LIBRARY_STATUS = ['planned', 'reading', 'finished', 'abandoned', 're-reading', 'wishlist'];
-const THREAD_STATE = ['active', 'dormant', 'concluded'];
 const MM_TYPE = ['curated', 'original', 'hybrid'];
 const DEPTH = ['dabbled', 'learning', 'working-in', 'teaching-from', 'decayed'];
 const COURSE_STATUS = ['planned', 'studying', 'completed', 'abandoned'];
@@ -68,41 +67,24 @@ const GOAL_STATUS = ['completed', 'partially-completed', 'dropped', 'rolled-over
 
 export const CONTENT_TYPES: ContentType[] = [
   /* ---- Notebook ---- */
-  {
-    key: 'notebook-note', label: 'Note', group: 'Notebook',
-    folder: 'notebook', route: '/notebook', titleField: 'title',
-    fixed: { type: 'note', draft: false },
-    fields: [
-      { name: 'title', label: 'Title', type: 'text', required: true },
-      { name: 'date', label: 'Date', type: 'date', default: '@today' },
-      { name: 'thread', label: 'Thread', type: 'text', placeholder: 'e.g. working', help: 'Slug of a notebook thread, optional.' },
-      { name: 'tags', label: 'Tags', type: 'tags' },
-      { name: 'epistemic-status', label: 'Epistemic status', type: 'text' },
-    ],
-    body: { mode: 'freeform', label: 'Note', placeholder: 'Markdown and [[wikilinks]] supported.' },
-  },
+  /* One content type. Notes and threads were removed in August 2026;
+     `draft` is the only axis left, and it defaults to true so a new
+     essay is private until the author deliberately publishes it. */
   {
     key: 'notebook-essay', label: 'Essay', group: 'Notebook',
     folder: 'notebook', route: '/notebook', titleField: 'title',
-    fixed: { type: 'essay', draft: true },
     fields: [
       { name: 'title', label: 'Title', type: 'text', required: true },
       { name: 'dek', label: 'Dek', type: 'text', help: 'One-line summary under the title.' },
       { name: 'date', label: 'Date', type: 'date', default: '@today' },
-      { name: 'thread', label: 'Thread', type: 'text', placeholder: 'e.g. working' },
       { name: 'tags', label: 'Tags', type: 'tags' },
       { name: 'epistemic-status', label: 'Epistemic status', type: 'text' },
+      {
+        name: 'draft', label: 'Draft', type: 'boolean', default: true,
+        help: 'Drafts sync to the database but stay invisible everywhere public, including at their own URL. Untick to publish.',
+      },
     ],
-    body: { mode: 'freeform', label: 'Essay', placeholder: 'Starts as a draft.' },
-  },
-  {
-    key: 'notebook-thread', label: 'Thread', group: 'Notebook',
-    folder: 'notebook/threads', route: '/notebook/threads', titleField: 'name',
-    fields: [
-      { name: 'name', label: 'Name', type: 'text', required: true },
-      { name: 'state', label: 'State', type: 'select', required: true, options: THREAD_STATE, default: 'active' },
-    ],
-    body: { mode: 'freeform', label: 'Summary', placeholder: 'What this thread is about.' },
+    body: { mode: 'freeform', label: 'Essay', placeholder: 'Starts as a draft. Markdown and [[wikilinks]] supported.' },
   },
 
   /* ---- Library ---- */

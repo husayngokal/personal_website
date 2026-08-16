@@ -42,7 +42,7 @@ npm run library:enrich # Open Library lookup + cover upload for the library
 
 | Surface | Route | Notes |
 |---|---|---|
-| Notebook | `/notebook` | Essays, threads, notes |
+| Notebook | `/notebook` | Essays |
 | Library | `/library` | Reading log with notes and reviews |
 | Projects | `/projects` | Project records and activity |
 | Courses | `/courses` | Coursework log |
