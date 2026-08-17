@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { ContentType } from '@/lib/studio/schema';
+import { clockTime, relativeTime, useDraft, type Draft } from './use-draft';
 import styles from './studio.module.css';
 
 /*
@@ -36,6 +37,34 @@ export function StudioForm({
   const [deleting, setDeleting] = useState(false);
 
   const set = (name: string, v: unknown) => setValues((prev) => ({ ...prev, [name]: v }));
+
+  /* Draft autosave. Keyed per form so a half-written essay and a half-written
+     book note don't overwrite each other, and so editing two entries of the
+     same type keeps two drafts. */
+  const draftKey = `${mode}:${type.key}:${editPath ?? 'new'}`;
+  const pristine = useRef(JSON.stringify({ values: initialValues, sections: initialSections, body: initialBody }));
+  const snapshot = useMemo(() => ({ values, sections, body }), [values, sections, body]);
+  const dirty = JSON.stringify(snapshot) !== pristine.current;
+
+  const applyDraft = useCallback((d: Draft) => {
+    setValues((prev) => ({ ...prev, ...d.values }));
+    setSections(d.sections);
+    setBody(d.body);
+  }, []);
+
+  const { restoredFrom, savedAt, clear: clearDraft, dismissRestoreNotice } = useDraft({
+    key: draftKey,
+    snapshot,
+    dirty,
+    onRestore: applyDraft,
+  });
+
+  function discardDraft() {
+    setValues(initialValues);
+    setSections(initialSections);
+    setBody(initialBody);
+    clearDraft();
+  }
 
   /* Image upload: track which text area is focused so an uploaded image's
      markdown lands where the cursor was. */
@@ -101,6 +130,11 @@ export function StudioForm({
       });
       const j = await res.json();
       if (res.ok) {
+        /* Safely in the vault now, so the local copy has done its job. Mark
+           the current state pristine first, or the save effect immediately
+           writes a fresh draft from the still-populated fields. */
+        pristine.current = JSON.stringify(snapshot);
+        clearDraft();
         setResult({
           ok: true,
           msg: `${mode === 'edit' ? 'Saved' : 'Created'} ${j.path}. Live in ~30s.`,
@@ -133,7 +167,11 @@ export function StudioForm({
         body: JSON.stringify({ path: editPath, sha }),
       });
       const j = await res.json();
-      if (res.ok) setResult({ ok: true, msg: `Deleted ${j.path}. Removed in ~30s.` });
+      if (res.ok) {
+        pristine.current = JSON.stringify(snapshot);
+        clearDraft();
+        setResult({ ok: true, msg: `Deleted ${j.path}. Removed in ~30s.` });
+      }
       else if (j.error === 'conflict') setResult({ ok: false, msg: 'This entry changed elsewhere since you opened it. Reload before deleting.' });
       else setResult({ ok: false, msg: j.detail || j.error || 'Delete failed.' });
     } catch (err) {
@@ -227,6 +265,17 @@ export function StudioForm({
             />
           </label>
         ))}
+
+      {restoredFrom !== null ? (
+        <p className={styles.draftNote}>
+          Restored an unsaved draft from {relativeTime(restoredFrom)}, saved on this device.{' '}
+          <button type="button" className={styles.cancel} onClick={dismissRestoreNotice}>keep it</button>
+          {' · '}
+          <button type="button" className={styles.cancel} onClick={discardDraft}>discard it</button>
+        </p>
+      ) : savedAt !== null ? (
+        <p className={styles.draftNote}>Draft saved on this device, {clockTime(savedAt)}. Nothing is published until you press {mode === 'edit' ? 'save changes' : 'create'}.</p>
+      ) : null}
 
       <div className={styles.actions}>
         <button className={styles.submit} type="submit" disabled={busy}>
