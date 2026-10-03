@@ -16,6 +16,7 @@
 import Link from 'next/link';
 import { BookCover } from './BookCover';
 import { CalendarTile } from './marks/CalendarTile';
+import { ProjectMark } from './marks/ProjectMark';
 import { ProgressBar } from './Primitives';
 import { useLiveState } from '@/lib/use-live-state';
 import type { LiveState } from '@/lib/content/state';
@@ -48,6 +49,7 @@ export function LiveRails({ initialState }: { initialState: LiveState }) {
 
       {state.building && (
         <Link href={state.building.href ?? `/projects/${state.building.slug}`} className={styles.rail}>
+          <ProjectMark size={48} />
           <div className={styles.railBody}>
             <p className={styles.railLabel}>
               currently building

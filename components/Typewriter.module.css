@@ -15,10 +15,6 @@
   letter-spacing: -0.005em;
   margin: 0 0 var(--space-m) 0;
   min-height: calc(var(--type-display-m) * var(--type-display-m-lh) * 2);
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 4px;
 }
 
 .caret {
@@ -27,7 +23,7 @@
   height: 0.95em;
   background: var(--accent);
   margin-left: 4px;
-  align-self: center;
+  vertical-align: baseline;
   animation: blink 1100ms steps(2, start) infinite;
 }
 
