@@ -19,6 +19,7 @@ export function StudioForm({
   sha,
   initialBody = '',
   initialSections = {},
+  baseFrontmatter,
 }: {
   type: ContentType;
   initialValues: Record<string, string>;
@@ -27,6 +28,9 @@ export function StudioForm({
   sha?: string;
   initialBody?: string;
   initialSections?: Record<string, string>;
+  /** The edited file's original frontmatter, sent back on save so keys the
+   *  schema doesn't expose are preserved rather than dropped. */
+  baseFrontmatter?: Record<string, unknown>;
 }) {
   const [values, setValues] = useState<Record<string, unknown>>(initialValues);
   const [sections, setSections] = useState<Record<string, string>>(initialSections);
@@ -119,7 +123,7 @@ export function StudioForm({
     const endpoint = mode === 'edit' ? '/api/studio/update' : '/api/studio/create';
     const requestBody =
       mode === 'edit'
-        ? { type: type.key, path: editPath, sha, values: payloadValues }
+        ? { type: type.key, path: editPath, sha, values: payloadValues, base: baseFrontmatter }
         : { type: type.key, values: payloadValues };
 
     try {

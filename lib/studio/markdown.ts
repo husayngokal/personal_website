@@ -76,17 +76,28 @@ export interface BuiltFile {
   url: string;
 }
 
-export function buildMarkdown(type: ContentType, values: Values): BuiltFile {
+export function buildMarkdown(
+  type: ContentType,
+  values: Values,
+  /* On edit, the file's original frontmatter. Schema fields are overlaid on
+     top of it, but any key the schema doesn't know about (e.g. a course's
+     `textbooks`/`syllabus` objects, a book's auto-probed `cover-url`) is
+     carried through untouched instead of being silently dropped. Omitted on
+     create, where frontmatter starts from nothing. */
+  base?: Record<string, unknown>,
+): BuiltFile {
   const titleValue = String(values[type.titleField] ?? '').trim();
   const slug = slugify(titleValue);
 
-  /* Frontmatter: fixed constants first, then each field that has a value.
-     Empty optionals are omitted to keep files clean; required emptiness is
-     already caught by validate(). */
-  const fm: Record<string, unknown> = { ...(type.fixed ?? {}) };
+  /* Frontmatter: preserved base first (edit only), then fixed constants, then
+     each schema field. A field the author cleared coerces to undefined and its
+     key is deleted — so clearing a field in the form removes it even when the
+     base carried a value. Non-schema keys in the base survive untouched. */
+  const fm: Record<string, unknown> = { ...(base ?? {}), ...(type.fixed ?? {}) };
   for (const f of type.fields) {
     const v = coerce(f, values[f.name]);
     if (v !== undefined) fm[f.name] = v;
+    else delete fm[f.name];
   }
 
   let body = '';
@@ -128,6 +139,9 @@ export interface LoadedEntry {
   values: Record<string, string>;
   body: string;
   sections: Record<string, string>;
+  /** The file's full original frontmatter, so an edit can preserve keys the
+   *  schema doesn't expose (rides back through buildMarkdown's `base`). */
+  original: Record<string, unknown>;
 }
 
 /* Reverse of buildMarkdown: turn an existing .md file into form-ready values
@@ -161,5 +175,5 @@ export function parseExisting(type: ContentType, raw: string): LoadedEntry {
     type.body.parts.forEach((p, i) => (secs[p] = (parts[i] ?? '').trim()));
   }
 
-  return { values, body, sections: secs };
+  return { values, body, sections: secs, original: data };
 }

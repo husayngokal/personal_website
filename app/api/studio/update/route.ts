@@ -18,7 +18,13 @@ export async function POST(req: NextRequest) {
   const session = await getStudioSession();
   if (!session) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
-  let payload: { type?: string; path?: string; sha?: string; values?: Values };
+  let payload: {
+    type?: string;
+    path?: string;
+    sha?: string;
+    values?: Values;
+    base?: Record<string, unknown>;
+  };
   try {
     payload = await req.json();
   } catch {
@@ -35,8 +41,10 @@ export async function POST(req: NextRequest) {
   const errors = validate(type, values);
   if (errors.length) return NextResponse.json({ error: 'validation', errors }, { status: 400 });
 
-  /* Content is rebuilt from values; the path stays what was loaded. */
-  const built = buildMarkdown(type, values);
+  /* Content is rebuilt from values over the file's original frontmatter, so
+     keys the schema doesn't expose are preserved; the path stays what was
+     loaded. */
+  const built = buildMarkdown(type, values, payload.base);
 
   try {
     await putFile(session.token, {

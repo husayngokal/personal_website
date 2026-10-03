@@ -111,6 +111,7 @@ export default async function EditTypePage({
         sha={loaded.sha}
         initialBody={parsed.body}
         initialSections={parsed.sections}
+        baseFrontmatter={parsed.original}
       />
     </div>
   );
