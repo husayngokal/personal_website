@@ -11,15 +11,26 @@
  * machines with git the API approach avoids a transient working tree.
  *
  * Strategy:
- *   - GET /git/trees/{branch}?recursive=1 → all paths + SHAs
- *   - Filter to .md files
- *   - GET /git/blobs/{sha} in batches (concurrency-limited so we
- *     don't spike GitHub's secondary rate limit)
+ *   - GET /tarball/{branch} → the whole repo as one gzipped tar, in a
+ *     SINGLE GitHub API call. This replaced a per-file blob fetch (1
+ *     tree call + one /git/blobs/{sha} call per .md file). At 549 files
+ *     that was ~550 requests per sync against the author's shared
+ *     5,000 req/hr budget — ~9 syncs exhausted it, and since every
+ *     Studio save commits (→ webhook → full sync), an editing session
+ *     starved its own reads into 403s. The tarball is ~1 request.
+ *   - Untar in memory, filter to .md files
  *   - Parse each via lib/vault/parse.ts
  *   - Group rows by table, batch upsert via the service-role client
  *   - Delete rows whose slug is no longer present in the vault — but
  *     only if there were zero parse errors, to prevent a broken file
  *     from silently deleting its DB row on the next sync
+ *
+ * The tarball still yields EVERY file's bytes, so the parse, wikilink-
+ * graph and safe-delete passes are unchanged — they need the complete
+ * file set, and an incremental (changed-files-only) fetch would have
+ * broken both (a partial parse set wipes untouched tables in the
+ * empty-folder sweep and drops backlink edges). Cheaper fetch, same
+ * semantics.
  *
  * last_edited_at: the caller (webhook route) extracts per-path
  * timestamps from GitHub's push-event payload — `commits[].timestamp`
@@ -33,6 +44,9 @@
  */
 
 import { revalidatePath } from 'next/cache';
+import { createGunzip } from 'node:zlib';
+import { Readable } from 'node:stream';
+import { extract as tarExtract } from 'tar-stream';
 import { parseFile, ParseError, type ParsedFile } from './parse';
 import { getServerAdminClient } from '../supabase';
 import { deriveAndWriteLiveState } from '../content/derive';
@@ -48,15 +62,6 @@ export interface SyncResult {
   errors: { path: string; message: string }[];
   warnings: string[];
 }
-
-interface TreeEntry {
-  path: string;
-  type: 'blob' | 'tree';
-  sha: string;
-  size?: number;
-}
-
-const CONCURRENCY = 12;
 
 export interface SyncOptions {
   /** Map from vault-relative path → ISO 8601 timestamp of the most recent
@@ -88,43 +93,49 @@ export async function syncVault(opts: SyncOptions = {}): Promise<SyncResult> {
     'User-Agent': 'husayngokal-vault-sync',
   };
 
-  /* 1. Get the recursive tree */
-  const treeUrl = `https://api.github.com/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`;
-  const treeRes = await fetch(treeUrl, { headers, cache: 'no-store' });
-  if (!treeRes.ok) {
-    throw new Error(`GitHub trees API failed (${treeRes.status}): ${await treeRes.text()}`);
+  /* 1+2. Fetch the whole repo as a single gzipped tarball and untar it in
+     memory. One GitHub request regardless of file count (see header). The
+     tarball endpoint 302s to a pre-signed codeload URL; fetch follows it,
+     and undici drops the Authorization header on that cross-origin hop —
+     which is fine, the signed URL needs no auth. last_edited_at still
+     comes from opts.fileTimestamps (the webhook's push payload). */
+  const tarUrl = `https://api.github.com/repos/${owner}/${repo}/tarball/${branch}`;
+  const tarRes = await fetch(tarUrl, { headers, cache: 'no-store' });
+  if (!tarRes.ok) {
+    throw new Error(`GitHub tarball API failed (${tarRes.status}): ${await tarRes.text()}`);
   }
-  const treeJson = (await treeRes.json()) as { tree: TreeEntry[]; truncated: boolean };
-  if (treeJson.truncated) {
-    result.warnings.push('Tree response was truncated by GitHub — vault has grown past 100k entries or 7MB. Switch to paged tree walk.');
-  }
+  const tarballGz = Buffer.from(await tarRes.arrayBuffer());
 
-  const mdFiles = treeJson.tree.filter(
-    (e) => e.type === 'blob' && e.path.endsWith('.md'),
-  );
-
-  /* 2. Fetch every .md blob in parallel, batched for rate-limit safety.
-     Per-file commits API is intentionally NOT called here — see the
-     header comment. last_edited_at comes from opts.fileTimestamps. */
   const contents: { path: string; content: string; lastEditedAt: string | null }[] = [];
-  for (let i = 0; i < mdFiles.length; i += CONCURRENCY) {
-    const batch = mdFiles.slice(i, i + CONCURRENCY);
-    const fetched = await Promise.all(batch.map(async (f) => {
-      const blobUrl = `https://api.github.com/repos/${owner}/${repo}/git/blobs/${f.sha}`;
-      const bRes = await fetch(blobUrl, { headers, cache: 'no-store' });
-      if (!bRes.ok) {
-        result.errors.push({ path: f.path, message: `blob fetch failed (${bRes.status})` });
-        return null;
+  await new Promise<void>((resolve, reject) => {
+    const extract = tarExtract();
+    extract.on('entry', (header, stream, next) => {
+      /* Every entry is under a top-level `<owner>-<repo>-<sha>/` directory
+         GitHub adds; strip that first segment for the vault-relative path. */
+      const rel = header.name.replace(/^[^/]+\//, '');
+      if (header.type !== 'file' || !rel.endsWith('.md')) {
+        stream.on('end', next);
+        stream.resume();               // drain + skip non-markdown entries
+        return;
       }
-      const j = (await bRes.json()) as { content: string; encoding: string };
-      const content = j.encoding === 'base64'
-        ? Buffer.from(j.content, 'base64').toString('utf8')
-        : j.content;
-      const lastEditedAt = opts.fileTimestamps?.get(f.path) ?? null;
-      return { path: f.path, content, lastEditedAt };
-    }));
-    for (const item of fetched) if (item) contents.push(item);
-  }
+      const chunks: Buffer[] = [];
+      stream.on('data', (c) => { chunks.push(c as Buffer); });
+      stream.on('end', () => {
+        contents.push({
+          path: rel,
+          content: Buffer.concat(chunks).toString('utf8'),
+          lastEditedAt: opts.fileTimestamps?.get(rel) ?? null,
+        });
+        next();
+      });
+      stream.on('error', reject);
+    });
+    extract.on('finish', resolve);
+    extract.on('error', reject);
+    const gunzip = createGunzip();
+    gunzip.on('error', reject);
+    Readable.from(tarballGz).pipe(gunzip).pipe(extract);
+  });
 
   /* 3. Parse each + attach last_edited_at into the row payload */
   const parsed: ParsedFile[] = [];
