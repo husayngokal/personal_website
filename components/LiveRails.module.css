@@ -13,7 +13,7 @@
 
 .rail {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--space-m);
   text-decoration: none;
   color: inherit;
