@@ -1,127 +1,161 @@
+/*
+ * Live plates — three equal cream cards under the hero.
+ *
+ * Every row inside a plate has a FIXED height (top, figure, title, foot),
+ * so the three plates are the same height and every row sits at the same
+ * y across all of them regardless of content. Nothing here depends on how
+ * long a title is or how tall a mark is.
+ */
+
 .rails {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: var(--space-xl);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-m);
   margin-top: var(--space-2xl);
-  padding-top: var(--space-l);
-  border-top: 1px solid var(--border);
 }
 
 @media (max-width: 860px) {
-  .rails { grid-template-columns: 1fr; gap: var(--space-l); }
+  .rails { grid-template-columns: minmax(0, 1fr); }
 }
 
-/* Each rail is a 2x2 grid:
- *
- *   [ mark slot ] [ label + title  ]   <- heading row
- *   [           ] [ meta           ]   <- meta row
- *
- * The mark slot is a FIXED width, and the mark is centered inside it on
- * both axes. That is what makes the three rails read as one aligned row
- * no matter how differently sized the marks are (book 40px wide, cube
- * 46, calendar 56): their centers line up, and the text starts at the
- * same x in every column instead of wandering with each mark's width.
- *
- * Vertically the mark is centered on the HEADING row (label + title),
- * not the whole block. Centering on the whole block dropped each mark
- * below its label; anchoring to the heading keeps mark and kicker
- * visually paired. The mark is absolutely positioned so a tall mark
- * (the 75px calendar) can never inflate the heading row, which is what
- * keeps the meta rows at the same baseline across all three rails. */
-.rail {
-  --mark-slot: 64px;
-  display: grid;
-  grid-template-columns: var(--mark-slot) minmax(0, 1fr);
-  grid-template-rows: auto auto;
-  /* The outer .rails grid stretches every rail to the tallest one (the
-     building rail, whose bordered branch chip makes its meta line a few
-     px taller). Without this, that surplus height is split across the
-     two auto rows, silently pushing the shorter rails' heading rows and
-     metas out of line. Packing rows to the start keeps row 1 at exactly
-     label + title in all three. */
-  align-content: start;
-  column-gap: var(--space-m);
-  row-gap: var(--space-xs);
-  text-decoration: none;
-  color: inherit;
-  padding: var(--space-s) 0;
-  transition: opacity var(--hover-ms) var(--ease);
-}
-.rail:hover { opacity: 0.85; }
-
-.railMark {
-  grid-column: 1;
-  grid-row: 1;
-  position: relative;
-}
-.railMark > * {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-
-.railHead {
-  grid-column: 2;
-  grid-row: 1;
+.plate {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: var(--space-m) var(--space-m) 0;
+  text-decoration: none;
+  color: inherit;
   min-width: 0;
+  transition: border-color var(--hover-ms) var(--ease);
+}
+.plate:hover { border-color: var(--text-muted); }
+
+/* -- Row 1: kicker + mark ------------------------------------------- */
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  height: 26px;
 }
 
-.railLabel {
+.kicker {
   font-family: var(--font-mono);
   font-size: var(--type-mono-s);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-body);
-  margin: 0;
+  line-height: 1.6;
 }
 
-.railTitle {
+/* All three marks render 26px tall; the box is fixed and the mark is
+   pinned to its top-right corner so the right edges line up exactly. */
+.mark {
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+  width: 26px;
+  height: 26px;
+  flex: none;
+}
+.mark svg { display: block; }
+
+/* -- Row 2: the figure ---------------------------------------------- */
+.figureRow {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-s);
+  height: var(--type-display-l);
+  margin-top: var(--space-s);
+  white-space: nowrap;
+}
+
+.figure {
   font-family: var(--font-serif);
-  font-size: var(--type-body-m);
+  font-weight: 600;
+  font-size: var(--type-display-l);
+  line-height: 1;
+  letter-spacing: -0.01em;
   color: var(--text-strong);
-  margin: 0;
-  line-height: 1.3;
-  /* Clamp long titles to two lines AND always reserve two lines, so the
-     meta row below (progress bar / branch chip / countdown) sits at the
-     same baseline across all three rails regardless of how long any one
-     title is. A one-line title no longer lifts its meta above the others. */
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  min-height: calc(1.3em * 2);
 }
 
-.railMeta {
-  grid-column: 2;
-  grid-row: 2;
-  font-family: var(--font-mono);
-  font-size: var(--type-mono-m);
-  color: var(--text-muted);
-  margin: 0;
+.unit {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-xs);
-  flex-wrap: wrap;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-s);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-body);
 }
 
-.railSub { color: var(--text-body); }
-.railDot { color: var(--border); margin: 0 4px; }
+/* -- Row 3: title ---------------------------------------------------- */
+.title {
+  display: block;
+  font-family: var(--font-serif);
+  font-size: var(--type-body-m);
+  line-height: 1.3;
+  color: var(--text-strong);
+  margin: var(--space-m) 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
-.branchChip {
+/* Stacked (one plate per row): nothing sits beside the title any more,
+   so there is no cross-plate row to protect. Let a long title wrap to two
+   lines rather than cutting it off on the narrowest screens. */
+@media (max-width: 860px) {
+  .title {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+}
+
+/* -- Row 4: footer --------------------------------------------------- */
+.foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-m);
+  height: 40px;
+  margin-top: auto;
+  border-top: 1px solid var(--border);
   font-family: var(--font-mono);
   font-size: var(--type-mono-m);
   color: var(--text-body);
-  background: var(--bg-page);
+  white-space: nowrap;
+}
+.footLeft { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.footRight { flex: none; display: inline-flex; align-items: center; }
+
+.chip {
   border: 1px solid var(--border);
   border-radius: 3px;
   padding: 1px 5px;
+  background: var(--bg-page);
 }
 
+.track {
+  display: block;
+  width: 110px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  overflow: hidden;
+}
+.fill {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+}
+
+/* -- Orange: the only colour that moves ------------------------------ */
 .livePulse {
   width: 6px;
   height: 6px;
@@ -129,13 +163,18 @@
   background: var(--accent);
   display: inline-block;
   animation: railPulse var(--pulse-ms) var(--ease) infinite;
-  margin: 0 4px;
 }
 
-/* Brighter, faster pulse when a Realtime update just landed. ~2s flash. */
-.livePulseFlash {
+/* Appears beside the kicker for ~2s when a Realtime update just landed. */
+.flashIndicator {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-left: var(--space-s);
+  vertical-align: middle;
   animation: railFlash 600ms var(--ease) 3;
-  box-shadow: 0 0 8px rgba(242, 107, 31, 0.7);
 }
 
 @keyframes railPulse {
@@ -148,25 +187,6 @@
   50%      { opacity: 0.8; transform: scale(1.4); }
 }
 
-/* Small inline indicator that appears next to the rail label when the
-   underlying signal just changed. Disappears after ~2s. */
-.flashIndicator {
-  display: inline-block;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--accent);
-  margin-left: var(--space-xs);
-  animation: railFlash 600ms var(--ease) 3;
-  vertical-align: middle;
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .livePulse { animation: none; }
-  .livePulseFlash { animation: none; box-shadow: none; }
-  .flashIndicator { animation: none; }
+  .livePulse, .flashIndicator { animation: none; }
 }
-
-.railCommitTime { color: var(--accent); }
-
-.daysOrange { color: var(--accent); font-weight: 500; }
