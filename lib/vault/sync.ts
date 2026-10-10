@@ -50,6 +50,8 @@ import { extract as tarExtract } from 'tar-stream';
 import { parseFile, ParseError, type ParsedFile } from './parse';
 import { getServerAdminClient } from '../supabase';
 import { deriveAndWriteLiveState } from '../content/derive';
+import { authorDay } from '../content/streak';
+import { ACTIVITY_KEY, PATHS_KEY, writeStateIfChanged } from '../content/vault-state';
 import {
   buildRegistry, extractWikilinks, resolveTarget, urlFor,
   type SlugRegistryEntry,
@@ -139,11 +141,19 @@ export async function syncVault(opts: SyncOptions = {}): Promise<SyncResult> {
 
   /* 3. Parse each + attach last_edited_at into the row payload */
   const parsed: ParsedFile[] = [];
+  /* slug -> vault path, for the tables Studio's one-tap updates edit. A
+     task's slug comes from its frontmatter and its file sits in a nested
+     folder, so the path cannot be rebuilt from the slug; record it here
+     while both are in hand. */
+  const pathIndex: Record<string, Record<string, string>> = {};
   for (const { path, content, lastEditedAt } of contents) {
     try {
       const p = parseFile(path, content);
       if (!p) continue;
       if (p.ignored) continue;
+      if (INDEXED_TABLES.has(p.table) && p.slug) {
+        (pathIndex[p.table] ??= {})[p.slug] = path;
+      }
       if (lastEditedAt && p.row && typeof p.row === 'object') {
         (p.row as Record<string, unknown>).last_edited_at = lastEditedAt;
       }
@@ -317,6 +327,19 @@ export async function syncVault(opts: SyncOptions = {}): Promise<SyncResult> {
     result.warnings.push(`wikilink graph rebuild failed: ${(err as Error).message}`);
   }
 
+  /* 6a. Bookkeeping rows in current_state (key/value, so no migration):
+        the slug -> path index, and the list of days the vault changed,
+        which drives the activity streak. Both are written only when they
+        actually differ, because every write to current_state is broadcast
+        to open homepages over Realtime. Never fatal. */
+  try {
+    await writeStateIfChanged(db, PATHS_KEY, { paths: sortKeys(pathIndex) });
+    const days = await fetchActivityDays(owner, repo, branch, headers);
+    if (days) await writeStateIfChanged(db, ACTIVITY_KEY, { days });
+  } catch (err) {
+    result.warnings.push(`vault bookkeeping failed: ${(err as Error).message}`);
+  }
+
   /* 6. Re-derive currently_* live-state rows from the freshly-upserted
         content. Realtime broadcasts to subscribers. */
   try {
@@ -359,6 +382,39 @@ export async function syncVault(opts: SyncOptions = {}): Promise<SyncResult> {
   }
 
   return result;
+}
+
+const INDEXED_TABLES = new Set(['library_books', 'tasks', 'projects', 'living_entries']);
+
+function sortKeys(index: Record<string, Record<string, string>>): Record<string, Record<string, string>> {
+  const out: Record<string, Record<string, string>> = {};
+  for (const table of Object.keys(index).sort()) {
+    out[table] = Object.fromEntries(Object.entries(index[table]).sort(([a], [b]) => a.localeCompare(b)));
+  }
+  return out;
+}
+
+/* Days (author's timezone) on which the vault received a commit, over the
+   last ~13 months. One or two GitHub requests per sync; the streak maths
+   lives in lib/content/streak.ts. Returns null if GitHub refuses, so a
+   bad response never overwrites a good stored list. */
+async function fetchActivityDays(
+  owner: string, repo: string, branch: string, headers: Record<string, string>,
+): Promise<string[] | null> {
+  const since = new Date(Date.now() - 400 * 86_400_000).toISOString();
+  const days = new Set<string>();
+  for (let page = 1; page <= 5; page++) {
+    const url = `https://api.github.com/repos/${owner}/${repo}/commits?sha=${encodeURIComponent(branch)}&since=${since}&per_page=100&page=${page}`;
+    const res = await fetch(url, { headers, cache: 'no-store' });
+    if (!res.ok) return null;
+    const commits = (await res.json()) as Array<{ commit?: { author?: { date?: string } } }>;
+    for (const c of commits) {
+      const at = c.commit?.author?.date;
+      if (at) days.add(authorDay(new Date(at)));
+    }
+    if (commits.length < 100) break;
+  }
+  return [...days].sort();
 }
 
 async function populateBookCovers(

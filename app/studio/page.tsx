@@ -1,7 +1,7 @@
 /*
  * Studio landing. Reached only with a valid session (the layout gates it).
- * Lists the surfaces you can create right now. More types get added to the
- * schema registry as the fan-out proceeds.
+ * Leads with the one-tap quick updates page, then lists every surface you
+ * can create an entry for.
  */
 
 import { CONTENT_TYPES } from '@/lib/studio/schema';
@@ -37,6 +37,12 @@ export default async function StudioHome({
     <div>
       {error && <p className={styles.error}>{ERROR_COPY[error] ?? `Sign-in error: ${error}`}</p>}
       <h1 className={styles.h1}>Studio</h1>
+      <div className={styles.grid}>
+        <a href="/studio/quick" className={styles.card}>
+          <span className={styles.cardLabel}>Quick updates</span>
+          <span className={styles.cardFolder}>one tap: progress, done, streak</span>
+        </a>
+      </div>
       <p className={styles.p}>
         Create a new entry, or <a className={styles.inlineLink} href="/studio/edit">edit an existing one</a>.
         It commits to the vault and goes live in about 30 seconds.
@@ -56,7 +62,6 @@ export default async function StudioHome({
         </section>
       ))}
 
-      <p className={styles.pMuted}>Editing existing entries is being added next.</p>
     </div>
   );
 }
