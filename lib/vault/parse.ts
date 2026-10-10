@@ -163,6 +163,15 @@ export function parseFile(relPath: string, content: string): ParsedFile | null {
       repo:    strOrNull(fm.repo),
       repo_private: fm['repo-private'] === true,
       external_url: strOrNull(fm['external-url']),
+      /* `last_active` is a dead column kept alive only because the table
+         declares it NOT NULL and the Supabase dashboard is locked out, so
+         the constraint cannot be dropped. Nothing reads it. The author no
+         longer maintains a last-active date at all (a project is `active`
+         or it is not), so write a stable placeholder: the start date, or
+         today for a project without one. Omitting the key fails the
+         upsert and aborts the whole sync. Same pattern as the notebook's
+         `kind` / `thread` columns above. */
+      last_active:  strOrNull(fm.started) ?? new Date().toISOString().slice(0, 10),
       current_state: currentState,
       stuck_on: stuckOn.length > 0 ? stuckOn : null,
       tasks: (fm.tasks as object) ?? null,
