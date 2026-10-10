@@ -31,39 +31,43 @@ export function LiveRails({ initialState }: { initialState: LiveState }) {
     <section className={styles.rails} aria-label="Currently">
       {state.reading && (
         <Link href={`/library/${state.reading.slug}`} className={styles.rail}>
-          <BookCover url={state.reading.coverUrl} width={40} height={56} alt={`${state.reading.title} cover`} />
-          <div className={styles.railBody}>
+          <span className={styles.railMark}>
+            <BookCover url={state.reading.coverUrl} width={40} height={56} alt={`${state.reading.title} cover`} />
+          </span>
+          <div className={styles.railHead}>
             <p className={styles.railLabel}>
               currently reading
               <FlashDot active={flashing('currently_reading')} />
             </p>
             <p className={styles.railTitle}>{state.reading.title}</p>
-            <p className={styles.railMeta}>
-              <span className={styles.railSub}>{state.reading.author}</span>
-              <span className={styles.railDot}>·</span>
-              <ProgressBar pct={state.reading.progressPct ?? 0} showLabel width="100px" />
-            </p>
           </div>
+          <p className={styles.railMeta}>
+            <span className={styles.railSub}>{state.reading.author}</span>
+            <span className={styles.railDot}>·</span>
+            <ProgressBar pct={state.reading.progressPct ?? 0} showLabel width="100px" />
+          </p>
         </Link>
       )}
 
       {state.building && (
         <Link href={state.building.href ?? `/projects/${state.building.slug}`} className={styles.rail}>
-          <ProjectMark size={48} />
-          <div className={styles.railBody}>
+          <span className={styles.railMark}>
+            <ProjectMark size={46} />
+          </span>
+          <div className={styles.railHead}>
             <p className={styles.railLabel}>
               currently building
               <FlashDot active={flashing('currently_building')} />
             </p>
             <p className={styles.railTitle}>{state.building.title}</p>
-            <p className={styles.railMeta}>
-              {state.building.kind !== 'task' && (
-                <span className={styles.branchChip}>{state.building.branch}</span>
-              )}
-              <span className={`${styles.livePulse} ${flashing('currently_building') ? styles.livePulseFlash : ''}`} aria-hidden="true" />
-              <span className={styles.railCommitTime}>active now</span>
-            </p>
           </div>
+          <p className={styles.railMeta}>
+            {state.building.kind !== 'task' && (
+              <span className={styles.branchChip}>{state.building.branch}</span>
+            )}
+            <span className={`${styles.livePulse} ${flashing('currently_building') ? styles.livePulseFlash : ''}`} aria-hidden="true" />
+            <span className={styles.railCommitTime}>active now</span>
+          </p>
         </Link>
       )}
 
@@ -89,17 +93,19 @@ function StudyingRail({
 
   return (
     <Link href={`/study/credentials/${data.slug}`} className={styles.rail}>
-      <CalendarTile monthCode={monthCode} day={day} weekday={weekday} />
-      <div className={styles.railBody}>
+      <span className={styles.railMark}>
+        <CalendarTile monthCode={monthCode} day={day} weekday={weekday} />
+      </span>
+      <div className={styles.railHead}>
         <p className={styles.railLabel}>
           currently studying
           <FlashDot active={flashing} />
         </p>
         <p className={styles.railTitle}>{data.title}</p>
-        <p className={styles.railMeta}>
-          Exam in <span className={styles.daysOrange}>{daysUntil} {daysUntil === 1 ? 'day' : 'days'}</span>
-        </p>
       </div>
+      <p className={styles.railMeta}>
+        Exam in <span className={styles.daysOrange}>{daysUntil} {daysUntil === 1 ? 'day' : 'days'}</span>
+      </p>
     </Link>
   );
 }

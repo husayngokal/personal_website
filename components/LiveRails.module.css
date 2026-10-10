@@ -11,10 +11,37 @@
   .rails { grid-template-columns: 1fr; gap: var(--space-l); }
 }
 
+/* Each rail is a 2x2 grid:
+ *
+ *   [ mark slot ] [ label + title  ]   <- heading row
+ *   [           ] [ meta           ]   <- meta row
+ *
+ * The mark slot is a FIXED width, and the mark is centered inside it on
+ * both axes. That is what makes the three rails read as one aligned row
+ * no matter how differently sized the marks are (book 40px wide, cube
+ * 46, calendar 56): their centers line up, and the text starts at the
+ * same x in every column instead of wandering with each mark's width.
+ *
+ * Vertically the mark is centered on the HEADING row (label + title),
+ * not the whole block. Centering on the whole block dropped each mark
+ * below its label; anchoring to the heading keeps mark and kicker
+ * visually paired. The mark is absolutely positioned so a tall mark
+ * (the 75px calendar) can never inflate the heading row, which is what
+ * keeps the meta rows at the same baseline across all three rails. */
 .rail {
-  display: flex;
-  align-items: center;
-  gap: var(--space-m);
+  --mark-slot: 64px;
+  display: grid;
+  grid-template-columns: var(--mark-slot) minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  /* The outer .rails grid stretches every rail to the tallest one (the
+     building rail, whose bordered branch chip makes its meta line a few
+     px taller). Without this, that surplus height is split across the
+     two auto rows, silently pushing the shorter rails' heading rows and
+     metas out of line. Packing rows to the start keeps row 1 at exactly
+     label + title in all three. */
+  align-content: start;
+  column-gap: var(--space-m);
+  row-gap: var(--space-xs);
   text-decoration: none;
   color: inherit;
   padding: var(--space-s) 0;
@@ -22,7 +49,21 @@
 }
 .rail:hover { opacity: 0.85; }
 
-.railBody {
+.railMark {
+  grid-column: 1;
+  grid-row: 1;
+  position: relative;
+}
+.railMark > * {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.railHead {
+  grid-column: 2;
+  grid-row: 1;
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -56,10 +97,12 @@
 }
 
 .railMeta {
+  grid-column: 2;
+  grid-row: 2;
   font-family: var(--font-mono);
   font-size: var(--type-mono-m);
   color: var(--text-muted);
-  margin: var(--space-xs) 0 0 0;
+  margin: 0;
   display: inline-flex;
   align-items: center;
   gap: var(--space-xs);

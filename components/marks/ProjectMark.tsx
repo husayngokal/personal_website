@@ -16,12 +16,16 @@
 const INK = '#111111';
 const PAPER = '#F8F2E3';
 
-export function ProjectMark({ size = 48 }: { size?: number }) {
+/* The viewBox is cropped tight to the drawing (geometry spans x 7..49,
+   y 7..55, plus a 1px stroke margin). Without this the SVG box carried
+   ~7px of empty space on every side, so centering the box in the rail's
+   mark slot did not actually center the cube. */
+export function ProjectMark({ size = 46 }: { size?: number }) {
   return (
     <svg
       width={size}
-      height={size * (64 / 56)}
-      viewBox="0 0 56 64"
+      height={size * (50 / 44)}
+      viewBox="6 6 44 50"
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
     >
