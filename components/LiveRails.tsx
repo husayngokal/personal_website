@@ -6,6 +6,8 @@
  *
  *   kicker ............ mark      "currently reading"   + line mark
  *   FIGURE  unit                  the one number that matters
+ *                                 (percent read, weeks into the project,
+ *                                 days to the exam)
  *   title                         what it is
  *   ------------------------
  *   footer left .. footer right   the supporting detail
@@ -66,10 +68,6 @@ export function LiveRails({ initialState }: { initialState: LiveState }) {
           flashing={flashedKey === 'currently_building'}
           title={building.title}
           {...buildingFigure(building)}
-          footLeft={building.kind === 'task' ? 'task' : 'branch'}
-          footRight={
-            building.kind === 'task' ? 'in progress' : <span className={styles.chip}>{building.branch}</span>
-          }
         />
       )}
 
@@ -146,23 +144,28 @@ function readingFigure(r: NonNullable<LiveState['reading']>): Figure {
   return { figure: `${clampPct(r.progressPct)}%`, unit: 'through' };
 }
 
-/* Real last-active date, never a hardcoded "active now". Day precision is
-   all the source has (vault edit / last-active date), so the figure is a
-   count of days, weeks or months; the dot only pulses when it is fresh.
-   Thresholds mirror relativeDay() in lib/content/state.ts so this plate
-   and the typewriter's "active 1 month ago" never disagree. */
+/* A project is on this plate because its status is `active`: the author
+   has it switched on as the thing being worked on right now. There is no
+   "last active" date to keep fresh. The figure is how long the project has
+   been running, which needs no upkeep at all, and the dot pulses because
+   being on the plate already means it is live. */
 function buildingFigure(b: NonNullable<LiveState['building']>): Figure {
-  const then = new Date(b.lastActiveDate).getTime();
-  const days = Number.isFinite(then) ? Math.floor((Date.now() - then) / DAY_MS) : 0;
-  if (days <= 0) return { figure: 'today', unit: 'last active', live: true };
-  const since = (n: number, noun: string, live = false): Figure => ({
-    figure: String(n),
-    unit: `${noun}${n === 1 ? '' : 's'} since active`,
-    live,
+  const start = b.started ? new Date(b.started) : null;
+  if (!start || Number.isNaN(start.getTime())) {
+    return { figure: 'now', unit: 'in progress', live: true, footLeft: 'status', footRight: 'active' };
+  }
+  const foot = {
+    footLeft: 'started',
+    footRight: start.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }),
+  };
+  const days = Math.max(0, Math.floor((Date.now() - start.getTime()) / DAY_MS));
+  const running = (n: number, noun: string): Figure => ({
+    figure: String(n), unit: `${noun}${n === 1 ? '' : 's'} in`, live: true, ...foot,
   });
-  if (days < 7) return since(days, 'day', days === 1);
-  if (days < 30) return since(Math.floor(days / 7), 'week');
-  return since(Math.floor(days / 30), 'month');
+  if (days < 1) return { figure: 'today', unit: 'started', live: true, ...foot };
+  if (days < 14) return running(days, 'day');
+  if (days < 112) return running(Math.floor(days / 7), 'week');
+  return running(Math.floor(days / 30), 'month');
 }
 
 function studyingFigure(s: NonNullable<LiveState['studying']>): Figure {

@@ -3,7 +3,7 @@
  *
  *   { target: 'book', slug, action: 'bump', by: 10 }
  *   { target: 'task', slug, action: 'done' }
- *   { target: 'project', slug, action: 'active-today' }
+ *   { target: 'project', slug, action: 'set-active', on: true }
  *   { target: 'atlas', slug: 'field-atlas', action: 'done', line }
  *
  * Flow: resolve the vault path, read the file from GitHub, compute the
@@ -99,10 +99,7 @@ export async function POST(req: NextRequest) {
 
   /* Write-through. Committed already, so nothing below may fail the tap. */
   try {
-    const row = body.target === 'project'
-      ? { ...result.row, last_edited_at: new Date().toISOString() }
-      : result.row;
-    await db.from(spec.table).update(row).eq('slug', body.slug);
+    await db.from(spec.table).update(result.row).eq('slug', body.slug);
     await markActiveToday(db);
     await deriveAndWriteLiveState(db);
     for (const p of REVALIDATE[body.target] ?? []) {

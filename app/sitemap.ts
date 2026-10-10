@@ -66,7 +66,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const detailRoutes: MetadataRoute.Sitemap = [];
   for (const p of posts)        detailRoutes.push({ url: `${BASE}/notebook/${p.slug}`,             lastModified: p.date ? new Date(p.date) : now });
   for (const b of books)        detailRoutes.push({ url: `${BASE}/library/${b.slug}`,             lastModified: b.finished ? new Date(b.finished) : now });
-  for (const p of projects)     detailRoutes.push({ url: `${BASE}/projects/${p.slug}`,            lastModified: p.lastActive ? new Date(p.lastActive) : now });
+  for (const p of projects)     detailRoutes.push({ url: `${BASE}/projects/${p.slug}`,            lastModified: now });
   for (const c of courses)      detailRoutes.push({ url: `${BASE}/courses/${c.slug}`,             lastModified: now });
   for (const w of writeups)     detailRoutes.push({ url: `${BASE}/writeups/${w.slug}`,            lastModified: w.date ? new Date(w.date) : now });
   for (const c of credentials)  detailRoutes.push({ url: `${BASE}/credentials/${c.slug}`,         lastModified: now });

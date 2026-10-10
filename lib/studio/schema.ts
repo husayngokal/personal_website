@@ -117,9 +117,8 @@ export const CONTENT_TYPES: ContentType[] = [
     fields: [
       { name: 'title', label: 'Title', type: 'text', required: true },
       { name: 'tagline', label: 'Tagline', type: 'text', required: true },
-      { name: 'status', label: 'Status', type: 'select', required: true, options: PROJECT_STATUS, default: 'active' },
+      { name: 'status', label: 'Status', type: 'select', required: true, options: PROJECT_STATUS, default: 'active', help: '"active" means you are working on it right now; it drives the homepage. Flip it from Quick updates.' },
       { name: 'started', label: 'Started', type: 'date', default: '@today' },
-      { name: 'last-active', label: 'Last active', type: 'date', help: 'Leave blank for "active today".' },
       { name: 'ended', label: 'Ended', type: 'date', help: 'Set when the project concludes.' },
       { name: 'tags', label: 'Tags', type: 'tags' },
       { name: 'repo', label: 'Repo URL', type: 'text' },

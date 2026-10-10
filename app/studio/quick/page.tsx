@@ -28,7 +28,7 @@ export default async function QuickPage() {
     db.from('tasks').select('slug,title,status,scope,priority,category')
       .in('status', ['open', 'in-progress', 'blocked'])
       .order('priority', { ascending: true, nullsFirst: false }).order('ordinal', { ascending: true, nullsFirst: false }),
-    db.from('projects').select('slug,title,status,last_active,last_edited_at').eq('status', 'active'),
+    db.from('projects').select('slug,title,status').in('status', ['active', 'paused', 'dormant']).order('title'),
     db.from('living_entries').select('slug,title,body').eq('slug', 'field-atlas').maybeSingle(),
     getActivityDays(db),
   ]);
@@ -41,8 +41,7 @@ export default async function QuickPage() {
       slug: t.slug, title: t.title, status: t.status, scope: t.scope, category: t.category ?? null,
     })),
     projects: (projects.data ?? []).map((p) => ({
-      slug: p.slug, title: p.title,
-      lastActive: (p.last_edited_at ?? p.last_active ?? null) as string | null,
+      slug: p.slug, title: p.title, status: p.status,
     })),
     atlas: atlas.data
       ? { slug: atlas.data.slug, title: atlas.data.title, groups: listDoneItems(atlas.data.body ?? '') }

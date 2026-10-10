@@ -101,13 +101,16 @@ export async function deriveAndWriteLiveState(db: SupabaseClient): Promise<Deriv
   /* -- Building ----------------------------------------------------- */
   let buildingValue: Record<string, unknown> = {};
 
-  /* Primary: an active project, most recently touched. */
+  /* A project is "currently being built" when its status is `active`.
+     That status is the whole signal: the author flips it on and off (one
+     tap in Studio), and nothing has to be dated or kept fresh. If several
+     are active, the most recently edited one represents the slot. */
   const { data: projectRows } = await db
     .from('projects')
-    .select('slug, title, last_active, last_edited_at, repo_private')
+    .select('slug, title, started, last_edited_at, repo_private')
     .eq('status', 'active')
     .order('last_edited_at', { ascending: false, nullsFirst: false })
-    .order('last_active', { ascending: false })
+    .order('started', { ascending: false, nullsFirst: false })
     .limit(1);
 
   /* No task fallback by design: "currently building" is a project-only
@@ -119,8 +122,7 @@ export async function deriveAndWriteLiveState(db: SupabaseClient): Promise<Deriv
     buildingValue = {
       slug: p.slug,
       title: p.title,
-      branch: 'main',
-      lastActiveDate: p.last_edited_at ?? p.last_active ?? new Date().toISOString().slice(0, 10),
+      started: p.started ?? null,
       private: p.repo_private,
       kind: 'project',
       href: `/projects/${p.slug}`,

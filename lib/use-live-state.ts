@@ -28,15 +28,7 @@ export interface UseLiveStateResult {
 export function useLiveState(initial: LiveState): UseLiveStateResult {
   const [state, setState] = useState<LiveState>(initial);
   const [flashedKey, setFlashedKey] = useState<string | null>(null);
-  const [nowMs, setNowMs] = useState<number>(() => Date.now());
   const flashTimer = useRef<number | null>(null);
-
-  /* Tick once a minute so relative dates ("active today" turning into
-     "active yesterday") roll over on a tab left open past midnight. */
-  useEffect(() => {
-    const id = window.setInterval(() => setNowMs(Date.now()), 60_000);
-    return () => window.clearInterval(id);
-  }, []);
 
   useEffect(() => {
     if (!isSupabaseConfigured()) return;
@@ -67,7 +59,7 @@ export function useLiveState(initial: LiveState): UseLiveStateResult {
     };
   }, []);
 
-  return { state, phrases: phrasesFor(state, nowMs), flashedKey };
+  return { state, phrases: phrasesFor(state), flashedKey };
 }
 
 function mergeRow(prev: LiveState, key: string, value: unknown): LiveState {

@@ -153,7 +153,7 @@ async function build() {
       title: p.title, tagline: p.tagline, status: p.status,
       started: p.started, ended: p.ended, tags: p.tags,
       repo: p.repo, 'repo-private': p.repoPrivate ?? false,
-      'external-url': p.externalUrl, 'last-active': p.lastActive,
+      'external-url': p.externalUrl,
       tasks: p.tasks, activity: p.activity,
     }, sections.join('\n\n'));
   }

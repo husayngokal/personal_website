@@ -25,8 +25,9 @@ export interface CurrentReadingState {
 export interface CurrentBuildingState {
   slug: string;
   title: string;
-  branch: string;
-  lastActiveDate: string;      // ISO date; consumer formats as "today"/"yesterday"/etc.
+  /** ISO date the project began, when known. The plate shows how long it
+   *  has been running; there is deliberately no "last active" date. */
+  started?: string | null;
   private: boolean;
   /** Where the state came from — a project has a detail page; a task
    *  (fallback when there's no active project) links to the tasks surface
@@ -87,16 +88,11 @@ export async function getLiveState(): Promise<LiveState> {
   };
 }
 
-/* -- Derive the typewriter phrase set from a LiveState ----------------
- * `nowMs` is the current time in ms, used for relative dates ("active
- * today"). Defaults to Date.now() when omitted.                      */
-export function phrasesFor(state: LiveState, nowMs?: number): string[] {
+/* -- Derive the typewriter phrase set from a LiveState ---------------- */
+export function phrasesFor(state: LiveState): string[] {
   const out: string[] = [];
   if (state.building) {
-    /* Date-precision only until GitHub commit webhooks are wired.
-       Avoids the embarrassing "last commit 1398 minutes ago." */
-    const when = relativeDay(state.building.lastActiveDate, nowMs);
-    out.push(`currently building ${state.building.title.toLowerCase()}, active ${when}.`);
+    out.push(`currently building ${state.building.title.toLowerCase()}.`);
   }
   if (state.reading) {
     const title = shortTitle(state.reading.title).toLowerCase();
@@ -135,17 +131,6 @@ export function phrasesFor(state: LiveState, nowMs?: number): string[] {
     out.push(`currently exploring ${state.exploring.title.toLowerCase()}.`);
   }
   return out.length > 0 ? out : ['currently here, writing this.'];
-}
-
-function relativeDay(iso: string, nowMs?: number): string {
-  const then = new Date(iso).getTime();
-  const now  = nowMs ?? Date.now();
-  const days = Math.floor((now - then) / 86_400_000);
-  if (days <= 0) return 'today';
-  if (days === 1) return 'yesterday';
-  if (days < 7)   return `${days} days ago`;
-  if (days < 30)  return `${Math.floor(days / 7)} week${Math.floor(days / 7) === 1 ? '' : 's'} ago`;
-  return `${Math.floor(days / 30)} month${Math.floor(days / 30) === 1 ? '' : 's'} ago`;
 }
 
 function shortTitle(t: string): string {

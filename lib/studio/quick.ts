@@ -32,7 +32,7 @@ export type QuickRequest =
   | { target: 'book'; slug: string; action: 'bump'; by: number }
   | { target: 'book'; slug: string; action: 'finish' | 'shelve' }
   | { target: 'task'; slug: string; action: 'done' | 'reopen' | 'this-week' | 'later' }
-  | { target: 'project'; slug: string; action: 'active-today' }
+  | { target: 'project'; slug: string; action: 'set-active'; on: boolean }
   | { target: 'atlas'; slug: string; action: 'done' | 'undone'; line: string }
   | { target: FrontmatterTarget; slug: string; action: 'restore'; fields: Record<string, ScalarChange> };
 
@@ -49,7 +49,7 @@ interface TargetSpec {
 export const QUICK_TARGETS: Record<QuickTarget, TargetSpec> = {
   book:    { table: 'library_books',  folder: 'library',  keys: ['status', 'progress-pct', 'finished'], columns: ['status', 'progress_pct', 'finished'] },
   task:    { table: 'tasks',          folder: null,       keys: ['status', 'scope', 'completed'],      columns: ['status', 'scope', 'completed'] },
-  project: { table: 'projects',       folder: 'projects', keys: ['last-active'],                       columns: ['last_active'] },
+  project: { table: 'projects',       folder: 'projects', keys: ['status'],                            columns: ['status'] },
   atlas:   { table: 'living_entries', folder: 'living',   keys: [],                                    columns: ['body'] },
 };
 
@@ -96,7 +96,14 @@ function changesFor(req: QuickRequest, fm: Record<string, unknown>, today: strin
       if (req.action === 'later') return { changes: { scope: 'lifetime' }, verb: 'moved to later' };
       break;
     case 'project':
-      if (req.action === 'active-today') return { changes: { 'last-active': today }, verb: 'active today' };
+      /* The one switch a project has: actively being worked on, or not.
+         Off parks it as `paused`; lifecycle states (shipped, concluded,
+         dead) are set through the full edit form, not from here. */
+      if (req.action === 'set-active') {
+        return req.on
+          ? { changes: { status: 'active' }, verb: 'actively working on it' }
+          : { changes: { status: 'paused' }, verb: 'not working on it right now' };
+      }
       break;
   }
   if (req.action === 'restore') {

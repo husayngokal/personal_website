@@ -14,7 +14,6 @@ export const PROJECTS: ProjectPage[] = [
     started: '2026-01-10',
     ended: '2026-04-30',
     tags: ['product', 'university', 'mobile'],
-    lastActive: '2026-04-30',
     currentState:
       'Submitted and graded. The project page exists as an archive of what was built and what I learned about coordinating a four-person student team under deadline.',
     decisions: [
@@ -39,7 +38,6 @@ export const PROJECTS: ProjectPage[] = [
     status: 'paused',
     started: '2025-11-01',
     tags: ['personal', 'productivity'],
-    lastActive: '2026-04-12',
     currentState:
       'Paused while Slipwise and the MI exam take precedence. The architecture is sound, the daily-pattern code works, and I will come back to it after the UK trip.',
     stuckOn: [
@@ -54,7 +52,6 @@ export const PROJECTS: ProjectPage[] = [
     started: '2025-09-01',
     ended: '2025-12-15',
     tags: ['newsletter', 'experiment'],
-    lastActive: '2025-12-15',
     currentState:
       'Dormant rather than dead. The hypothesis (that there is room for a serious daily UAE signal newsletter) holds; the constraint is that I do not currently have the time to research and write it well. The archive remains.',
   },
@@ -66,7 +63,6 @@ export const PROJECTS: ProjectPage[] = [
     started: '2024-06-01',
     ended: '2025-08-10',
     tags: ['saas', 'edtech'],
-    lastActive: '2025-08-10',
     externalUrl: 'https://example.com/ece',
     currentState:
       'Shipped and operational with a small set of paying clients. Maintenance-only from my side; the surface area is intentionally bounded.',
@@ -78,7 +74,6 @@ export const PROJECTS: ProjectPage[] = [
     status: 'active',
     started: '2026-04-15',
     tags: ['site', 'meta'],
-    lastActive: '2026-05-16',
     currentState:
       'The brief is the operating document for husayngokal.com — every visual, structural, and architectural decision documented to be defended. The build follows the brief; the brief refers to the build only through the changed-my-mind log when revision is warranted.',
     decisions: [

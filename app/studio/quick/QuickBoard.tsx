@@ -15,7 +15,7 @@ import styles from './quick.module.css';
 
 interface Book { slug: string; title: string; author: string; status: string; progressPct: number }
 interface Task { slug: string; title: string; status: string; scope: string; category: string | null }
-interface Project { slug: string; title: string; lastActive: string | null }
+interface Project { slug: string; title: string; status: string }
 
 export interface QuickData {
   books: Book[];
@@ -62,7 +62,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
         ...t, status: String(r.status ?? t.status), scope: String(r.scope ?? t.scope),
       }));
     } else if (req.target === 'project') {
-      setProjects((list) => list.map((p) => p.slug !== req.slug ? p : { ...p, lastActive: String(r.last_active ?? p.lastActive) }));
+      setProjects((list) => list.map((p) => p.slug !== req.slug ? p : { ...p, status: String(r.status ?? p.status) }));
     } else if (req.target === 'atlas' && res.line) {
       const next = res.line;
       const done = req.action === 'done';
@@ -168,18 +168,28 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
       </Section>
 
       {/* -- Building ------------------------------------------------- */}
-      <Section title="Building" count={projects.length} empty="No active project.">
+      <Section title="Building" count={projects.length} empty="No projects yet.">
         {projects.map((p) => {
-          const today = p.lastActive?.slice(0, 10) === authorDay();
+          const on = p.status === 'active';
+          const key = `${p.slug}:active`;
           return (
-            <li key={p.slug} className={styles.row}>
+            <li key={p.slug} className={`${styles.row} ${styles.rowSwitch}`}>
               <div className={styles.rowText}>
                 <span className={styles.rowTitle}>{p.title}</span>
-                <span className={styles.rowMeta}>{today ? 'active today' : p.lastActive ? `last active ${p.lastActive.slice(0, 10)}` : 'no activity logged'}</span>
+                <span className={styles.rowMeta}>{on ? 'actively working on it · shown on the homepage' : 'not working on it right now'}</span>
               </div>
-              <div className={styles.rowActions}>
-                <Btn primary busy={busy === `${p.slug}:active`} disabled={!!busy || today} onClick={() => send({ target: 'project', slug: p.slug, action: 'active-today' }, `${p.slug}:active`)}>Worked on it today</Btn>
-              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={on}
+                aria-label={`Actively working on ${p.title}`}
+                className={`${styles.switch} ${on ? styles.switchOn : ''}`}
+                disabled={!!busy}
+                aria-busy={busy === key || undefined}
+                onClick={() => send({ target: 'project', slug: p.slug, action: 'set-active', on: !on }, key)}
+              >
+                <span className={styles.switchKnob} />
+              </button>
             </li>
           );
         })}
