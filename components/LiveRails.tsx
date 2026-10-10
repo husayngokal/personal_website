@@ -30,6 +30,8 @@ import type { LiveState } from '@/lib/content/state';
 import styles from './LiveRails.module.css';
 
 const DAY_MS = 86_400_000;
+/* Rendered height of the corner marks; matches .mark in the CSS module. */
+const MARK_PX = 22;
 
 export function LiveRails({ initialState }: { initialState: LiveState }) {
   const { state, flashedKey } = useLiveState(initialState);
@@ -41,7 +43,7 @@ export function LiveRails({ initialState }: { initialState: LiveState }) {
         <Plate
           href={`/library/${reading.slug}`}
           kicker="currently reading"
-          mark={<BookMark />}
+          mark={<BookMark size={MARK_PX} />}
           flashing={flashedKey === 'currently_reading'}
           title={reading.title}
           {...readingFigure(reading)}
@@ -60,7 +62,7 @@ export function LiveRails({ initialState }: { initialState: LiveState }) {
         <Plate
           href={building.href ?? `/projects/${building.slug}`}
           kicker="currently building"
-          mark={<ProjectMark />}
+          mark={<ProjectMark size={MARK_PX} />}
           flashing={flashedKey === 'currently_building'}
           title={building.title}
           {...buildingFigure(building)}
@@ -75,7 +77,7 @@ export function LiveRails({ initialState }: { initialState: LiveState }) {
         <Plate
           href={`/study/credentials/${studying.slug}`}
           kicker="currently studying"
-          mark={<CalendarMark />}
+          mark={<CalendarMark size={MARK_PX} />}
           flashing={flashedKey === 'currently_studying'}
           title={studying.title}
           {...studyingFigure(studying)}
