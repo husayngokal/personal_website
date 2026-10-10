@@ -17,7 +17,7 @@ npm run typecheck
 ```
 
 Node 22+ required. Copy the environment variables you need into a local `.env`
-(Supabase, GitHub vault sync, R2, Spotify, location). The site degrades gracefully
+(Supabase, GitHub vault sync, R2). The site degrades gracefully
 when a service is not configured, so it runs without every integration set.
 
 ## How it works
@@ -56,7 +56,7 @@ npm run library:enrich # Open Library lookup + cover upload for the library
 
 ```
 /app             Next.js App Router pages, one folder per surface
-  /api           route handlers (vault webhook, spotify, location, newsletter)
+  /api           route handlers (vault webhook, newsletter)
 /components      React components
   /marks         bespoke hand-line SVGs
 /lib             typed content, state, and search index

@@ -1,6 +1,6 @@
 import { Logo } from './Logo';
 import { MenuDrawer } from './MenuDrawer';
-import { StatusPulse, type StatusPulseProps } from './StatusPulse';
+import { StatusPulse } from './StatusPulse';
 import { SearchButton } from './SearchButton';
 import styles from './TopNav.module.css';
 
@@ -22,14 +22,14 @@ import styles from './TopNav.module.css';
  * the other.
  */
 
-export function TopNav({ location }: { location?: StatusPulseProps }) {
+export function TopNav() {
   return (
     <header className={styles.header}>
       <div className={styles.inner}>
         <Logo />
         <div className={styles.right}>
           <SearchButton />
-          <StatusPulse city={location?.city} timezone={location?.timezone} />
+          <StatusPulse />
           <MenuDrawer />
         </div>
       </div>

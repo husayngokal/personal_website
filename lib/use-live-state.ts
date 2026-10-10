@@ -5,7 +5,7 @@
  *
  * Receives the server-rendered initialState as a starting point, then
  * subscribes to Postgres changes on public.current_state. When a row
- * updates (Spotify poller, vault webhook, GitHub commit, etc.) the hook
+ * updates (vault webhook, GitHub commit, etc.) the hook
  * re-derives the LiveState and consumers re-render.
  *
  * Also exposes `flashedKey` — the key that just changed — so visual
@@ -31,12 +31,10 @@ export function useLiveState(initial: LiveState): UseLiveStateResult {
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
   const flashTimer = useRef<number | null>(null);
 
-  /* Tick once per second so the listening phrase re-renders with the
-     latest client-computed elapsed time. Cheap (a number setState every
-     second); the Typewriter still respects the no-mid-phrase-interrupt
-     rule, so consumers see updated time on the next phrase boundary. */
+  /* Tick once a minute so relative dates ("active today" turning into
+     "active yesterday") roll over on a tab left open past midnight. */
   useEffect(() => {
-    const id = window.setInterval(() => setNowMs(Date.now()), 1000);
+    const id = window.setInterval(() => setNowMs(Date.now()), 60_000);
     return () => window.clearInterval(id);
   }, []);
 
@@ -81,7 +79,6 @@ function mergeRow(prev: LiveState, key: string, value: unknown): LiveState {
     case 'currently_studying':  return { ...prev, studying:  v as LiveState['studying'] };
     case 'currently_exploring': return { ...prev, exploring: v as LiveState['exploring'] };
     case 'currently_writing':   return { ...prev, writing:   v as LiveState['writing'] };
-    case 'currently_listening': return { ...prev, listening: v as LiveState['listening'] };
     default: return prev;
   }
 }

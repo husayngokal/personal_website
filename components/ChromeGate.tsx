@@ -7,7 +7,7 @@ import { usePathname } from 'next/navigation';
  * Studio surface. Studio is a private authoring tool with its own header, so
  * the marketing chrome would just stack a second header on top of it.
  *
- * Server components (e.g. TopNav with its location prop) are passed through as
+ * Server components (e.g. TopNav) are passed through as
  * children; this client wrapper only decides whether to include them, based on
  * the current path.
  */

@@ -24,7 +24,7 @@ Supabase doesn't get a CLI install dependency here — apply via the dashboard:
 | --- | --- | --- |
 | `notebook_*`, `library_books`, `projects`, `mental_models`, `study_*`, `publications`, `conferences`, `life_*` | Obsidian vault → vault webhook | public read |
 | `wikilinks` | Computed on every vault sync | public read |
-| `current_state` | Spotify / GitHub / vault-commit jobs | public read; service-role write |
+| `current_state` | Vault sync derive + GitHub jobs | public read; service-role write |
 | `comments` | Reader submissions via `/api/notebook/submit` | service-role only (queue is private) |
 
 ## Realtime channels

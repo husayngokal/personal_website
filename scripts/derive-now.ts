@@ -5,7 +5,6 @@
  *   npm run derive
  *
  * Useful when:
- *   - Spotify went silent and you want to clear the listening row
  *   - You manually edited a library_book / project / task in the DB
  *     and want the homepage typewriter to reflect it before the
  *     next sync runs

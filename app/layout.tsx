@@ -7,7 +7,6 @@ import { SearchPalette } from '@/components/SearchPalette';
 import { ChromeGate } from '@/components/ChromeGate';
 import { LoadingSplash } from '@/components/LoadingSplash';
 import { LoadingSplashGate } from '@/components/LoadingSplashGate';
-import { getCurrentLocation } from '@/lib/content/location';
 import './globals.css';
 
 /*
@@ -91,21 +90,14 @@ export const viewport: Viewport = {
   colorScheme: 'light',
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  /* Server-fetch the author's location so the status pulse renders
-     with the right city + timezone on first paint. Falls back to
-     Sharjah inside getCurrentLocation if Supabase isn't configured
-     or no row exists.
-
-     The search index used to be fetched here too, but it touches a
-     dozen tables and most visitors never open Cmd-K. The palette now
-     pulls /api/search-index lazily on first open, cutting every
-     page-render's Supabase fan-out down to a single small query. */
-  const location = await getCurrentLocation();
+  /* No data fetching here on purpose: the layout wraps every page, so
+     anything awaited at this level is paid on every render. The search
+     index is pulled lazily by the palette on first open. */
   return (
     /* suppressHydrationWarning: the splash gate script sets
        data-splash on <html> during body parse, before React hydrates.
@@ -134,7 +126,7 @@ export default async function RootLayout({
           Skip to content
         </a>
         <ChromeGate>
-          <TopNav location={{ city: location.city, timezone: location.timezone }} />
+          <TopNav />
         </ChromeGate>
         <main id="main">
           <RouteTransition>{children}</RouteTransition>

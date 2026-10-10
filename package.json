@@ -13,7 +13,6 @@
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "seed": "tsx --env-file=.env scripts/seed.ts",
-    "spotify:poll": "tsx --env-file=.env scripts/spotify-poll.ts",
     "vault:export": "tsx --env-file=.env scripts/export-vault.ts",
     "vault:sync": "tsx --env-file=.env scripts/vault-sync.ts",
     "derive": "tsx --env-file=.env scripts/derive-now.ts",

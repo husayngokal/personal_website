@@ -71,13 +71,6 @@ export function getCurrentWriting() {
   };
 }
 
-/* -- Currently listening (mocked) -------------------------------------- */
-export function getCurrentListening() {
-  // The Spotify integration is optional per Part XIII. The mock matches
-  // the brief's example so the typewriter has the right grammar.
-  return { artist: 'Faraz Anwar', track: 'Talwar' };
-}
-
 /* -- Typewriter phrases ------------------------------------------------- */
 /* Phrases match the patterns in Part V exactly. Each is regenerated from
    the live state above; the typewriter cycles through them in order.  */
@@ -87,7 +80,6 @@ export function getTypewriterPhrases(): string[] {
   const building = getCurrentBuilding();
   const studying = getCurrentStudying();
   const writing = getCurrentWriting();
-  const listening = getCurrentListening();
 
   if (building) {
     phrases.push(
@@ -107,11 +99,6 @@ export function getTypewriterPhrases(): string[] {
   if (studying) {
     phrases.push(
       `currently ${studying.daysUntil} days from the ics marine insurance exam.`,
-    );
-  }
-  if (listening) {
-    phrases.push(
-      `currently listening to ${listening.artist.toLowerCase()} — ${listening.track.toLowerCase()}.`,
     );
   }
   return phrases;

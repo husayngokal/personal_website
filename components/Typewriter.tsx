@@ -95,10 +95,9 @@ export function Typewriter({
            genuinely different SHAPE (count or starting words), swap
            to it and start from index 0. Identical-shape arrays are
            treated as "same rotation" even if their content drifts
-           every second (the listening phrase carries elapsed time
-           that updates per tick — without this check we'd reset to
-           index 0 every cycle and never reach phrases past the
-           first one). */
+           between renders (a word count growing, a relative date
+           rolling over). Without this check any drift would reset
+           the cursor to index 0 and starve the later phrases. */
         const sameShape = phraseShapeMatches(queuedPhrasesRef.current, activePhrases);
         if (!sameShape) {
           setActivePhrases(queuedPhrasesRef.current);
@@ -143,10 +142,9 @@ export function Typewriter({
 /* Two phrase arrays match in "shape" when they describe the same set
    of currently-X slots even if the content drifted between renders.
    We compare counts and the first three words of each phrase, which
-   is the verb-plus-noun stem ("currently building slipwise…", "currently
-   listening to onerepublic…"). The listening phrase's trailing elapsed
-   time ("2:48 in.") changes every second, but its stem stays put, so
-   this check stays true tick-to-tick and the cursor keeps advancing. */
+   is the verb-plus-noun stem ("currently building slipwise…"). A
+   trailing detail like a word count can change while the stem stays
+   put, so the cursor keeps advancing. */
 function phraseShapeMatches(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {

@@ -42,8 +42,6 @@
  *                         registers — studying is a syllabus, exploring
  *                         is an open question.
  *
- *   currently_listening — owned by the Spotify poller, not touched here.
- *
  * Called by:
  *   - scripts/seed.ts                (initial population)
  *   - lib/vault/sync.ts              (after every content upsert)
