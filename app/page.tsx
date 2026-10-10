@@ -5,7 +5,6 @@ import { HeroPortrait } from '@/components/HeroPortrait';
 import { HeroHand } from '@/components/HeroHand';
 import { WorkingNow } from '@/components/WorkingNow';
 import { LiveRails } from '@/components/LiveRails';
-import { NewsletterForm } from '@/components/NewsletterForm';
 import { ScrollDrop } from '@/components/marks/ScrollDrop';
 import { getLiveState } from '@/lib/content/state';
 import { getCurrentWorking } from '@/lib/content/working';
@@ -175,14 +174,6 @@ export default async function HomePage() {
               </Link>
             )}
           </div>
-        </div>
-      </section>
-
-      {/* -- Newsletter ---------------------------------------------- */}
-      <section className={styles.section}>
-        <div className={styles.sectionInner}>
-          <Eyebrow number="04">The weekly email</Eyebrow>
-          <NewsletterForm />
         </div>
       </section>
 

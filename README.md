@@ -56,7 +56,7 @@ npm run library:enrich # Open Library lookup + cover upload for the library
 
 ```
 /app             Next.js App Router pages, one folder per surface
-  /api           route handlers (vault webhook, newsletter)
+  /api           route handlers (vault webhook, studio)
 /components      React components
   /marks         bespoke hand-line SVGs
 /lib             typed content, state, and search index

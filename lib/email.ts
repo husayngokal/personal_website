@@ -1,10 +1,12 @@
 /*
- * Resend wrapper — single send() that adds List-Unsubscribe headers
- * for one-click compliance (Gmail/Yahoo requirement as of 2024).
+ * Resend wrapper: a single send().
  *
- * The unsubscribe-by-token URL is the same one served at
- * /api/newsletter/unsubscribe. Including it as a header makes inbox
- * UIs offer the one-click button without the user opening the message.
+ * The only caller today is the reader-note notification
+ * (app/api/notebook/submit), which emails the author when someone leaves
+ * a note. The weekly subscriber digest was switched off in October 2026.
+ *
+ * The List-Unsubscribe support is kept for any future list mail: passing
+ * an unsubscribeToken adds the one-click headers Gmail and Yahoo require.
  */
 
 import 'server-only';

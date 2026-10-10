@@ -18,6 +18,9 @@ const nextConfig = {
     return [
       { source: '/notebook/threads', destination: '/notebook', permanent: true },
       { source: '/notebook/threads/:name*', destination: '/notebook', permanent: true },
+      // The weekly email was switched off in October 2026. Temporary, in
+      // case it ever returns at the same address.
+      { source: '/newsletter', destination: '/', permanent: false },
     ];
   },
 };

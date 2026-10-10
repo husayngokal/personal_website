@@ -3,7 +3,9 @@ import { unsubscribeByToken } from '@/lib/content/newsletter';
 
 export const dynamic = 'force-dynamic';
 
-/* GET so the unsubscribe link in emails works without a form submission. */
+/* GET so the unsubscribe link in emails works without a form submission.
+   The weekly email itself is switched off (see lib/content/newsletter.ts);
+   this route stays so links in already-delivered digests keep working. */
 export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get('t') ?? '';
   const result = await unsubscribeByToken(token);
@@ -27,7 +29,7 @@ function unsubscribePage(state: 'ok' | 'error', email?: string): string {
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Unsubscribe — husayn gokal.</title>
+  <title>Unsubscribe · husayn gokal.</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
     body { font: 17px/1.65 Georgia, serif; background: #EFE7D7; color: #6B6B6B; padding: 80px 32px; max-width: 560px; margin: 0 auto; }
