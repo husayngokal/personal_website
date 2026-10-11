@@ -90,7 +90,7 @@ export function LiveRails({ initialState }: { initialState: LiveState }) {
 interface Figure {
   figure: string;
   unit: string;
-  /** Pulse the orange dot beside the unit: the signal is live right now. */
+  /** Pulse the orange dot beside the kicker: the signal is live right now. */
   live?: boolean;
   footLeft?: ReactNode;
   footRight?: ReactNode;
@@ -108,9 +108,15 @@ function Plate({
   return (
     <Link href={href} className={styles.plate}>
       <span className={styles.top}>
+        {/* One dot, after the label. It pulses while the signal is live and
+            flashes for ~2s when a Realtime update lands. It sits here, not
+            beside the figure, because a dot at the figure's baseline reads
+            as a full stop ("6."). */}
         <span className={styles.kicker}>
           {kicker}
-          {flashing && <span className={styles.flashIndicator} aria-hidden="true" />}
+          {(live || flashing) && (
+            <span className={flashing ? styles.flashIndicator : styles.livePulse} aria-hidden="true" />
+          )}
         </span>
         <span className={styles.mark}>{mark}</span>
       </span>
@@ -118,10 +124,7 @@ function Plate({
           server render and the visitor's clock around midnight. */}
       <span className={styles.figureRow} suppressHydrationWarning>
         <span className={styles.figure} suppressHydrationWarning>{figure}</span>
-        <span className={styles.unit} suppressHydrationWarning>
-          {live && <span className={styles.livePulse} aria-hidden="true" />}
-          {unit}
-        </span>
+        <span className={styles.unit} suppressHydrationWarning>{unit}</span>
       </span>
       <span className={styles.title} title={title}>{title}</span>
       <span className={styles.foot}>

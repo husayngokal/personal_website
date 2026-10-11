@@ -50,6 +50,9 @@
 }
 
 .kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-s);
   font-family: var(--font-mono);
   font-size: var(--type-mono-s);
   letter-spacing: 0.14em;
@@ -90,9 +93,6 @@
 }
 
 .unit {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
   font-family: var(--font-mono);
   font-size: var(--type-mono-s);
   letter-spacing: 0.1em;
@@ -164,6 +164,7 @@
   border-radius: 50%;
   background: var(--accent);
   display: inline-block;
+  flex: none;
   animation: railPulse var(--pulse-ms) var(--ease) infinite;
 }
 
@@ -174,8 +175,6 @@
   height: 5px;
   border-radius: 50%;
   background: var(--accent);
-  margin-left: var(--space-s);
-  vertical-align: middle;
   animation: railFlash 600ms var(--ease) 3;
 }
 
