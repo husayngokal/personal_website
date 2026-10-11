@@ -29,7 +29,7 @@ export default function EditIndex() {
             {types.map((t) => (
               <a key={t.key} href={`/studio/edit/${t.key}`} className={styles.card}>
                 <span className={styles.cardLabel}>{t.label}</span>
-                <span className={styles.cardFolder}>{t.folder}/</span>
+                <span className={styles.cardFolder}>{t.singleton ? `${t.folder}/${t.singleton}` : `${t.folder}/`}</span>
               </a>
             ))}
           </div>

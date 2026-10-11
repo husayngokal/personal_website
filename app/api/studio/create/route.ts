@@ -26,6 +26,9 @@ export async function POST(req: NextRequest) {
 
   const type = payload.type ? getContentType(payload.type) : undefined;
   if (!type) return NextResponse.json({ error: 'unknown-type' }, { status: 400 });
+  /* A singleton is one fixed file; "creating" it would write a second,
+     slug-named file beside it that the parser ignores. */
+  if (type.singleton) return NextResponse.json({ error: 'singleton', detail: 'This entry is edited, not created.' }, { status: 400 });
 
   const values = payload.values ?? {};
   const errors = validate(type, values);

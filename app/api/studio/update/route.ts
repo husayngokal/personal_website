@@ -11,6 +11,9 @@ import { getStudioSession } from '@/lib/studio/session';
 import { getContentType } from '@/lib/studio/schema';
 import { buildMarkdown, validate, type Values } from '@/lib/studio/markdown';
 import { putFile } from '@/lib/studio/github';
+import { revalidatePath } from 'next/cache';
+import { parseFile } from '@/lib/vault/parse';
+import { getServerAdminClient, isSupabaseConfigured } from '@/lib/supabase';
 
 export const dynamic = 'force-dynamic';
 
@@ -59,6 +62,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'conflict' }, { status: 409 });
     }
     return NextResponse.json({ error: 'commit-failed', detail: msg }, { status: 502 });
+  }
+
+  /* A file that maps to a current_state row (the job line, now/working.md)
+     is a single small fact the homepage reads directly. Write it through
+     now so the change shows at once instead of after the ~30s webhook
+     sync, which then writes the same value again. Best effort: the commit
+     above is the source of truth and has already succeeded. */
+  try {
+    const parsed = parseFile(payload.path, built.content);
+    if (parsed && !parsed.ignored && parsed.table === 'current_state' && isSupabaseConfigured()) {
+      const row = parsed.row as { key: string; value: object };
+      await getServerAdminClient()
+        .from('current_state')
+        .upsert({ key: row.key, value: row.value ?? {}, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+      revalidatePath('/');
+    }
+  } catch (err) {
+    console.error(`[studio/update] write-through skipped for ${payload.path}: ${(err as Error).message}`);
   }
 
   return NextResponse.json({ ok: true, path: payload.path, url: built.url });

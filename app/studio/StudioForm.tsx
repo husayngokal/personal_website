@@ -286,7 +286,7 @@ export function StudioForm({
           {busy ? 'Publishing…' : mode === 'edit' ? 'Save changes' : `Create ${type.label}`}
         </button>
         <a className={styles.cancel} href="/studio">Cancel</a>
-        {mode === 'edit' && (
+        {mode === 'edit' && !type.singleton && (
           <span className={styles.deleteZone}>
             {confirmingDelete ? (
               <>

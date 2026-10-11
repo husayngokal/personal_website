@@ -27,6 +27,7 @@ export default async function StudioHome({
   /* Group the types by their `group` field, preserving first-seen order. */
   const groupMap = new Map<string, typeof CONTENT_TYPES>();
   for (const t of CONTENT_TYPES) {
+    if (t.singleton) continue;            // one fixed file: edited, never created
     const list = groupMap.get(t.group) ?? [];
     list.push(t);
     groupMap.set(t.group, list);
@@ -42,6 +43,12 @@ export default async function StudioHome({
           <span className={styles.cardLabel}>Quick updates</span>
           <span className={styles.cardFolder}>one tap: progress, done, streak</span>
         </a>
+        {CONTENT_TYPES.filter((t) => t.singleton).map((t) => (
+          <a key={t.key} href={`/studio/edit/${t.key}`} className={styles.card}>
+            <span className={styles.cardLabel}>{t.label}</span>
+            <span className={styles.cardFolder}>{t.blurb ?? `${t.folder}/${t.singleton}`}</span>
+          </a>
+        ))}
       </div>
       <p className={styles.p}>
         Create a new entry, or <a className={styles.inlineLink} href="/studio/edit">edit an existing one</a>.

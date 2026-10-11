@@ -42,6 +42,14 @@ export interface ContentType {
   route: string;           // public URL prefix for the "view" link
   titleField: string;      // field whose value becomes the slug
   numberPrefix?: { field: string; pad: number };  // filename like 01-slug.md
+  /** A type backed by exactly one fixed file (e.g. now/working.md). It has
+   *  no create flow and no list to pick from: Studio goes straight to the
+   *  edit form for this filename, and it cannot be deleted from there. */
+  singleton?: string;
+  /** Where "view" should point after a save, when it is not route/slug. */
+  viewUrl?: string;
+  /** One line shown on the Studio card instead of the folder. */
+  blurb?: string;
   fixed?: Record<string, string | boolean>;       // constant frontmatter
   fields: Field[];
   body: BodyConfig;
@@ -66,6 +74,28 @@ const GOAL_SCALE = ['lifetime', 'five-year', 'this-year', 'this-quarter', 'this-
 const GOAL_STATUS = ['completed', 'partially-completed', 'dropped', 'rolled-over', 'in-progress', 'planned'];
 
 export const CONTENT_TYPES: ContentType[] = [
+  /* ---- Now: the standing job line under the homepage hero ---- */
+  /* One file, now/working.md, parsed into the current_working row that
+     components/WorkingNow.tsx renders ("AI Engineer at Constellation
+     Marine Services · Dubai · On-site · since July 2026"). `started` is
+     free text on purpose: it is shown as written ("July 2026"). */
+  {
+    key: 'now-working', label: 'Current role', group: 'Now',
+    folder: 'now', route: '', titleField: 'role',
+    singleton: 'working.md', viewUrl: '/',
+    blurb: 'the job line under the homepage hero',
+    fields: [
+      { name: 'role', label: 'Role', type: 'text', required: true, placeholder: 'AI Engineer' },
+      { name: 'company', label: 'Company', type: 'text', placeholder: 'Constellation Marine Services' },
+      { name: 'url', label: 'Company link', type: 'text', placeholder: 'https://', help: 'The company name links here. Leave blank for plain text.' },
+      { name: 'location', label: 'Location', type: 'text', placeholder: 'Dubai' },
+      { name: 'arrangement', label: 'Arrangement', type: 'text', placeholder: 'On-site, Remote, Hybrid' },
+      { name: 'started', label: 'Since', type: 'text', placeholder: 'July 2026', help: 'Shown as written, after "since".' },
+      { name: 'blurb', label: 'Blurb', type: 'text', help: 'One sentence on what the role is. Stored, not shown on the homepage yet.' },
+    ],
+    body: { mode: 'none' },
+  },
+
   /* ---- Notebook ---- */
   /* One content type. Notes and threads were removed in August 2026;
      `draft` is the only axis left, and it defaults to true so a new

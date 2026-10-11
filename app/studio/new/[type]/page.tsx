@@ -4,7 +4,7 @@
  * client form. The gated layout guarantees a valid session before this renders.
  */
 
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { getContentType } from '@/lib/studio/schema';
 import { StudioForm } from '../../StudioForm';
 import styles from '../../studio.module.css';
@@ -22,6 +22,7 @@ export default async function NewEntryPage({ params }: { params: Promise<{ type:
   const { type: key } = await params;
   const type = getContentType(key);
   if (!type) notFound();
+  if (type.singleton) redirect(`/studio/edit/${type.key}`);
 
   const initialValues: Record<string, string> = {};
   for (const f of type.fields) initialValues[f.name] = resolveDefault(f.default);

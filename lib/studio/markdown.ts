@@ -131,7 +131,7 @@ export function buildMarkdown(
      a tidy diff. */
   const content = matter.stringify(body ? `\n${body}\n` : '\n', fm);
   const path = `${type.folder}/${filename}.md`;
-  const url = `${type.route}/${slug}`;
+  const url = type.viewUrl ?? `${type.route}/${slug}`;
   return { slug, path, content, url };
 }
 

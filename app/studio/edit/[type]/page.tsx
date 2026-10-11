@@ -26,9 +26,10 @@ export default async function EditTypePage({
   searchParams: Promise<{ file?: string }>;
 }) {
   const { type: key } = await params;
-  const { file } = await searchParams;
   const type = getContentType(key);
   if (!type) notFound();
+  /* A singleton type is one fixed file: never list, always edit that file. */
+  const file = type.singleton ?? (await searchParams).file;
 
   const session = await getStudioSession();
   if (!session) notFound(); // layout already guards, this narrows the type
@@ -100,9 +101,10 @@ export default async function EditTypePage({
   return (
     <div>
       <p className={styles.crumb}>
-        <a href="/studio">Studio</a> / <a href={`/studio/edit/${type.key}`}>{type.label}</a> / {file}
+        <a href="/studio">Studio</a> / {type.singleton ? type.label : <><a href={`/studio/edit/${type.key}`}>{type.label}</a> / {file}</>}
       </p>
-      <h1 className={styles.h1}>Edit: {file.replace(/\.md$/, '')}</h1>
+      <h1 className={styles.h1}>{type.singleton ? type.label : `Edit: ${file.replace(/\.md$/, '')}`}</h1>
+      {type.singleton && type.blurb && <p className={styles.p}>This is {type.blurb}. Saving updates the site straight away.</p>}
       <StudioForm
         type={type}
         initialValues={parsed.values}
