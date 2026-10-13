@@ -163,7 +163,7 @@ They repeat.
 The motto of this document is:
 
 
-> Understand deeply. Build honestly. Ship publicly. Serve usefully. Repeat
+> Understand deeply. Build quickly. Ship publicly. Serve usefully. Repeat
 > forever.
 
 
@@ -1393,7 +1393,7 @@ I will create consistently enough to serve.
 The work begins here.
 
 
-> Understand deeply. Build honestly. Ship publicly. Serve usefully. Repeat
+> Understand deeply. Build quickly. Ship publicly. Serve usefully. Repeat
 > forever.`,
   },
   {
@@ -18579,7 +18579,7 @@ It answers:
 The mission is:
 
 
-> Understand deeply. Build honestly. Ship publicly. Serve usefully. Repeat
+> Understand deeply. Build quickly. Ship publicly. Serve usefully. Repeat
 > forever.
 
 
@@ -27433,7 +27433,7 @@ The whole master plan can be summarized as:
 Even shorter:
 
 
-> Understand deeply. Build honestly. Ship publicly. Serve usefully. Repeat for
+> Understand deeply. Build quickly. Ship publicly. Serve usefully. Repeat for
 > years.
 
 
