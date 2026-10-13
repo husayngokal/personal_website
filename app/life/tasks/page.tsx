@@ -132,10 +132,11 @@ export default async function TasksPage({
       </p>
       <h1 className={styles.title}>Tasks</h1>
       <p className={styles.dek}>
-        What I am actively working on, with status, published so the
-        list itself becomes accountability. Smaller than goals,
-        more granular than the Master Plan&apos;s artifact backlog. Edits
-        flow through the vault — the public read-only view is here.
+        All aligned with the master plan. Things I'm getting done but not 
+        necessarily everyday. Finer than the Master Plan&apos;s
+        artifact backlog. Every item here is something you can
+        ask me about. Each varies in difficulty and length. All 
+        published here for accountability.
       </p>
 
       <div className={styles.filterRow}>

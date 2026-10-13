@@ -19,7 +19,7 @@ import type {
  */
 
 export const MOTTO = {
-  text: 'Understand deeply. Build honestly. Ship publicly. Serve usefully. Repeat forever.',
+  text: 'Understand deeply. Build quickly. Ship publicly. Serve usefully. Repeat forever.',
   language: 'en',
 };
 

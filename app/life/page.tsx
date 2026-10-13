@@ -64,14 +64,13 @@ export default async function LifePage() {
         <Link href="/life/plan" className="lifePillar">
           <p className="lifePillarLabel">The Master Plan</p>
           <p className="lifePillarTitle">
-            The operating document that underwrites the rest of the site.
+            The foundation of this entire site.
           </p>
           <p className="lifePillarDek">
-            Eighteen Parts. Roughly 880 pages. Identity, ten technical
-            domains, the build-to-understand loop, the AI usage
-            constitution, the phases, the season structure, the first
-            ninety artifacts. Written privately as a working brief;
-            published here for accountability.
+            Eighteen Parts with roughly 880 pages. On identity, my ten technical
+            domains, the build-to-understand loop, my AI usage
+            constitution, phases, the season structure, and the first
+            ninety artifacts. All published here for accountability.
           </p>
           <p className="lifePillarCTA">
             {PLAN_PARTS.length} Parts · read in order or jump in →
@@ -81,14 +80,14 @@ export default async function LifePage() {
         <Link href="/life/tasks" className="lifePillar">
           <p className="lifePillarLabel">Current Tasks</p>
           <p className="lifePillarTitle">
-            What I am actively working on, with status, in public.
+            What I'm currently working on.
           </p>
           <p className="lifePillarDek">
-            Smaller than goals. Finer than the Master Plan&apos;s
+            All aligned with the master plan. Things I'm getting done but not 
+            necessarily everyday. Finer than the Master Plan&apos;s
             artifact backlog. Every item here is something you can
-            ask me about. Daily, weekly, monthly, lifetime; recurring
-            routines too. Status flips happen in the vault; the
-            public view is read-only.
+            ask me about. Each varies in difficulty and length. All 
+            published here for accountability.
           </p>
           <p className="lifePillarCTA">
             {taskCounts.total} total ·
