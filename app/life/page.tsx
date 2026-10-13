@@ -136,33 +136,12 @@ export default async function LifePage() {
           TimelineEntry / DecisionLogEntry primitives are untouched
           so a revert is the only change needed.
       */}
-
-      {/* Building in public, bounded framework */}
-      <h2 className="lifeSectionTitle">Building in public, with edges</h2>
-      <p>
-        Publishing the work is not the goal. The accountability that
-        publishing produces is the goal.
-      </p>
-      <p>
-        I publish architectural decisions, position changes, and what
-        I learned this week. I do not publish client work, family
-        details, or anything that requires more context than a
-        paragraph can carry. The schedule is the discipline. Sunday is
-        the weekly accountability note. End of month is the site-state
-        note. End of quarter is the goal review. End of year is the
-        full retrospective.
-      </p>
-      <p>
-        The framework is the point. Without the framework, building in
-        public degrades into either over-sharing or under-sharing.
-        Both are worse than not building in public at all.
-      </p>
     </div>
   );
 }
 
-/* Editorial: render small counts as words ("Seven operating principles",
-   not "7 operating principles"). Falls back to digits for >10 because the
+/* Editorial: render small counts as words ("Five operating principles",
+   not "5 operating principles"). Falls back to digits for >10 because the
    word forms get clunky. */
 function spellOut(n: number): string {
   const words = ['zero','one','two','three','four','five','six','seven','eight','nine','ten'];
