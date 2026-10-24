@@ -11,6 +11,7 @@ export const dynamic = 'force-dynamic';
 export default function EditIndex() {
   const groupMap = new Map<string, typeof CONTENT_TYPES>();
   for (const t of CONTENT_TYPES) {
+    if (t.singleton) continue;            // one-file facts (the role line) are not listed
     const list = groupMap.get(t.group) ?? [];
     list.push(t);
     groupMap.set(t.group, list);
