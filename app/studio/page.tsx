@@ -41,14 +41,8 @@ export default async function StudioHome({
       <div className={styles.grid}>
         <a href="/studio/quick" className={styles.card}>
           <span className={styles.cardLabel}>Quick updates</span>
-          <span className={styles.cardFolder}>one tap: progress, done, streak</span>
+          <span className={styles.cardFolder}>one tap, and every tap scores</span>
         </a>
-        {CONTENT_TYPES.filter((t) => t.singleton).map((t) => (
-          <a key={t.key} href={`/studio/edit/${t.key}`} className={styles.card}>
-            <span className={styles.cardLabel}>{t.label}</span>
-            <span className={styles.cardFolder}>{t.blurb ?? `${t.folder}/${t.singleton}`}</span>
-          </a>
-        ))}
       </div>
       <p className={styles.p}>
         Create a new entry, or <a className={styles.inlineLink} href="/studio/edit">edit an existing one</a>.
