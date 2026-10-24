@@ -49,7 +49,7 @@ import { getServerAdminClient } from '../supabase';
 import { deriveAndWriteLiveState } from '../content/derive';
 import { authorDay } from '../content/streak';
 import { ACTIVITY_KEY, PATHS_KEY, writeStateIfChanged } from '../content/vault-state';
-import { fetchVaultMarkdown, vaultRepo } from './tarball';
+import { fetchVaultMarkdown, headCommit, vaultRepo } from './tarball';
 import { recomputeScore } from '../score/store';
 import {
   buildRegistry, extractWikilinks, resolveTarget, urlFor,
@@ -71,6 +71,11 @@ export interface SyncOptions {
    *  populate `last_edited_at` from this map and skip the per-file
    *  commits API call entirely. */
   fileTimestamps?: Map<string, string>;
+  /** Commit to read (the push's head sha) and its time. Without them the
+   *  sync asks GitHub for the branch head. Reading by sha means the sync
+   *  sees exactly the pushed state, not a cached older tarball. */
+  ref?: string;
+  asOf?: string;
 }
 
 export async function syncVault(opts: SyncOptions = {}): Promise<SyncResult> {
@@ -84,7 +89,12 @@ export async function syncVault(opts: SyncOptions = {}): Promise<SyncResult> {
      one GitHub request regardless of file count (see header and
      lib/vault/tarball.ts). last_edited_at still comes from
      opts.fileTimestamps (the webhook's push payload). */
-  const files = await fetchVaultMarkdown();
+  let ref = opts.ref;
+  let asOf = opts.asOf;
+  if (!ref) {
+    try { const head = await headCommit(); ref = head.sha; asOf = head.date; } catch { /* fall back to the branch */ }
+  }
+  const files = await fetchVaultMarkdown(ref);
   const contents = files.map((f) => ({
     path: f.path,
     content: f.content,
@@ -295,7 +305,7 @@ export async function syncVault(opts: SyncOptions = {}): Promise<SyncResult> {
   /* 6b. The score: recomputed from every file, stored in current_state.
         Only written when it changed (it is broadcast like the rest). */
   try {
-    await recomputeScore(db, files);
+    await recomputeScore(db, files, { asOf });
   } catch (err) {
     result.warnings.push(`score recompute failed: ${(err as Error).message}`);
   }

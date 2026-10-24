@@ -64,14 +64,21 @@ export async function POST(req: NextRequest) {
      sync (the original implementation did that and was timing out at
      Vercel's 60s function limit; see lib/vault/sync.ts header). */
   const fileTimestamps = new Map<string, string>();
+  let ref: string | undefined;
+  let asOf: string | undefined;
   try {
     const payload = JSON.parse(raw) as {
+      after?: string;
+      head_commit?: { timestamp?: string };
       commits?: Array<{
         timestamp?: string;
         added?: string[];
         modified?: string[];
       }>;
     };
+    /* The pushed head: the sync reads exactly this commit. */
+    if (payload.after && /^[0-9a-f]{40}$/.test(payload.after)) ref = payload.after;
+    asOf = payload.head_commit?.timestamp;
     for (const c of payload.commits ?? []) {
       const ts = c.timestamp;
       if (!ts) continue;
@@ -87,7 +94,7 @@ export async function POST(req: NextRequest) {
   /* ACK fast — GitHub's webhook timeout is 10s, well under a full sync. */
   after(async () => {
     try {
-      const result = await syncVault({ fileTimestamps });
+      const result = await syncVault({ fileTimestamps, ref, asOf });
       console.log(
         `[vault/webhook] sync ok — parsed=${result.parsed} touched=${fileTimestamps.size} ` +
         `upserted=${JSON.stringify(result.upserted)} deleted=${JSON.stringify(result.deleted)} ` +

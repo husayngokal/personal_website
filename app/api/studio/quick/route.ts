@@ -71,6 +71,7 @@ export async function POST(req: NextRequest) {
   const today = authorDay();
   const cached = await readScore(db);
   let result: QuickResult | null = null;
+  let commit = { commitSha: '', commitDate: '' };
   try {
     /* Two attempts: if the file changed between our read and our write
        (a sync cannot do that, but Obsidian on another device can), read
@@ -94,7 +95,7 @@ export async function POST(req: NextRequest) {
         });
       }
       try {
-        await putFile(session.token, { path, content: computed.raw, sha: file.sha, message: `studio: ${computed.summary}` });
+        commit = await putFile(session.token, { path, content: computed.raw, sha: file.sha, message: `studio: ${computed.summary}` });
         result = computed;
       } catch (err) {
         const msg = (err as Error).message;
@@ -125,7 +126,13 @@ export async function POST(req: NextRequest) {
       console.error(`[studio/quick] write-through failed for ${path}: ${(err as Error).message}`);
     }
     try {
-      await recomputeScore(db, await fetchVaultMarkdown(), { path, content: done.raw });
+      /* Read the vault at exactly this commit (never a cached older copy),
+         and stamp the result with its time so an earlier tap's recompute
+         finishing later cannot overwrite it. */
+      await recomputeScore(db, await fetchVaultMarkdown(commit.commitSha || undefined), {
+        override: { path, content: done.raw },
+        asOf: commit.commitDate || undefined,
+      });
     } catch (err) {
       console.error(`[studio/quick] score recompute failed: ${(err as Error).message}`);
     }

@@ -9,12 +9,13 @@
  */
 
 import { getServerAdminClient } from '../lib/supabase';
-import { fetchVaultMarkdown } from '../lib/vault/tarball';
+import { fetchVaultMarkdown, headCommit } from '../lib/vault/tarball';
 import { recomputeScore } from '../lib/score/store';
 
 async function main() {
   const db = getServerAdminClient();
-  const s = await recomputeScore(db, await fetchVaultMarkdown());
+  const head = await headCommit();
+  const s = await recomputeScore(db, await fetchVaultMarkdown(head.sha), { asOf: head.date });
   console.log(`week of ${s.week.start}: ${s.week.bar} / ${s.bar} (quests ${s.week.quest}, curiosity ${s.week.curiosityCounted} of ${s.curiosityCap})`);
   console.log(`lifetime ${s.lifetime.points}, level ${s.lifetime.level}, ${s.streak} full weeks in a row`);
   for (const i of s.items) {

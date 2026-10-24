@@ -45,6 +45,10 @@ export function TopScoreBar() {
   const [banner, setBanner] = useState<{ id: number; text: string; big: boolean } | null>(null);
   const timers = useRef<number[]>([]);
   const lastBar = useRef<number | null>(null);
+  /* After a tap here, an older recompute arriving late must not pull the
+     line back; hold the shown value up for a minute, or until released
+     (an undo or failed save, where lower is right). */
+  const holdUntil = useRef(0);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const fx = useRef<FxCanvas | null>(null);
 
@@ -63,6 +67,7 @@ export function TopScoreBar() {
   const applyBar = useCallback((bar: number, max: number) => {
     const prev = lastBar.current;
     if (prev === bar) return;
+    if (prev !== null && bar < prev && Date.now() < holdUntil.current) return;
     lastBar.current = bar;
     setS({ bar, max });
     if (prev !== null && bar > prev) showTag(`+${bar - prev} · ${bar} / ${max}`);
@@ -71,7 +76,8 @@ export function TopScoreBar() {
   /* A tap on this device: the full show. */
   const onFx = useCallback((d: ScoreFxDetail) => {
     lastBar.current = d.after.bar;
-    if (d.gained <= 0) { setS({ bar: d.after.bar, max: d.barMax }); return; }
+    if (d.gained <= 0) { holdUntil.current = 0; setS({ bar: d.after.bar, max: d.barMax }); return; }
+    holdUntil.current = Date.now() + 60_000;
 
     const quarters = quartersCrossed(d.before.bar, d.after.bar, d.barMax);
     const levelUp = d.levelAfter > d.levelBefore;
@@ -132,6 +138,8 @@ export function TopScoreBar() {
     window.addEventListener('resize', onResize);
     const handler = (e: Event) => onFx((e as CustomEvent<ScoreFxDetail>).detail);
     window.addEventListener(SCORE_FX_EVENT, handler);
+    const release = () => { holdUntil.current = 0; };
+    window.addEventListener('score:release', release);
     let channel: ReturnType<ReturnType<typeof getBrowserClient>['channel']> | null = null;
     if (isSupabaseConfigured()) {
       const supabase = getBrowserClient();
@@ -165,6 +173,7 @@ export function TopScoreBar() {
     return () => {
       window.removeEventListener('resize', onResize);
       window.removeEventListener(SCORE_FX_EVENT, handler);
+      window.removeEventListener('score:release', release);
       if (channel && isSupabaseConfigured()) void getBrowserClient().removeChannel(channel);
       pending.forEach((t) => window.clearTimeout(t));
     };

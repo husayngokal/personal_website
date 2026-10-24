@@ -68,6 +68,11 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
   const press = useRef<{ x: number; y: number } | null>(null);
   const run = useRef<{ at: number; n: number }>({ at: 0, n: 0 });
   const [swap, setSwap] = useState<SwapState | null>(null);
+  /* After a tap, the recompute for an earlier tap can still arrive and
+     would step the numbers back. Until the server has caught up with
+     everything tapped here (or a minute passes), a lower total is ignored.
+     An undo clears the hold, since then lower is right. */
+  const hold = useRef<{ points: number; until: number } | null>(null);
 
   /* The server recomputes the full score after answering; it arrives here
      over Realtime and settles whatever the prediction got wrong. */
@@ -78,7 +83,11 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
       .channel(`quick_${Math.random().toString(36).slice(2, 10)}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'current_state', filter: 'key=eq.score' }, (payload) => {
         const v = (payload.new as { value?: ScoreState } | null)?.value;
-        if (v?.version === 1) setScore({ week: v.week, lifetime: v.lifetime, streak: v.streak, items: v.items, load: v.load });
+        if (v?.version !== 1) return;
+        const h = hold.current;
+        if (h && Date.now() < h.until && v.lifetime.points < h.points) return;
+        if (h && v.lifetime.points >= h.points) hold.current = null;
+        setScore({ week: v.week, lifetime: v.lifetime, streak: v.streak, items: v.items, load: v.load });
       })
       .subscribe();
     return () => { void supabase.removeChannel(channel); };
@@ -177,6 +186,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
       const now = Date.now();
       run.current = now - run.current.at < 90_000 ? { at: now, n: run.current.n + 1 } : { at: now, n: 1 };
       setScore(optimistic);
+      hold.current = { points: optimistic.lifetime.points, until: now + 60_000 };
       emitScoreFx({
         before: snapshot.week, after: optimistic.week, barMax: 200,
         levelBefore: snapshot.lifetime.level, levelAfter: optimistic.lifetime.level,
@@ -185,6 +195,8 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
     }
     const rollback = () => {
       if (!optimistic || !snapshot) return;
+      hold.current = null;
+      window.dispatchEvent(new Event('score:release'));
       setScore(snapshot);
       emitScoreFx({
         before: optimistic.week, after: snapshot.week, barMax: 200,
@@ -214,6 +226,12 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
         return;
       }
       reflect(req, j as ApiOk);
+      /* An undo, a park or any change that was not predicted can lower the
+         total for real: stop holding the numbers up. */
+      if (!p || p.gained <= 0) {
+        hold.current = null;
+        window.dispatchEvent(new Event('score:release'));
+      }
       setNote({
         kind: 'ok',
         text: `${(j as ApiOk).summary}${p && p.gained > 0 ? ` · +${p.gained}` : ''}`,
@@ -309,10 +327,10 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
             <div className={styles.rowText}>
               <span className={styles.rowTitle}>{i.title}</span>
               <span className={styles.rowMeta}>
-                {[i.summary, i.lane, i.weekPoints ? `+${i.weekPoints} this week` : null].filter(Boolean).join(' · ')}
+                {[liveSummary(i), i.lane, i.weekPoints ? `+${i.weekPoints} this week` : null].filter(Boolean).join(' · ')}
               </span>
               {i.total > 0 && (
-                <span className={styles.miniTrack} aria-hidden="true"><span className={styles.miniFill} style={{ width: `${i.pct}%` }} /></span>
+                <span className={styles.miniTrack} aria-hidden="true"><span className={styles.miniFill} style={{ width: `${livePct(i)}%` }} /></span>
               )}
             </div>
             {i.needsSetup ? (
@@ -558,6 +576,25 @@ function SetupForm({ template, busy, disabled, onSubmit }: {
       <Btn primary busy={busy} disabled={disabled} onClick={() => undefined} submit>Save</Btn>
     </form>
   );
+}
+
+/* The progress line, worked out here from the parts so a tap shows
+   "1 of 7" at once instead of when the server's recompute lands. */
+function liveSummary(i: ItemView): string {
+  const unit = i.parts[0]?.unit;
+  if (!unit) return i.summary;
+  const same = i.parts.filter((g) => g.unit === unit);
+  const done = same.reduce((n, g) => n + g.done, 0);
+  const count = same.reduce((n, g) => n + g.count, 0);
+  const now = same.length > 1 ? same.find((g) => g.done < g.count) : undefined;
+  return `${done} of ${count} ${count === 1 ? unit : pluralUnit(unit)}${now?.name ? ` · now ${now.name}` : ''}`;
+}
+
+function livePct(i: ItemView): number {
+  const total = i.parts.reduce((n, g) => n + g.points, 0);
+  if (!total) return 0;
+  const earned = i.parts.reduce((n, g) => n + Math.round((g.points * g.done) / g.count), 0);
+  return Math.round((earned / total) * 100);
 }
 
 function pluralUnit(u: string): string {

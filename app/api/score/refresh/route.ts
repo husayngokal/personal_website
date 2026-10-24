@@ -14,7 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { getServerAdminClient, isSupabaseConfigured } from '@/lib/supabase';
-import { fetchVaultMarkdown } from '@/lib/vault/tarball';
+import { fetchVaultMarkdown, headCommit } from '@/lib/vault/tarball';
 import { recomputeScore } from '@/lib/score/store';
 
 export const dynamic = 'force-dynamic';
@@ -28,7 +28,8 @@ export async function GET(req: NextRequest) {
   if (!ok) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   if (!isSupabaseConfigured()) return NextResponse.json({ error: 'no-database' }, { status: 503 });
 
-  const s = await recomputeScore(getServerAdminClient(), await fetchVaultMarkdown());
+  const head = await headCommit();
+  const s = await recomputeScore(getServerAdminClient(), await fetchVaultMarkdown(head.sha), { asOf: head.date });
   for (const p of ['/', '/life/tasks', '/field-atlas', '/bucket-list', '/library', '/courses']) revalidatePath(p);
   return NextResponse.json({ ok: true, week: s.week.start, bar: s.week.bar });
 }

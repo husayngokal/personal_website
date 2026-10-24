@@ -63,6 +63,8 @@ export interface ItemView {
 
 export interface ScoreState {
   version: 1;
+  /** Commit time (ISO, UTC) of the vault state this was computed from. */
+  asOf?: string;
   today: string;
   epoch: string;
   bar: number;

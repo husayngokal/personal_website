@@ -33,10 +33,27 @@ export function vaultRepo() {
   return { owner, repo, branch, headers };
 }
 
-/** Every .md file in the vault, path relative to the repo root. */
-export async function fetchVaultMarkdown(): Promise<VaultFile[]> {
+/** The branch's current head: its sha and commit time (ISO, UTC). One
+ *  request. Fetching the tarball by this sha (not the branch name) gives
+ *  exactly that commit, never a cached older one. */
+export async function headCommit(): Promise<{ sha: string; date: string }> {
   const { owner, repo, branch, headers } = vaultRepo();
-  const tarUrl = `https://api.github.com/repos/${owner}/${repo}/tarball/${branch}`;
+  const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits/${encodeURIComponent(branch)}`, { headers, cache: 'no-store' });
+  if (!res.ok) throw new Error(`GitHub commits API failed (${res.status})`);
+  const j = (await res.json()) as { sha: string; commit?: { committer?: { date?: string } } };
+  return { sha: j.sha, date: isoUtc(j.commit?.committer?.date) };
+}
+
+export function isoUtc(v: string | undefined | null): string {
+  const d = v ? new Date(v) : new Date();
+  return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+}
+
+/** Every .md file in the vault at `ref` (a commit sha; the branch head if
+ *  omitted), path relative to the repo root. */
+export async function fetchVaultMarkdown(ref?: string): Promise<VaultFile[]> {
+  const { owner, repo, branch, headers } = vaultRepo();
+  const tarUrl = `https://api.github.com/repos/${owner}/${repo}/tarball/${encodeURIComponent(ref || branch)}`;
   const tarRes = await fetch(tarUrl, { headers, cache: 'no-store' });
   if (!tarRes.ok) {
     throw new Error(`GitHub tarball API failed (${tarRes.status}): ${await tarRes.text()}`);

@@ -88,7 +88,7 @@ export async function deleteFile(
 export async function putFile(
   token: string,
   opts: { path: string; content: string; message: string; sha?: string },
-): Promise<{ commitSha: string }> {
+): Promise<{ commitSha: string; commitDate: string }> {
   const { owner, name, branch } = repo();
   const res = await fetch(`${API}/repos/${owner}/${name}/contents/${encodePath(opts.path)}`, {
     method: 'PUT',
@@ -101,6 +101,6 @@ export async function putFile(
     }),
   });
   if (!res.ok) throw new Error(`putFile ${res.status}: ${await res.text()}`);
-  const j = (await res.json()) as { commit?: { sha?: string } };
-  return { commitSha: j.commit?.sha ?? '' };
+  const j = (await res.json()) as { commit?: { sha?: string; committer?: { date?: string } } };
+  return { commitSha: j.commit?.sha ?? '', commitDate: j.commit?.committer?.date ?? '' };
 }
