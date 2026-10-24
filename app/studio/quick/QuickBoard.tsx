@@ -7,7 +7,9 @@
  * appears at the bottom.
  */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { ScoreMeter } from '@/components/score/ScoreMeter';
+import { emitScoreFx, setSoundOn, soundOn } from '@/lib/score/fx';
 import type { QuickRequest } from '@/lib/studio/quick';
 import type { DoneGroup } from '@/lib/vault/done-items';
 import type { ItemView, ScoreState } from '@/lib/score/compute';
@@ -56,6 +58,10 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
   const [score, setScore] = useState<ScoreSlice | null>(initial.score);
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<Note | null>(null);
+  /* Where the last press landed (effects start there) and the current run
+     of quick taps (each one in a run pitches higher). */
+  const press = useRef<{ x: number; y: number } | null>(null);
+  const run = useRef<{ at: number; n: number }>({ at: 0, n: 0 });
 
   /* Apply the server's row patch to local state. Used for both a tap and
      its undo, which is why it is keyed on the request, not the button. */
@@ -96,8 +102,22 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
         });
         return;
       }
+      const before = score;
       reflect(req, j as ApiOk);
       const gained = (j as ApiOk).gained ?? 0;
+      const after = (j as ApiOk).score;
+      if (before && after && after.week.bar !== before.week.bar) {
+        const now = Date.now();
+        run.current = now - run.current.at < 90_000 ? { at: now, n: run.current.n + 1 } : { at: now, n: 1 };
+        emitScoreFx({
+          before: before.week, after: after.week, barMax: 200,
+          levelBefore: before.lifetime.level, levelAfter: after.lifetime.level,
+          gained: after.week.bar - before.week.bar,
+          origin: press.current ?? undefined,
+          combo: run.current.n,
+          sound: true,
+        });
+      }
       setNote({
         kind: 'ok',
         text: `${(j as ApiOk).summary}${gained > 0 ? ` · +${gained}` : gained < 0 ? ` · ${gained}` : ''}`,
@@ -132,7 +152,10 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
   );
 
   return (
-    <div className={styles.board}>
+    <div
+      className={styles.board}
+      onPointerDownCapture={(e) => { press.current = { x: e.clientX, y: e.clientY }; }}
+    >
       {/* -- This week ------------------------------------------------ */}
       {score && <WeekCard score={score} load={initial.score?.load ?? null} />}
 
@@ -158,7 +181,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
               />
             ) : (
               <div className={styles.rowActions}>
-                {i.parts.map((g) => g.unit === 'page' ? (
+                {i.parts.filter((g) => g.unit === 'page' || g.current).map((g) => g.unit === 'page' ? (
                   <PageLog
                     key={`p${g.index}`}
                     at={g.done}
@@ -172,7 +195,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
                     key={`p${g.index}`}
                     primary
                     busy={busy === `${i.key}:p${g.index}`}
-                    disabled={!!busy || g.done >= g.count}
+                    disabled={!!busy}
                     onClick={() => send({ target: 'score', table: i.table, slug: i.slug, action: 'part', group: g.index }, `${i.key}:p${g.index}`)}
                   >
                     {g.name ? `${g.name}: ` : ''}{g.unit} done
@@ -189,6 +212,13 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
                   </Btn>
                 ))}
               </div>
+            )}
+            {!i.needsSetup && i.parts.length > 0 && !i.parts.some((g) => g.unit === 'page') && (
+              <PartsEditor
+                item={i}
+                busy={busy}
+                send={(req, key) => send({ target: 'score', table: i.table, slug: i.slug, ...req } as QuickRequest, key)}
+              />
             )}
           </li>
         ))}
@@ -289,26 +319,29 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
   );
 }
 
-function WeekCard({ score, load }: { score: ScoreSlice; load: ScoreState['load'] | null }) {
-  const { week, lifetime, streak } = score;
-  const bar = 200;
-  const q = Math.min(100, (week.quest / bar) * 100);
-  const c = Math.min(100 - q, (week.curiosityCounted / bar) * 100);
+function WeekCard({ score }: { score: ScoreSlice; load: ScoreState['load'] | null }) {
+  const [sound, setSound] = useState(true);
+  useEffect(() => { setSound(soundOn()); }, []);
   return (
     <section className={styles.streak} aria-label="This week">
-      <div className={styles.streakFigure}>
-        <span className={styles.streakNum}>{week.bar}</span>
-        <span className={styles.streakUnit}>of {bar} this week{week.full ? ' · full' : ''}</span>
-      </div>
-      <div className={styles.weekTrack} aria-hidden="true">
-        <span className={styles.weekQuest} style={{ width: `${q}%` }} />
-        <span className={styles.weekCur} style={{ width: `${c}%`, left: `${q}%` }} />
-      </div>
-      <p className={styles.streakNote}>
-        Quests {week.quest} · curiosity {week.curiosityCounted} of 80
-        {' · '}level {lifetime.level} · {lifetime.points} lifetime · {streak} full {streak === 1 ? 'week' : 'weeks'} in a row
-        {load && load.hours > 0 ? ` · ${load.hours} of ${load.capacity} hours committed` : ''}
-      </p>
+      <ScoreMeter
+        compact
+        week={score.week}
+        barMax={200}
+        cap={80}
+        level={score.lifetime.level}
+        lifetime={score.lifetime.points}
+        streak={score.streak}
+      >
+        <button
+          type="button"
+          className={styles.soundBtn}
+          aria-pressed={sound}
+          onClick={() => { setSoundOn(!sound); setSound(!sound); }}
+        >
+          Sound {sound ? 'on' : 'off'}
+        </button>
+      </ScoreMeter>
     </section>
   );
 }
@@ -364,6 +397,99 @@ function SetupForm({ template, busy, disabled, onSubmit }: {
       ))}
       <Btn primary busy={busy} disabled={disabled} onClick={() => undefined} submit>Save</Btn>
     </form>
+  );
+}
+
+function pluralUnit(u: string): string {
+  return /(s|x|ch|sh)$/.test(u) ? `${u}es` : /[^aeiou]y$/.test(u) ? `${u.slice(0, -1)}ies` : `${u}s`;
+}
+
+type GroupAction =
+  | { action: 'part'; group: number }
+  | { action: 'edit-group'; group: number; name?: string; count?: number; prior?: number }
+  | { action: 'remove-group'; group: number }
+  | { action: 'add-group'; unit: string; name?: string; count: number; hours: number; basis: 'gut' | 'measured' };
+
+/* Every part group of an item, editable: name, how many parts, how many
+   were done before scoring. Counts lock once something is logged in that
+   group (the engine refuses otherwise), so earned points never shift. */
+function PartsEditor({ item, busy, send }: {
+  item: ItemView; busy: string | null; send: (req: GroupAction, key: string) => void;
+}) {
+  const [adding, setAdding] = useState({ name: '', unit: item.parts[0]?.unit ?? 'chapter', count: '', hours: '', basis: 'gut' });
+  return (
+    <details className={styles.parts}>
+      <summary className={styles.partsHead}>Edit parts · {item.parts.length} {item.parts.length === 1 ? 'group' : 'groups'}</summary>
+      <ul className={styles.partsList}>
+        {item.parts.map((g) => (
+          <GroupRow key={`${item.key}-${g.index}-${g.count}-${g.prior}-${g.name ?? ''}`} itemKey={item.key} g={g} busy={busy} send={send} />
+        ))}
+      </ul>
+      <form
+        className={styles.partsAdd}
+        onSubmit={(e) => {
+          e.preventDefault();
+          send({
+            action: 'add-group', unit: adding.unit, name: adding.name || undefined,
+            count: Number(adding.count), hours: Number(adding.hours), basis: adding.basis as 'gut' | 'measured',
+          }, `${item.key}:add`);
+          setAdding((a) => ({ ...a, name: '', count: '', hours: '' }));
+        }}
+      >
+        <p className={styles.setupHead}>Add a group (a book, a module set). Its points are worked out from the hours and frozen.</p>
+        <div className={styles.partsGrid}>
+          <label className={styles.setupField}><span>Name</span><input value={adding.name} placeholder="Tort Law (Book 3)" onChange={(e) => setAdding({ ...adding, name: e.target.value })} /></label>
+          <label className={styles.setupField}><span>Unit</span><input required value={adding.unit} onChange={(e) => setAdding({ ...adding, unit: e.target.value })} /></label>
+          <label className={styles.setupField}><span>How many</span><input required type="number" min={1} inputMode="numeric" value={adding.count} onChange={(e) => setAdding({ ...adding, count: e.target.value })} /></label>
+          <label className={styles.setupField}><span>Hours, all in</span><input required type="number" min={0} step="any" inputMode="decimal" value={adding.hours} onChange={(e) => setAdding({ ...adding, hours: e.target.value })} /></label>
+          <label className={styles.setupField}>
+            <span>Those hours are</span>
+            <select value={adding.basis} onChange={(e) => setAdding({ ...adding, basis: e.target.value })}>
+              <option value="gut">a guess (doubled)</option>
+              <option value="measured">measured (used as is)</option>
+            </select>
+          </label>
+        </div>
+        <Btn primary busy={busy === `${item.key}:add`} disabled={!!busy} onClick={() => undefined} submit>Add group</Btn>
+      </form>
+    </details>
+  );
+}
+
+function GroupRow({ itemKey, g, busy, send }: {
+  itemKey: string; g: ItemView['parts'][number]; busy: string | null; send: (req: GroupAction, key: string) => void;
+}) {
+  const [name, setName] = useState(g.name ?? '');
+  const [count, setCount] = useState(String(g.count));
+  const [prior, setPrior] = useState(String(g.prior));
+  const locked = g.logged > 0;
+  const key = `${itemKey}:g${g.index}`;
+  return (
+    <li className={styles.groupRow}>
+      <p className={styles.groupTitle}>
+        {g.name ?? g.unit} · {g.done} of {g.count} {g.count === 1 ? g.unit : pluralUnit(g.unit)} · {g.points} points
+        {locked ? ' · count locked' : ''}
+      </p>
+      <form
+        className={styles.partsGrid}
+        onSubmit={(e) => {
+          e.preventDefault();
+          send({
+            action: 'edit-group', group: g.index, name,
+            ...(locked ? {} : { count: Number(count), prior: Number(prior || 0) }),
+          }, `${key}:edit`);
+        }}
+      >
+        <label className={styles.setupField}><span>Name</span><input value={name} onChange={(e) => setName(e.target.value)} /></label>
+        <label className={styles.setupField}><span>How many</span><input type="number" min={1} disabled={locked} value={count} onChange={(e) => setCount(e.target.value)} /></label>
+        <label className={styles.setupField}><span>Done before scoring</span><input type="number" min={0} disabled={locked} value={prior} onChange={(e) => setPrior(e.target.value)} /></label>
+        <div className={styles.rowActions}>
+          <Btn busy={busy === `${key}:edit`} disabled={!!busy} onClick={() => undefined} submit>Save</Btn>
+          <Btn primary busy={busy === `${key}:part`} disabled={!!busy || g.done >= g.count} onClick={() => send({ action: 'part', group: g.index }, `${key}:part`)}>{g.unit} done</Btn>
+          {!locked && <Btn busy={busy === `${key}:rm`} disabled={!!busy} onClick={() => send({ action: 'remove-group', group: g.index }, `${key}:rm`)}>Remove</Btn>}
+        </div>
+      </form>
+    </li>
   );
 }
 

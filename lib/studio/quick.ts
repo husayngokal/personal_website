@@ -24,9 +24,9 @@ import matter from 'gray-matter';
 import { patchFrontmatter, type ScalarChange } from '../vault/frontmatter-patch';
 import { itemLabel, listDoneItems, setItemDone } from '../vault/done-items';
 import { parseFile } from '../vault/parse';
-import { TEMPLATES, type TemplateId } from '../score/rules';
+import { TEMPLATES, estimate, type TemplateId } from '../score/rules';
 import {
-  buildFromTemplate, logParts, logRepeat, partsDone, readBlock, setScoreBlock,
+  addGroup, buildFromTemplate, editGroup, logParts, logRepeat, partsDone, readBlock, removeGroup, setScoreBlock,
   type ScoreBlock, type TemplateInputs,
 } from '../score/block';
 import { atlasPoints, effectiveBlock, itemFromFile, plural } from '../score/items';
@@ -54,6 +54,9 @@ export type QuickRequest =
   | { target: 'score'; table: string; slug: string; action: 'repeat'; group: number }
   | { target: 'score'; table: string; slug: string; action: 'page'; page: number }
   | { target: 'score'; table: string; slug: string; action: 'setup'; template: TemplateId; inputs: TemplateInputs }
+  | { target: 'score'; table: string; slug: string; action: 'add-group'; unit: string; name?: string; count: number; hours: number; basis: 'gut' | 'measured' }
+  | { target: 'score'; table: string; slug: string; action: 'edit-group'; group: number; name?: string; count?: number; prior?: number }
+  | { target: 'score'; table: string; slug: string; action: 'remove-group'; group: number }
   | { target: 'score'; table: string; slug: string; action: 'restore-block'; block: ScoreBlock | null; fields?: Record<string, ScalarChange> };
 
 interface TargetSpec {
@@ -272,7 +275,28 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string)
   let verb: string;
   const fields: Record<string, ScalarChange> = {};
   try {
-    if (req.action === 'part') {
+    if (req.action === 'add-group') {
+      const hours = Number(req.hours);
+      if (!Number.isFinite(hours) || hours <= 0) throw new Error('hours must be a positive number');
+      const points = req.basis === 'measured' ? estimate.measured(hours) : estimate.gut(hours);
+      nextBlock = addGroup(block, { unit: String(req.unit ?? ''), name: req.name, count: Number(req.count), points });
+      verb = `added ${req.name?.trim() || req.unit} (${Math.round(Number(req.count))} ${plural(String(req.unit).trim())}, ${points} points)`;
+    } else if (req.action === 'edit-group') {
+      const g = block.parts[req.group];
+      if (!g) throw new Error('no such part');
+      nextBlock = editGroup(block, req.group, {
+        name: req.name,
+        count: req.count === undefined ? undefined : Number(req.count),
+        prior: req.prior === undefined ? undefined : Number(req.prior),
+      });
+      const n = nextBlock.parts[req.group];
+      verb = `${n.name ?? n.unit} is now ${n.count} ${plural(n.unit)}${n.prior ? `, ${n.prior} done before scoring` : ''}`;
+    } else if (req.action === 'remove-group') {
+      const g = block.parts[req.group];
+      if (!g) throw new Error('no such part');
+      nextBlock = removeGroup(block, req.group);
+      verb = `removed ${g.name ?? g.unit}`;
+    } else if (req.action === 'part') {
       const g = block.parts[req.group];
       if (!g) throw new Error('no such part');
       nextBlock = logParts(block, req.group, req.qty ?? 1, today);

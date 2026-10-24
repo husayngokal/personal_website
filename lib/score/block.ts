@@ -231,6 +231,78 @@ export function logRepeat(b: ScoreBlock, groupIndex: number, day: string): Score
   return next;
 }
 
+/* -- Shaping an item's parts ------------------------------------------
+ * An item can hold several part groups: one per book of a course, say,
+ * each with its own number of chapters. These edit that list from Studio.
+ *
+ * The guard that keeps points frozen: a group's count can change only
+ * while nothing in it has been logged. Its points total never changes,
+ * so re-counting just re-spreads the same points over its parts. Adding
+ * a group adds its own points; the item's outcome stays as it was set.
+ */
+
+export interface GroupInput {
+  unit: string;
+  name?: string;
+  count: number;
+  points: number;
+  prior?: number;
+}
+
+export function addGroup(b: ScoreBlock, g: GroupInput): ScoreBlock {
+  const next = cloneBlock(b);
+  const count = Math.round(g.count);
+  if (!g.unit.trim()) throw new Error('a part needs a name for its unit');
+  if (!Number.isFinite(count) || count < 1) throw new Error('count must be at least 1');
+  if (!Number.isFinite(g.points) || g.points < 1) throw new Error('points must be at least 1');
+  next.parts.push({
+    unit: g.unit.trim(),
+    name: g.name?.trim() || undefined,
+    count,
+    points: Math.round(g.points),
+    prior: Math.max(0, Math.min(Math.round(g.prior ?? 0), count)),
+    done: [],
+  });
+  return next;
+}
+
+export function editGroup(
+  b: ScoreBlock, index: number, change: { name?: string; count?: number; prior?: number },
+): ScoreBlock {
+  const next = cloneBlock(b);
+  const g = next.parts[index];
+  if (!g) throw new Error('no such part group');
+  if (change.name !== undefined) g.name = change.name.trim() || undefined;
+  const reshaping = (change.count !== undefined && Math.round(change.count) !== g.count)
+    || (change.prior !== undefined && Math.round(change.prior) !== g.prior);
+  if (reshaping && g.done.length > 0) {
+    throw new Error(`${g.name ?? g.unit} already has logged ${plural0(g.unit)}; its count is frozen`);
+  }
+  if (change.count !== undefined) {
+    const c = Math.round(change.count);
+    if (!Number.isFinite(c) || c < 1) throw new Error('count must be at least 1');
+    g.count = c;
+  }
+  if (change.prior !== undefined) {
+    g.prior = Math.max(0, Math.min(Math.round(change.prior), g.count));
+  }
+  g.prior = Math.min(g.prior, g.count);
+  return next;
+}
+
+export function removeGroup(b: ScoreBlock, index: number): ScoreBlock {
+  const next = cloneBlock(b);
+  const g = next.parts[index];
+  if (!g) throw new Error('no such part group');
+  if (g.done.length > 0) throw new Error(`${g.name ?? g.unit} already has logged work; it cannot be removed`);
+  next.parts.splice(index, 1);
+  return next;
+}
+
+function plural0(unit: string): string {
+  return /(s|x|ch|sh)$/.test(unit) ? `${unit}es` : `${unit}s`;
+}
+
 /* -- Templates -------------------------------------------------------- */
 
 export type TemplateInputs = Record<string, string | number | undefined>;

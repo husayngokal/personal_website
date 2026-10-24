@@ -1,0 +1,92 @@
+.meter { display: flex; flex-direction: column; gap: var(--space-m); }
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--space-l);
+  flex-wrap: wrap;
+}
+
+.figure {
+  margin: 0;
+  font-family: var(--font-serif);
+  line-height: 1;
+  color: var(--text-strong);
+}
+.num {
+  display: inline-block;
+  font-size: var(--type-display-xl);
+  font-variant-numeric: tabular-nums;
+  transform-origin: left bottom;
+}
+.numFlare { animation: numPop 650ms cubic-bezier(0.34, 1.56, 0.64, 1); color: var(--accent); transition: color 900ms var(--ease); }
+@keyframes numPop {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+.of { font-size: var(--type-display-s); color: var(--text-body); }
+
+.facts { display: flex; gap: var(--space-l); margin: 0; }
+.facts div { display: flex; flex-direction: column; gap: 2px; }
+.facts dt {
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-s);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-body);
+}
+.facts dd {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: var(--type-display-s);
+  line-height: 1;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.track {
+  position: relative;
+  height: 16px;
+  background: var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: box-shadow 600ms var(--ease);
+}
+.fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background: var(--accent);
+  transition: width 1100ms cubic-bezier(0.34, 1.4, 0.64, 1), left 1100ms cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+/* Curiosity: the same solid orange, set off from the quest segment by a
+   hairline of paper. */
+.fillCur { box-shadow: inset 2px 0 0 var(--bg-page); }
+.trackFlare { box-shadow: 0 0 0 2px var(--accent), 0 0 18px 2px var(--accent); }
+.trackFull { box-shadow: 0 0 0 2px var(--accent); }
+
+.legend {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-l);
+  font-family: var(--font-sans);
+  font-size: var(--type-ui);
+  color: var(--text-body);
+}
+.full { color: var(--text-strong); font-weight: 600; }
+
+.compact .num { font-size: var(--type-display-l); }
+.compact .track { height: 12px; }
+
+@media (max-width: 700px) {
+  .num { font-size: var(--type-display-l); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fill, .track { transition: none; }
+  .numFlare { animation: none; transition: none; }
+}

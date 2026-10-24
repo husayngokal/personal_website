@@ -104,29 +104,31 @@ export async function deriveAndWriteLiveState(db: SupabaseClient): Promise<Deriv
   /* A project is "currently being built" when its status is `active`.
      That status is the whole signal: the author flips it on and off (one
      tap in Studio), and nothing has to be dated or kept fresh. If several
-     are active, the most recently edited one represents the slot. */
+     are active, the most recently edited one represents the slot and the
+     rest ride along in `others`, so the plate can step through them. */
   const { data: projectRows } = await db
     .from('projects')
     .select('slug, title, started, last_edited_at, repo_private')
     .eq('status', 'active')
     .order('last_edited_at', { ascending: false, nullsFirst: false })
     .order('started', { ascending: false, nullsFirst: false })
-    .limit(1);
+    .limit(8);
 
   /* No task fallback by design: "currently building" is a project-only
      signal. When there's no active project the slot stays empty, so the
      homepage building rail and the typewriter's building phrase simply do
      not render (the other slots keep the typewriter alive). */
+  const asBuilding = (p: { slug: string; title: string; started: string | null; repo_private: boolean }) => ({
+    slug: p.slug,
+    title: p.title,
+    started: p.started ?? null,
+    private: p.repo_private,
+    kind: 'project',
+    href: `/projects/${p.slug}`,
+  });
   if (projectRows?.[0]) {
-    const p = projectRows[0];
-    buildingValue = {
-      slug: p.slug,
-      title: p.title,
-      started: p.started ?? null,
-      private: p.repo_private,
-      kind: 'project',
-      href: `/projects/${p.slug}`,
-    };
+    const [first, ...rest] = projectRows;
+    buildingValue = { ...asBuilding(first), ...(rest.length ? { others: rest.map(asBuilding) } : {}) };
   }
   await writeKey(db, 'currently_building', buildingValue);
   result.written['currently_building'] = Object.keys(buildingValue).length ? buildingValue : null;
@@ -197,24 +199,34 @@ export async function deriveAndWriteLiveState(db: SupabaseClient): Promise<Deriv
   const upcoming = pending.find((c) => c.exam_date >= today);
   const cred = upcoming ?? [...pending].reverse().find((c) => c.exam_date < today);
 
+  /* Everything being studied at once, for the plate to step through: every
+     upcoming exam (soonest first), then exams sat and awaiting results,
+     then courses marked studying. The first one is the slot itself. */
+  const { data: courseRows } = await db
+    .from('courses')
+    .select('slug, title, status, last_edited_at')
+    .eq('status', 'studying')
+    .order('last_edited_at', { ascending: false, nullsFirst: false })
+    .limit(8);
+  const asCred = (c: { slug: string; title: string; exam_date: string }) => c.exam_date < today
+    ? { slug: c.slug, title: c.title, examDate: c.exam_date, awaitingResults: true, href: `/study/credentials/${c.slug}` }
+    : { slug: c.slug, title: c.title, examDate: c.exam_date, href: `/study/credentials/${c.slug}` };
+  const studyList = [
+    ...pending.filter((c) => c.exam_date >= today).map(asCred),
+    ...[...pending].reverse().filter((c) => c.exam_date < today).map(asCred),
+    ...(courseRows ?? []).map((c) => ({ slug: c.slug, title: c.title, examDate: '', href: `/courses/${c.slug}` })),
+  ];
+
   if (cred) {
-    const awaiting = cred.exam_date < today;
-    studyingValue = awaiting
-      ? { slug: cred.slug, title: cred.title, examDate: cred.exam_date, awaitingResults: true }
-      : { slug: cred.slug, title: cred.title, examDate: cred.exam_date };
-  } else {
+    studyingValue = asCred(cred);
+  } else if (studyList[0]) {
     /* Fallback: a currently-studying course, most recently touched.
        No idea fallback here; ideas have their own slot below. */
-    const { data: courseRows } = await db
-      .from('courses')
-      .select('slug, title, status, last_edited_at')
-      .eq('status', 'studying')
-      .order('last_edited_at', { ascending: false, nullsFirst: false })
-      .limit(1);
-    if (courseRows?.[0]) {
-      const c = courseRows[0];
-      studyingValue = { slug: c.slug, title: c.title, examDate: '' };
-    }
+    studyingValue = studyList[0];
+  }
+  if (Object.keys(studyingValue).length) {
+    const others = studyList.filter((x) => x.slug !== studyingValue.slug);
+    if (others.length) studyingValue.others = others;
   }
   await writeKey(db, 'currently_studying', studyingValue);
   result.written['currently_studying'] = Object.keys(studyingValue).length ? studyingValue : null;

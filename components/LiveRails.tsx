@@ -23,7 +23,7 @@
  */
 
 import Link from 'next/link';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { BookMark } from './marks/BookMark';
 import { CalendarMark } from './marks/CalendarMark';
 import { ProjectMark } from './marks/ProjectMark';
@@ -37,7 +37,22 @@ const MARK_PX = 22;
 
 export function LiveRails({ initialState }: { initialState: LiveState }) {
   const { state, flashedKey } = useLiveState(initialState);
-  const { reading, building, studying } = state;
+  const { reading, building: buildingSlot, studying: studyingSlot } = state;
+
+  /* Building and studying can each hold several things at once; the plate
+     shows one and the arrows step through the rest. */
+  const builds = buildingSlot ? [buildingSlot, ...(buildingSlot.others ?? [])] : [];
+  const studies = studyingSlot ? [studyingSlot, ...(studyingSlot.others ?? [])] : [];
+  const [bi, setBi] = useState(0);
+  const [si, setSi] = useState(0);
+  const building = builds.length ? builds[bi % builds.length] : null;
+  const studying = studies.length ? studies[si % studies.length] : null;
+  const pager = (n: number, i: number, set: (f: (x: number) => number) => void, what: string) => n > 1 ? {
+    label: `${(i % n) + 1} of ${n}`,
+    what,
+    prev: () => set((x) => (x - 1 + n) % n),
+    next: () => set((x) => (x + 1) % n),
+  } : undefined;
 
   return (
     <section className={styles.rails} aria-label="Currently">
@@ -67,17 +82,19 @@ export function LiveRails({ initialState }: { initialState: LiveState }) {
           mark={<ProjectMark size={MARK_PX} />}
           flashing={flashedKey === 'currently_building'}
           title={building.title}
+          pager={pager(builds.length, bi, setBi, 'project')}
           {...buildingFigure(building)}
         />
       )}
 
       {studying && (
         <Plate
-          href={`/study/credentials/${studying.slug}`}
+          href={studying.href ?? `/study/credentials/${studying.slug}`}
           kicker="currently studying"
           mark={<CalendarMark size={MARK_PX} />}
           flashing={flashedKey === 'currently_studying'}
           title={studying.title}
+          pager={pager(studies.length, si, setSi, 'thing being studied')}
           {...studyingFigure(studying)}
         />
       )}
@@ -96,16 +113,19 @@ interface Figure {
   footRight?: ReactNode;
 }
 
+interface Pager { label: string; what: string; prev: () => void; next: () => void }
+
 function Plate({
-  href, kicker, mark, flashing, title, figure, unit, live, footLeft, footRight,
+  href, kicker, mark, flashing, title, figure, unit, live, footLeft, footRight, pager,
 }: Figure & {
   href: string;
   kicker: string;
   mark: ReactNode;
   flashing: boolean;
   title: string;
+  pager?: Pager;
 }) {
-  return (
+  const link = (
     <Link href={href} className={styles.plate}>
       <span className={styles.top}>
         {/* One dot, after the label. It pulses while the signal is live and
@@ -132,6 +152,19 @@ function Plate({
         <span className={styles.footRight} suppressHydrationWarning>{footRight}</span>
       </span>
     </Link>
+  );
+  if (!pager) return link;
+  /* The arrows sit over the plate's top row, outside the link (a button
+     inside a link is not allowed), left of the corner mark. */
+  return (
+    <div className={styles.plateWrap}>
+      {link}
+      <span className={styles.pager}>
+        <button type="button" className={styles.pagerBtn} onClick={pager.prev} aria-label={`Previous ${pager.what}`}>‹</button>
+        <span className={styles.pagerCount} aria-live="polite">{pager.label}</span>
+        <button type="button" className={styles.pagerBtn} onClick={pager.next} aria-label={`Next ${pager.what}`}>›</button>
+      </span>
+    </div>
   );
 }
 

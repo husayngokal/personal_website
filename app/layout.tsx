@@ -5,6 +5,7 @@ import { MementoLine } from '@/components/MementoLine';
 import { RouteTransition } from '@/components/RouteTransition';
 import { SearchPalette } from '@/components/SearchPalette';
 import { ChromeGate } from '@/components/ChromeGate';
+import { TopScoreBar } from '@/components/score/TopScoreBar';
 import { LoadingSplash } from '@/components/LoadingSplash';
 import { LoadingSplashGate } from '@/components/LoadingSplashGate';
 import './globals.css';
@@ -125,6 +126,8 @@ export default function RootLayout({
         <a href="#main" className="skip-link">
           Skip to content
         </a>
+        {/* This week's score, pinned to the top edge of every page. */}
+        <TopScoreBar />
         <ChromeGate>
           <TopNav />
         </ChromeGate>

@@ -275,3 +275,44 @@
 @media (prefers-reduced-motion: reduce) {
   .weekQuest, .weekCur, .miniFill { transition: none; }
 }
+
+/* -- Parts editor ------------------------------------------------------- */
+.parts { margin-top: var(--space-s); }
+.partsHead {
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  color: var(--text-body);
+}
+.partsList { list-style: none; margin: var(--space-s) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-s); }
+.groupRow {
+  padding: var(--space-s) var(--space-m);
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.groupTitle { margin: 0 0 var(--space-s); font-family: var(--font-sans); font-size: var(--type-ui); color: var(--text-strong); }
+.partsGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: var(--space-s); align-items: end; }
+.partsAdd {
+  margin-top: var(--space-m);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-s);
+  padding: var(--space-m);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+
+.soundBtn {
+  align-self: flex-start;
+  min-height: 32px;
+  padding: 0 var(--space-m);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  color: var(--text-strong);
+  cursor: pointer;
+}
+.soundBtn:hover { border-color: var(--accent); }

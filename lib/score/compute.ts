@@ -33,6 +33,9 @@ export interface ItemGroupView {
   done: number;
   count: number;
   points: number;
+  prior: number;                // finished before tracking (no points)
+  logged: number;               // entries logged since tracking (count is frozen once > 0)
+  current: boolean;             // the first unfinished group of its unit
 }
 
 export interface ItemView {
@@ -99,16 +102,28 @@ function totalsFor(start: string, events: ScoreEvent[]): WeekTotals {
 
 function itemView(item: ScoreItem, weekPoints: number): ItemView {
   let earned = 0, total = 0;
+  const seen = new Set<string>();
   const parts: ItemGroupView[] = item.parts.map((g, index) => {
     const done = partsDone(g);
     earned += Math.round((g.points * done) / g.count);
     total += g.points;
-    return { index, unit: g.unit, name: g.name ?? null, done, count: g.count, points: g.points };
+    const current = done < g.count && !seen.has(g.unit);
+    if (current) seen.add(g.unit);
+    return {
+      index, unit: g.unit, name: g.name ?? null, done, count: g.count, points: g.points,
+      prior: g.prior, logged: g.done.length, current,
+    };
   });
-  const main = parts[0];
+  /* Summarise the item by its first unit, across every group of that unit
+     (all the chapters of all the books), naming the group in progress. */
+  const unit = parts[0]?.unit;
+  const same = parts.filter((g) => g.unit === unit);
+  const doneSum = same.reduce((n, g) => n + g.done, 0);
+  const countSum = same.reduce((n, g) => n + g.count, 0);
+  const now = same.length > 1 ? same.find((g) => g.current) : undefined;
   const rep = item.repeat[0];
-  const summary = main
-    ? `${main.done} of ${main.count} ${main.count === 1 ? main.unit : plural(main.unit)}`
+  const summary = unit
+    ? `${doneSum} of ${countSum} ${countSum === 1 ? unit : plural(unit)}${now?.name ? ` · now ${now.name}` : ''}`
     : rep ? `${rep.done.length} ${rep.done.length === 1 ? rep.unit : plural(rep.unit)} logged`
     : item.needsSetup ? 'not set up for scoring yet' : '';
   return {

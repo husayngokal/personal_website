@@ -1,0 +1,132 @@
+/* The line pinned to the top edge, its tag, and the effects layer. */
+
+.hit {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 14px;
+  z-index: 60;
+  display: block;
+  text-decoration: none;
+}
+.line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 5px;
+  background: var(--border);
+  transition: height 300ms var(--ease), box-shadow 600ms var(--ease);
+}
+.fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 1100ms cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+.flare { height: 7px; box-shadow: 0 0 14px 2px var(--accent); }
+.full .fill { box-shadow: 0 0 8px 0 var(--accent); }
+.hit:hover .line, .hit:focus-visible .line { height: 7px; }
+
+.tag {
+  position: absolute;
+  top: 10px;
+  right: var(--space-m);
+  padding: 2px var(--space-s);
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-m);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-strong);
+  background: var(--accent);
+  border-radius: 999px;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 250ms var(--ease), transform 250ms var(--ease);
+  pointer-events: none;
+}
+.tagOn, .hit:hover .tag, .hit:focus-visible .tag { opacity: 1; transform: translateY(0); }
+
+/* -- Effects ------------------------------------------------------- */
+.fx {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 70;
+  overflow: hidden;
+}
+.spark {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--accent);
+  transform: translate(-50%, -50%);
+  animation: burst 1000ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+}
+@keyframes burst {
+  0%   { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  100% { transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) scale(0.2); opacity: 0; }
+}
+.rain {
+  border-radius: 2px;
+  animation: rain 1900ms cubic-bezier(0.3, 0.1, 0.5, 1) both;
+}
+@keyframes rain {
+  0%   { transform: translate(0, 0) rotate(0deg); opacity: 1; }
+  85%  { opacity: 1; }
+  100% { transform: translate(var(--dx), var(--dy)) rotate(540deg); opacity: 0; }
+}
+
+.float {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  font-family: var(--font-serif);
+  font-size: var(--type-display-s);
+  font-weight: 600;
+  color: var(--accent);
+  text-shadow: 0 1px 0 var(--bg-page);
+  white-space: nowrap;
+  animation: rise 1200ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+.combo { font-family: var(--font-mono); font-size: var(--type-ui); }
+@keyframes rise {
+  0%   { transform: translate(-50%, -60%) scale(0.6); opacity: 0; }
+  15%  { transform: translate(-50%, -110%) scale(1.15); opacity: 1; }
+  70%  { opacity: 1; }
+  100% { transform: translate(-50%, -260%) scale(1); opacity: 0; }
+}
+
+.bannerWrap {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  z-index: 80;
+}
+.banner {
+  margin: 0;
+  padding: var(--space-s) var(--space-l);
+  font-family: var(--font-serif);
+  font-size: var(--type-display-m);
+  color: var(--text-strong);
+  background: var(--bg-raised);
+  border: 2px solid var(--accent);
+  border-radius: 999px;
+  animation: bannerIn 1600ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.bannerBig { font-size: var(--type-display-xl); padding: var(--space-m) var(--space-2xl); animation-duration: 2600ms; }
+@keyframes bannerIn {
+  0%   { transform: scale(0.5); opacity: 0; }
+  14%  { transform: scale(1.06); opacity: 1; }
+  24%  { transform: scale(1); }
+  82%  { opacity: 1; }
+  100% { transform: scale(1); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .line, .fill, .tag { transition: none; }
+  .spark, .rain { display: none; }
+  .float { animation: none; transform: translate(-50%, -140%); }
+  .banner { animation: none; }
+}

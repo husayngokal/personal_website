@@ -191,3 +191,47 @@
 @media (prefers-reduced-motion: reduce) {
   .livePulse, .flashIndicator { animation: none; }
 }
+
+/* -- Next arrows (building and studying can hold several at once) ---- */
+.plateWrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.plateWrap > .plate { flex: 1; }
+.pager {
+  position: absolute;
+  top: calc(var(--space-m) - 4px);
+  right: calc(var(--space-m) + 22px + var(--space-s));
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  z-index: 1;
+}
+.pagerBtn {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: var(--bg-page);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  font-family: var(--font-mono);
+  font-size: var(--type-ui);
+  line-height: 1;
+  color: var(--text-strong);
+  cursor: pointer;
+  transition: border-color var(--hover-ms) var(--ease);
+}
+.pagerBtn:hover, .pagerBtn:focus-visible { border-color: var(--accent); }
+.pagerCount {
+  min-width: 44px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: var(--type-mono-s);
+  color: var(--text-body);
+  font-variant-numeric: tabular-nums;
+}

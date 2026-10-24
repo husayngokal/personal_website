@@ -35,6 +35,8 @@ export interface CurrentBuildingState {
   kind?: 'project' | 'task';
   /** Correct destination for the card link. */
   href?: string;
+  /** Other active projects, for the plate's next arrows. */
+  others?: CurrentBuildingState[];
 }
 
 export interface CurrentStudyingState {
@@ -46,6 +48,10 @@ export interface CurrentStudyingState {
   /** Exam sat, results pending. Flips the phrase from "studying" to
    *  "awaiting results". */
   awaitingResults?: boolean;
+  /** Where the plate links: the credential, or the course. */
+  href?: string;
+  /** Everything else being studied at the same time, for the next arrows. */
+  others?: CurrentStudyingState[];
 }
 
 export interface CurrentExploringState {
