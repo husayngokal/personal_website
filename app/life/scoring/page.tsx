@@ -121,9 +121,20 @@ export default function ScoringPage() {
 
       <h2 className={styles.h2}>Load</h2>
       <p>
-        Only what is active counts. Each active thing takes a share of the week, and the shares
-        cannot add up to more than the week. Something new comes in by swapping something out of
-        equal or larger size, so the load stays level. Backlog counts for nothing until it is swapped in.
+        Only what is active counts. Every active thing says how many hours a week it takes, and
+        together they cannot pass {WEEKLY_HOURS}. Anything that would push the plate over is refused
+        until something comes off: a swap, so the load stays level. A task with no figure of its own
+        takes its estimate spread over its scope (all of it in a this-week task, a thirteenth in a
+        this-quarter one). Backlog counts for nothing until it is swapped in.
+      </p>
+
+      <h2 className={styles.h2}>Finishing</h2>
+      <p>
+        An item reaches 100% when its last part is done. A task then closes as done and a course as
+        completed, and both leave the plate. A book closes on its last page. An exam stays until it is
+        sat; the result pays its outcome. A new week starts at midnight on Monday, Dubai time, on its
+        own; past weeks are never stored separately, they are read back from the dated log in each
+        item, so they cannot drift.
       </p>
     </div>
   );

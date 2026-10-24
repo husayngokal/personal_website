@@ -37,10 +37,19 @@ export type QuickTarget = FrontmatterTarget | 'atlas' | 'score';
 /* Tables whose items carry a score block, and where their files live. */
 export const SCORE_TABLES: Record<string, { folder: string | null; keys: string[]; columns: string[] }> = {
   library_books:     { folder: 'library',           keys: ['status', 'progress-pct', 'finished'], columns: ['status', 'progress_pct', 'finished'] },
-  tasks:             { folder: null,                keys: [],                                      columns: [] },
-  courses:           { folder: 'courses',           keys: [],                                      columns: [] },
+  tasks:             { folder: null,                keys: ['status', 'scope', 'completed'],        columns: ['status', 'scope', 'completed'] },
+  courses:           { folder: 'courses',           keys: ['status', 'finished'],                  columns: ['status', 'finished'] },
   study_credentials: { folder: 'study/credentials', keys: [],                                      columns: [] },
-  projects:          { folder: 'projects',          keys: [],                                      columns: [] },
+  projects:          { folder: 'projects',          keys: ['status'],                              columns: ['status'] },
+};
+
+/* Taking something off the plate, per kind. Exams have a date someone
+   else set; they come off only by being sat. */
+const PARK: Record<string, Record<string, string>> = {
+  tasks: { scope: 'lifetime' },
+  library_books: { status: 'planned' },
+  courses: { status: 'planned' },
+  projects: { status: 'paused' },
 };
 
 export type QuickRequest =
@@ -57,6 +66,7 @@ export type QuickRequest =
   | { target: 'score'; table: string; slug: string; action: 'add-group'; unit: string; name?: string; count: number; hours: number; basis: 'gut' | 'measured' }
   | { target: 'score'; table: string; slug: string; action: 'edit-group'; group: number; name?: string; count?: number; prior?: number }
   | { target: 'score'; table: string; slug: string; action: 'remove-group'; group: number }
+  | { target: 'score'; table: string; slug: string; action: 'park' }
   | { target: 'score'; table: string; slug: string; action: 'restore-block'; block: ScoreBlock | null; fields?: Record<string, ScalarChange> };
 
 interface TargetSpec {
@@ -260,6 +270,15 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string)
     return { raw: next, changed: true, row: {}, summary: `${title}: set up, ${total} points in all`, undo: undo() };
   }
 
+  if (req.action === 'park') {
+    const park = PARK[req.table];
+    if (!park) throw new QuickError('bad-request', 'an exam comes off the plate by being sat, not parked');
+    const prev: Record<string, ScalarChange> = {};
+    for (const k of Object.keys(park)) prev[k] = scalar(fm[k]);
+    const next = patchFrontmatter(raw, park);
+    return { raw: next, changed: next !== raw, row: {}, summary: `${title}: off the plate`, undo: undo(prev) };
+  }
+
   /* Logging. An item scored by defaults (a plain or recurring task) gets
      those defaults frozen into its file on the first log. */
   let block = own;
@@ -330,6 +349,24 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string)
     }
   } catch (err) {
     throw new QuickError('bad-request', (err as Error).message);
+  }
+
+  /* 100%: the last part of the last group closes the item out. A course
+     becomes completed, a task done. Books close on their last page above;
+     exams close when the result is in; projects stay until switched off. */
+  if (req.action === 'part' && nextBlock.parts.length && nextBlock.parts.every((g) => partsDone(g) >= g.count)) {
+    const close: Record<string, Record<string, string>> = {
+      courses: { status: 'completed', finished: today },
+      tasks: { status: 'done', completed: today },
+    };
+    const c = close[req.table];
+    if (c && !(req.table === 'tasks' && fm.recurrence)) {
+      for (const [k, v] of Object.entries(c)) {
+        prevFields[k] = scalar(fm[k]);
+        fields[k] = v;
+      }
+      verb += ' · all done';
+    }
   }
 
   let next = setScoreBlock(raw, nextBlock);

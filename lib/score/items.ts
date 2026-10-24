@@ -18,7 +18,7 @@ import matter from 'gray-matter';
 import { parseFile } from '../vault/parse';
 import { listDoneItems } from '../vault/done-items';
 import {
-  ATLAS, DEFAULT_LANE, RECURRING_GUT_HOURS, SCORE_EPOCH, TASK_GUT_HOURS, estimate,
+  DEFAULT_LANE, RECURRING_GUT_HOURS, SCOPE_WEEKS, SCORE_EPOCH, TASK_GUT_HOURS, atlasPoints, estimate,
   type Lane, type TemplateId,
 } from './rules';
 import { parseDone, readBlock, type PartGroup, type RepeatGroup, type ScoreBlock } from './block';
@@ -138,23 +138,7 @@ export function plural(unit: string): string {
   return `${unit}s`;
 }
 
-/** Gate-to-gate hours for a Field Atlas line, then points. */
-export function atlasPoints(text: string, heading: string): number {
-  const km = (() => {
-    const m = text.match(/(\d+(?:\.\d+)?)\s*(?:[–-]\s*(\d+(?:\.\d+)?))?\s*km\b/);
-    return m ? Number(m[2] ?? m[1]) : 0;
-  })();
-  const climb = (() => {
-    const m = text.match(/\+(\d{2,5})\s*m\b/);
-    return m ? Number(m[1]) : 0;
-  })();
-  const h = heading.toLowerCase();
-  const discipline = h.includes('div') ? 'diving' : h.includes('fish') ? 'fishing' : 'hiking';
-  const hours = km || climb
-    ? ATLAS.logisticsHours + km / ATLAS.kmPerHour + climb / ATLAS.metresClimbPerHour
-    : ATLAS.defaultHours[discipline];
-  return estimate.formula(hours);
-}
+export { atlasPoints } from './rules';
 
 function fromFile(src: VaultSource): ScoreItem | null {
   const surface = surfaceOf(src.path);
@@ -195,7 +179,15 @@ function fromFile(src: VaultSource): ScoreItem | null {
     case 'tasks': {
       base.active = ACTIVE_TASK.has(String(row.status)) && row.scope !== 'lifetime';
       base.deadline = day(row.due);
-      if (!block) {
+      if (block) {
+        /* A sized task finished by its status (Done in Quick, the edit form,
+           Obsidian): its single part counts as done on the completed day. */
+        const g = block.parts.length === 1 ? block.parts[0] : null;
+        const completed = day(row.completed);
+        if (g && g.count === 1 && g.done.length === 0 && g.prior === 0 && row.status === 'done' && completed) {
+          base.parts = [{ ...g, done: [completed] }];
+        }
+      } else {
         const rec = typeof row.recurrence === 'string' ? row.recurrence : null;
         if (rec) {
           base.repeat = [{ unit: 'occurrence', points: estimate.gut(RECURRING_GUT_HOURS[rec] ?? 1), done: [] }];
@@ -208,6 +200,14 @@ function fromFile(src: VaultSource): ScoreItem | null {
             done: completed ? [completed] : [],
           }];
         }
+      }
+      /* Hours a week while active: the item's own figure, or its estimate
+         spread over the weeks its scope spans (a this-week task takes its
+         whole estimate this week; a this-quarter one a thirteenth). */
+      if (base.active && base.weeklyHours === null) {
+        const pts = base.parts.reduce((n, g) => n + g.points, 0) || base.repeat.reduce((n, g) => n + g.points, 0);
+        const h = pts / 4 / (SCOPE_WEEKS[String(row.scope)] ?? 4);
+        base.weeklyHours = Math.round(h * 10) / 10;
       }
       break;
     }

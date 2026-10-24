@@ -316,3 +316,29 @@
   cursor: pointer;
 }
 .soundBtn:hover { border-color: var(--accent); }
+
+/* -- Load and swap ----------------------------------------------------- */
+.load {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-s);
+  font-family: var(--font-sans);
+  font-size: var(--type-ui-s);
+  color: var(--text-body);
+}
+.loadTrack { flex: 0 0 120px; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.loadFill { display: block; height: 100%; background: var(--text-strong); }
+.swap {
+  margin-top: var(--space-l);
+  padding: var(--space-m);
+  border: 2px solid var(--accent);
+  border-radius: 8px;
+  background: var(--bg-raised);
+}
+.swapHead { margin: 0 0 var(--space-s); font-family: var(--font-sans); font-size: var(--type-ui); color: var(--text-strong); }
+
+/* Press feedback: the button gives under the finger. */
+.btn { transition: transform 90ms var(--ease), background var(--hover-ms) var(--ease), border-color var(--hover-ms) var(--ease); }
+.btn:active:not(:disabled) { transform: scale(0.94); }
+@media (prefers-reduced-motion: reduce) { .btn:active:not(:disabled) { transform: none; } }

@@ -14,6 +14,7 @@ import { getBrowserClient, isSupabaseConfigured } from '@/lib/supabase';
 import type { ScoreState } from '@/lib/score/compute';
 import { SCORE_FX_EVENT, type ScoreFxDetail } from '@/lib/score/fx';
 import { ScoreMeter } from './score/ScoreMeter';
+import { freshWeek } from '@/lib/score/format';
 
 export function ScoreBoard({ initial }: { initial: ScoreState | null }) {
   const [state, setState] = useState(initial);
@@ -46,7 +47,7 @@ export function ScoreBoard({ initial }: { initial: ScoreState | null }) {
   if (!state) return null;
   return (
     <ScoreMeter
-      week={state.week}
+      week={freshWeek(state.week)}
       barMax={state.bar}
       cap={state.curiosityCap}
       level={state.lifetime.level}

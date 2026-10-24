@@ -319,8 +319,18 @@ function laneOf(inputs: TemplateInputs, surface: string): Lane {
   return DEFAULT_LANE[surface] ?? 'curiosity';
 }
 
-/** Turn a template's rough answers into a frozen score block. */
+/** Turn a template's rough answers into a frozen score block. Every
+ *  template also records the hours a week the item takes while active,
+ *  which is what the weekly limit adds up. */
 export function buildFromTemplate(id: TemplateId, inputs: TemplateInputs, surface: string): ScoreBlock {
+  const block = buildParts(id, inputs, surface);
+  const wh = Number(inputs.weeklyHours);
+  if (!Number.isFinite(wh) || wh <= 0) throw new Error('Hours a week must be a positive number');
+  block.weeklyHours = Math.round(wh * 10) / 10;
+  return block;
+}
+
+function buildParts(id: TemplateId, inputs: TemplateInputs, surface: string): ScoreBlock {
   switch (id) {
     case 'exam-prep': {
       const count = Math.round(needNum(inputs, 'count', 'Number of parts'));
@@ -359,9 +369,11 @@ export function buildFromTemplate(id: TemplateId, inputs: TemplateInputs, surfac
     case 'task': {
       const hours = needNum(inputs, 'hours', 'Hours');
       const count = Math.max(1, Math.round(Number(inputs.count) || 1));
+      const lane = laneOf(inputs, surface);
+      const points = estimate.gut(hours);
       return {
-        lane: laneOf(inputs, surface), template: id,
-        parts: [{ unit: count > 1 ? 'milestone' : 'task', count, points: estimate.gut(hours), prior: 0, done: [] }],
+        lane, template: id,
+        parts: [{ unit: count > 1 ? 'milestone' : 'task', count, points, prior: 0, done: [] }],
         repeat: [],
       };
     }

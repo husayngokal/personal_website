@@ -9,11 +9,16 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ScoreMeter } from '@/components/score/ScoreMeter';
-import { emitScoreFx, setSoundOn, soundOn } from '@/lib/score/fx';
+import { emitScoreFx, setSoundOn, soundOn, unlockAudio } from '@/lib/score/fx';
+import { getBrowserClient, isSupabaseConfigured } from '@/lib/supabase';
+import { TASK_GUT_HOURS, atlasPoints, estimate, partGain } from '@/lib/score/rules';
 import type { QuickRequest } from '@/lib/studio/quick';
 import type { DoneGroup } from '@/lib/vault/done-items';
 import type { ItemView, ScoreState } from '@/lib/score/compute';
 import { READING_TIERS, TEMPLATES, type TemplateId } from '@/lib/score/rules';
+
+interface SwapPlateItem { table: string; slug: string; title: string; hours: number | null; parkable: boolean }
+interface SwapState { req: QuickRequest; key: string; detail: string; plate: SwapPlateItem[] }
 import styles from './quick.module.css';
 
 interface Task { slug: string; title: string; status: string; scope: string; category: string | null; recurrence: string | null }
@@ -26,7 +31,7 @@ export interface QuickData {
   score: ScoreState | null;
 }
 
-type ScoreSlice = Pick<ScoreState, 'week' | 'lifetime' | 'streak' | 'items'>;
+type ScoreSlice = Pick<ScoreState, 'week' | 'lifetime' | 'streak' | 'items'> & { load?: ScoreState['load'] };
 
 interface ApiOk {
   ok: true;
@@ -62,6 +67,22 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
      of quick taps (each one in a run pitches higher). */
   const press = useRef<{ x: number; y: number } | null>(null);
   const run = useRef<{ at: number; n: number }>({ at: 0, n: 0 });
+  const [swap, setSwap] = useState<SwapState | null>(null);
+
+  /* The server recomputes the full score after answering; it arrives here
+     over Realtime and settles whatever the prediction got wrong. */
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    const supabase = getBrowserClient();
+    const channel = supabase
+      .channel(`quick_${Math.random().toString(36).slice(2, 10)}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'current_state', filter: 'key=eq.score' }, (payload) => {
+        const v = (payload.new as { value?: ScoreState } | null)?.value;
+        if (v?.version === 1) setScore({ week: v.week, lifetime: v.lifetime, streak: v.streak, items: v.items, load: v.load });
+      })
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, []);
 
   /* Apply the server's row patch to local state. Used for both a tap and
      its undo, which is why it is keyed on the request, not the button. */
@@ -83,9 +104,94 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
     }
   }
 
+  /* What a tap is worth, worked out here from the same frozen numbers
+     the server uses, so the effects can fire the instant the button goes
+     down instead of after the commit. Null when it cannot be known. */
+  function predict(req: QuickRequest): { gained: number; lane: 'quest' | 'curiosity'; itemKey?: string; group?: number; qty?: number } | null {
+    if (!score) return null;
+    if (req.target === 'score') {
+      const it = score.items.find((i) => i.table === req.table && i.slug === req.slug);
+      if (!it) return null;
+      if (req.action === 'part') {
+        const g = it.parts[req.group];
+        if (!g || g.done >= g.count) return null;
+        const qty = req.qty ?? 1;
+        return { gained: partGain(g.points, g.count, g.done, g.done + qty), lane: it.lane, itemKey: it.key, group: g.index, qty };
+      }
+      if (req.action === 'repeat') {
+        const g = it.repeat[req.group];
+        return g ? { gained: g.points, lane: it.lane, itemKey: it.key } : null;
+      }
+      if (req.action === 'page') {
+        const g = it.parts.find((x) => x.unit === 'page');
+        if (!g || req.page <= g.done) return null;
+        return { gained: partGain(g.points, g.count, g.done, req.page), lane: it.lane, itemKey: it.key, group: g.index, qty: Math.min(g.count, req.page) - g.done };
+      }
+      return null;
+    }
+    if (req.target === 'task' && req.action === 'done') {
+      const it = score.items.find((i) => i.table === 'tasks' && i.slug === req.slug);
+      if (it && it.total > 0) return { gained: Math.max(0, it.total - it.earned), lane: it.lane };
+      const t = tasks.find((x) => x.slug === req.slug);
+      return t ? { gained: estimate.gut(TASK_GUT_HOURS[t.scope] ?? 4), lane: 'quest' } : null;
+    }
+    if (req.target === 'atlas' && req.action === 'done') {
+      for (const g of groups) {
+        const i = g.items.find((x) => x.line === req.line);
+        if (i) return { gained: atlasPoints(i.text, g.heading), lane: 'curiosity' };
+      }
+    }
+    return null;
+  }
+
+  function withGain(sl: ScoreSlice, p: NonNullable<ReturnType<typeof predict>>, sign = 1): ScoreSlice {
+    const w = { ...sl.week };
+    if (p.lane === 'quest') w.quest += sign * p.gained;
+    else w.curiosity += sign * p.gained;
+    w.curiosityCounted = Math.min(w.curiosity, 80);
+    w.bar = w.quest + w.curiosityCounted;
+    w.full = w.bar >= 200;
+    w.extra = Math.max(0, w.bar - 200);
+    const points = sl.lifetime.points + sign * p.gained;
+    const items = p.itemKey === undefined ? sl.items : sl.items.map((i) => i.key !== p.itemKey ? i : {
+      ...i,
+      weekPoints: i.weekPoints + sign * p.gained,
+      parts: i.parts.map((g) => g.index !== p.group ? g : { ...g, done: Math.min(g.count, g.done + sign * (p.qty ?? 0)), logged: g.logged + sign }),
+    });
+    return {
+      ...sl, week: w, items,
+      lifetime: { ...sl.lifetime, points, level: Math.floor(points / 1000) + 1, intoLevel: points % 1000 },
+    };
+  }
+
   async function send(req: QuickRequest, key: string) {
     if (busy) return;
     setBusy(key);
+
+    /* Fire first, save second. If the save fails, the bar steps back. */
+    const snapshot = score;
+    const p = predict(req);
+    let optimistic: ScoreSlice | null = null;
+    if (p && p.gained > 0 && snapshot) {
+      optimistic = withGain(snapshot, p);
+      const now = Date.now();
+      run.current = now - run.current.at < 90_000 ? { at: now, n: run.current.n + 1 } : { at: now, n: 1 };
+      setScore(optimistic);
+      emitScoreFx({
+        before: snapshot.week, after: optimistic.week, barMax: 200,
+        levelBefore: snapshot.lifetime.level, levelAfter: optimistic.lifetime.level,
+        gained: p.gained, origin: press.current ?? undefined, combo: run.current.n, sound: true,
+      });
+    }
+    const rollback = () => {
+      if (!optimistic || !snapshot) return;
+      setScore(snapshot);
+      emitScoreFx({
+        before: optimistic.week, after: snapshot.week, barMax: 200,
+        levelBefore: optimistic.lifetime.level, levelAfter: snapshot.lifetime.level, gained: -(p?.gained ?? 0),
+      });
+    };
+
     try {
       const res = await fetch('/api/studio/quick', {
         method: 'POST',
@@ -94,36 +200,27 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
       });
       const j = await res.json();
       if (!res.ok) {
+        rollback();
+        if (j.error === 'over-capacity') {
+          setSwap({ req, key, detail: j.detail, plate: j.plate ?? [] });
+          return;
+        }
         setNote({
           kind: 'error',
           text: res.status === 401 ? 'Signed out. Reload and sign in again.'
-            : res.status === 409 ? 'That entry changed elsewhere. Reload the page.'
+            : res.status === 409 ? (j.detail || 'That entry changed elsewhere. Reload the page.')
             : j.detail || j.error || 'Could not save.',
         });
         return;
       }
-      const before = score;
       reflect(req, j as ApiOk);
-      const gained = (j as ApiOk).gained ?? 0;
-      const after = (j as ApiOk).score;
-      if (before && after && after.week.bar !== before.week.bar) {
-        const now = Date.now();
-        run.current = now - run.current.at < 90_000 ? { at: now, n: run.current.n + 1 } : { at: now, n: 1 };
-        emitScoreFx({
-          before: before.week, after: after.week, barMax: 200,
-          levelBefore: before.lifetime.level, levelAfter: after.lifetime.level,
-          gained: after.week.bar - before.week.bar,
-          origin: press.current ?? undefined,
-          combo: run.current.n,
-          sound: true,
-        });
-      }
       setNote({
         kind: 'ok',
-        text: `${(j as ApiOk).summary}${gained > 0 ? ` · +${gained}` : gained < 0 ? ` · ${gained}` : ''}`,
+        text: `${(j as ApiOk).summary}${p && p.gained > 0 ? ` · +${p.gained}` : ''}`,
         undo: (j as ApiOk).undo,
       });
     } catch (err) {
+      rollback();
       setNote({ kind: 'error', text: (err as Error).message });
     } finally {
       setBusy(null);
@@ -136,12 +233,24 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
   const soon = open.filter((t) => SOON.has(t.scope));
   const later = open.filter((t) => !THIS_WEEK.has(t.scope) && !SOON.has(t.scope));
 
-  const taskRow = (t: Task) => (
+  const taskRow = (t: Task) => {
+    const sized = score?.items.find((i) => i.table === 'tasks' && i.slug === t.slug);
+    const worth = sized && sized.total > 0 ? sized.total : estimate.gut(TASK_GUT_HOURS[t.scope] ?? 4);
+    return (
     <li key={t.slug} className={styles.row}>
       <div className={styles.rowText}>
         <span className={styles.rowTitle}>{t.title}</span>
-        <span className={styles.rowMeta}>{[t.category, t.scope.replace('-', ' ')].filter(Boolean).join(' · ')}</span>
+        <span className={styles.rowMeta}>{[t.category, t.scope.replace('-', ' '), `${worth} points`].filter(Boolean).join(' · ')}</span>
       </div>
+      {!sized?.hasBlock && (<details className={styles.parts}>
+        <summary className={styles.partsHead}>Size it</summary>
+        <SetupForm
+          template="task"
+          busy={busy === `${t.slug}:setup`}
+          disabled={!!busy}
+          onSubmit={(inputs) => send({ target: 'score', table: 'tasks', slug: t.slug, action: 'setup', template: 'task', inputs }, `${t.slug}:setup`)}
+        />
+      </details>)}
       <div className={styles.rowActions}>
         <Btn primary busy={busy === `${t.slug}:done`} disabled={!!busy} onClick={() => send({ target: 'task', slug: t.slug, action: 'done' }, `${t.slug}:done`)}>Done</Btn>
         {THIS_WEEK.has(t.scope)
@@ -149,15 +258,49 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
           : <Btn busy={busy === `${t.slug}:week`} disabled={!!busy} onClick={() => send({ target: 'task', slug: t.slug, action: 'this-week' }, `${t.slug}:week`)}>This week</Btn>}
       </div>
     </li>
-  );
+    );
+  };
 
   return (
     <div
       className={styles.board}
-      onPointerDownCapture={(e) => { press.current = { x: e.clientX, y: e.clientY }; }}
+      onPointerDownCapture={(e) => { press.current = { x: e.clientX, y: e.clientY }; unlockAudio(); }}
     >
       {/* -- This week ------------------------------------------------ */}
-      {score && <WeekCard score={score} load={initial.score?.load ?? null} />}
+      {score && <WeekCard score={score} load={score.load ?? initial.score?.load ?? null} />}
+
+      {/* -- Swap: the week is full ----------------------------------- */}
+      {swap && (
+        <section className={styles.swap} role="alertdialog" aria-label="Over the weekly hours">
+          <p className={styles.swapHead}>{swap.detail}</p>
+          <ul className={styles.rows}>
+            {swap.plate.map((x) => (
+              <li key={`${x.table}:${x.slug}`} className={`${styles.row} ${styles.rowSwitch}`}>
+                <div className={styles.rowText}>
+                  <span className={styles.rowTitle}>{x.title}</span>
+                  <span className={styles.rowMeta}>{x.hours ?? 0} hours a week{x.parkable ? '' : ' · exam, stays until it is sat'}</span>
+                </div>
+                {x.parkable && (
+                  <Btn
+                    busy={busy === `park:${x.slug}`}
+                    disabled={!!busy}
+                    onClick={() => {
+                      void send({ target: 'score', table: x.table, slug: x.slug, action: 'park' }, `park:${x.slug}`)
+                        .then(() => setSwap((sw) => sw && { ...sw, plate: sw.plate.filter((y) => y.slug !== x.slug) }));
+                    }}
+                  >
+                    Take off the plate
+                  </Btn>
+                )}
+              </li>
+            ))}
+          </ul>
+          <div className={styles.rowActions}>
+            <Btn primary disabled={!!busy} onClick={() => { const sw = swap; setSwap(null); void send(sw.req, sw.key); }}>Try again</Btn>
+            <Btn disabled={!!busy} onClick={() => setSwap(null)}>Cancel</Btn>
+          </div>
+        </section>
+      )}
 
       {/* -- On the plate --------------------------------------------- */}
       <Section title="On the plate" count={plate.length} empty="Nothing active is scored. Mark something as reading, studying or this week.">
@@ -211,6 +354,15 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
                     {g.unit} +{g.points}
                   </Btn>
                 ))}
+                {i.table !== 'study_credentials' && (
+                  <Btn
+                    busy={busy === `${i.key}:park`}
+                    disabled={!!busy}
+                    onClick={() => send({ target: 'score', table: i.table, slug: i.slug, action: 'park' }, `${i.key}:park`)}
+                  >
+                    Off the plate
+                  </Btn>
+                )}
               </div>
             )}
             {!i.needsSetup && i.parts.length > 0 && !i.parts.some((g) => g.unit === 'page') && (
@@ -319,7 +471,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
   );
 }
 
-function WeekCard({ score }: { score: ScoreSlice; load: ScoreState['load'] | null }) {
+function WeekCard({ score, load }: { score: ScoreSlice; load: ScoreState['load'] | null }) {
   const [sound, setSound] = useState(true);
   useEffect(() => { setSound(soundOn()); }, []);
   return (
@@ -341,6 +493,14 @@ function WeekCard({ score }: { score: ScoreSlice; load: ScoreState['load'] | nul
         >
           Sound {sound ? 'on' : 'off'}
         </button>
+        {load && (
+          <p className={styles.load}>
+            <span className={styles.loadTrack} aria-hidden="true">
+              <span className={styles.loadFill} style={{ width: `${Math.min(100, (load.hours / load.capacity) * 100)}%` }} />
+            </span>
+            {Math.round(load.hours * 10) / 10} of {load.capacity} hours a week on the plate
+          </p>
+        )}
       </ScoreMeter>
     </section>
   );

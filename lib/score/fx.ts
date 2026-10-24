@@ -71,6 +71,23 @@ function audio(): AudioContext | null {
   return ctx;
 }
 
+/** Call from a pointerdown handler. Browsers (iOS Safari above all) only
+ *  let audio start inside a user gesture; creating and resuming the
+ *  context there, and playing one silent sample, unlocks it for the rest
+ *  of the page's life. On iPhone the ring/silent switch still mutes web
+ *  audio, as it does for most games. */
+export function unlockAudio() {
+  const a = audio();
+  if (!a) return;
+  try {
+    const buf = a.createBuffer(1, 1, 22050);
+    const src = a.createBufferSource();
+    src.buffer = buf;
+    src.connect(a.destination);
+    src.start(0);
+  } catch { /* already unlocked */ }
+}
+
 const C5 = 523.25;
 const PENTATONIC = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28, 31];
 const hz = (semitones: number) => C5 * 2 ** (semitones / 12);
@@ -99,6 +116,16 @@ export function playGain(points: number, combo = 1) {
   tone(a, hz(step + 12), t, 0.09, 0.05, 'sine');
   if (points >= 12) tone(a, hz(step + 7), t + 0.07, 0.18, 0.12);
   if (points >= 30) tone(a, hz(step + 12), t + 0.14, 0.26, 0.12);
+}
+
+/** The points arriving in the bar: a bright two-note ting. */
+export function playLand(points: number) {
+  const a = audio();
+  if (!a) return;
+  const t = a.currentTime + 0.005;
+  const top = points >= 30 ? 31 : points >= 12 ? 28 : 24;
+  tone(a, hz(top), t, 0.22, 0.09, 'sine');
+  tone(a, hz(top + 7), t + 0.05, 0.3, 0.06, 'sine');
 }
 
 export function playQuarter(q: number) {

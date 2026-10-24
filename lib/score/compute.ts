@@ -47,6 +47,7 @@ export interface ItemView {
   href: string | null;
   lane: Lane;
   active: boolean;
+  hasBlock: boolean;            // carries its own frozen score block
   needsSetup: string | null;
   earned: number;               // points of finished parts (prior work included)
   total: number;                // points of all parts
@@ -129,7 +130,7 @@ function itemView(item: ScoreItem, weekPoints: number): ItemView {
   return {
     key: item.key, table: item.table, slug: item.slug, surface: item.surface,
     title: item.title, href: item.href, lane: item.lane, active: item.active,
-    needsSetup: item.needsSetup,
+    hasBlock: item.hasBlock, needsSetup: item.needsSetup,
     earned, total, pct: total ? Math.round((earned / total) * 100) : 0, summary,
     weekPoints, weeklyHours: item.weeklyHours, deadline: item.deadline, outcome: item.outcome,
     parts,

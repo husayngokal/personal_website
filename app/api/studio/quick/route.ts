@@ -18,13 +18,16 @@
  * returns the would-be file, for testing against production data safely.
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { getStudioSession } from '@/lib/studio/session';
 import { getFile, putFile } from '@/lib/studio/github';
 import { applyQuick, QuickError, specFor, type QuickRequest, type QuickResult } from '@/lib/studio/quick';
 import { fetchVaultMarkdown } from '@/lib/vault/tarball';
 import { readScore, recomputeScore } from '@/lib/score/store';
+import { itemFromFile } from '@/lib/score/items';
+import { WEEKLY_HOURS } from '@/lib/score/rules';
+import type { ScoreState } from '@/lib/score/compute';
 import { getServerAdminClient, isSupabaseConfigured } from '@/lib/supabase';
 import { getVaultPath, markActiveToday } from '@/lib/content/vault-state';
 import { deriveAndWriteLiveState } from '@/lib/content/derive';
@@ -66,8 +69,8 @@ export async function POST(req: NextRequest) {
   if (!path) return NextResponse.json({ error: 'path-unknown', detail: 'No vault path on record for this entry yet. It appears after the next sync.' }, { status: 404 });
 
   const today = authorDay();
+  const cached = await readScore(db);
   let result: QuickResult | null = null;
-  let committed = '';
   try {
     /* Two attempts: if the file changed between our read and our write
        (a sync cannot do that, but Obsidian on another device can), read
@@ -76,6 +79,13 @@ export async function POST(req: NextRequest) {
       const file = await getFile(session.token, path);
       if (!file) return NextResponse.json({ error: 'not-found', path }, { status: 404 });
       const computed = applyQuick(body, path, file.content, today);
+
+      /* The weekly limit. Anything that would push the active load past
+         the week is refused before it is committed, with the plate
+         attached so the page can offer a swap. */
+      const over = overCapacity(cached, path, computed.raw);
+      if (over) return NextResponse.json({ error: 'over-capacity', ...over }, { status: 409 });
+
       if (body.dryRun || !computed.changed) {
         return NextResponse.json({
           ok: true, dryRun: Boolean(body.dryRun), unchanged: !computed.changed, path,
@@ -85,7 +95,6 @@ export async function POST(req: NextRequest) {
       }
       try {
         await putFile(session.token, { path, content: computed.raw, sha: file.sha, message: `studio: ${computed.summary}` });
-        committed = computed.raw;
         result = computed;
       } catch (err) {
         const msg = (err as Error).message;
@@ -102,34 +111,54 @@ export async function POST(req: NextRequest) {
   }
   if (!result) return NextResponse.json({ error: 'conflict', detail: 'The file kept changing. Reload and try again.' }, { status: 409 });
 
-  /* Write-through. Committed already, so nothing below may fail the tap. */
-  try {
-    if (Object.keys(result.row).length) await db.from(spec.table).update(result.row).eq('slug', body.slug);
-    await markActiveToday(db);
-    await deriveAndWriteLiveState(db);
-  } catch (err) {
-    console.error(`[studio/quick] write-through failed for ${path}: ${(err as Error).message}`);
-  }
-
-  /* The score, recomputed from the whole vault with the file just
-     committed laid over it (the tarball can lag a commit by seconds).
-     The sync that follows the commit recomputes it again anyway. */
-  let score = null;
-  let gained = 0;
-  try {
-    const before = await readScore(db);
-    score = await recomputeScore(db, await fetchVaultMarkdown(), { path, content: committed });
-    gained = score.lifetime.points - (before?.lifetime.points ?? 0);
-  } catch (err) {
-    console.error(`[studio/quick] score recompute failed: ${(err as Error).message}`);
-  }
-  for (const p of REVALIDATE[body.target] ?? []) {
-    try { revalidatePath(p, p.includes('[') ? 'page' : undefined); } catch { /* best effort */ }
-  }
+  /* Answer now; the page has already shown the points. Everything else
+     (the row write-through, live state, the full score recompute from the
+     vault with this file laid over it, the cache) runs after the response.
+     The new score reaches every open page over Realtime when it lands. */
+  const done = result;
+  after(async () => {
+    try {
+      if (Object.keys(done.row).length) await db.from(spec.table).update(done.row).eq('slug', body.slug);
+      await markActiveToday(db);
+      await deriveAndWriteLiveState(db);
+    } catch (err) {
+      console.error(`[studio/quick] write-through failed for ${path}: ${(err as Error).message}`);
+    }
+    try {
+      await recomputeScore(db, await fetchVaultMarkdown(), { path, content: done.raw });
+    } catch (err) {
+      console.error(`[studio/quick] score recompute failed: ${(err as Error).message}`);
+    }
+    for (const p of REVALIDATE[body.target] ?? []) {
+      try { revalidatePath(p, p.includes('[') ? 'page' : undefined); } catch { /* best effort */ }
+    }
+  });
 
   return NextResponse.json({
     ok: true, path, row: result.row, summary: result.summary, undo: result.undo, line: result.line,
-    gained,
-    score: score ? { week: score.week, lifetime: score.lifetime, streak: score.streak, items: score.items } : null,
   });
+}
+
+/** Would this edit push the active load past the week? Compares the
+ *  item's hours a week before and after the edit against the stored load.
+ *  Only an increase can be refused, so taking things off always works. */
+function overCapacity(score: ScoreState | null, path: string, raw: string) {
+  if (!score) return null;
+  const item = itemFromFile({ path, content: raw });
+  if (!item || !item.active) return null;
+  const prev = score.items.find((i) => i.key === path);
+  const was = prev?.active ? prev.weeklyHours ?? 0 : 0;
+  const will = item.weeklyHours ?? 0;
+  if (will <= was) return null;
+  const load = Math.round((score.load.hours - was + will) * 10) / 10;
+  if (load <= WEEKLY_HOURS) return null;
+  return {
+    detail: `That would put ${load} hours a week on the plate, over the ${WEEKLY_HOURS}. Take something off first.`,
+    load,
+    capacity: WEEKLY_HOURS,
+    adding: Math.round((will - was) * 10) / 10,
+    plate: score.items
+      .filter((i) => i.active && (i.weeklyHours ?? 0) > 0 && i.key !== path)
+      .map((i) => ({ table: i.table, slug: i.slug, title: i.title, hours: i.weeklyHours, parkable: i.table !== 'study_credentials' })),
+  };
 }

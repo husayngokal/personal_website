@@ -86,6 +86,13 @@ export function buildMarkdown(
      create, where frontmatter starts from nothing. */
   base?: Record<string, unknown>,
 ): BuiltFile {
+  /* A task saved as done with no completed date gets today's, in the
+     author's timezone. The score dates a finished task by this field, so
+     forgetting it would otherwise earn nothing. */
+  if (type.folder === 'tasks' && values.status === 'done' && !String(values.completed ?? '').trim()) {
+    const dubai = new Date(Date.now() + 4 * 3_600_000).toISOString().slice(0, 10);
+    values = { ...values, completed: dubai };
+  }
   const titleValue = String(values[type.titleField] ?? '').trim();
   const slug = slugify(titleValue);
 

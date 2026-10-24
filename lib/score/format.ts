@@ -4,6 +4,17 @@
  * same string and hydration never mismatches.
  */
 
+import { authorDay, weekStart } from '../content/streak';
+
+/** A stored week from before this Monday reads as a fresh, empty week.
+ *  The daily refresh rolls the stored score over at midnight; this covers
+ *  the gap if a page is open across it. */
+export function freshWeek<W extends { start: string; bar: number; quest: number; curiosity?: number; curiosityCounted: number; full: boolean; extra: number }>(w: W): W {
+  const now = weekStart(authorDay());
+  if (w.start >= now) return w;
+  return { ...w, start: now, bar: 0, quest: 0, curiosity: 0, curiosityCounted: 0, full: false, extra: 0 };
+}
+
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export function shortDay(iso: string): string {

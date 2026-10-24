@@ -110,6 +110,37 @@ export const estimate = {
   words: (words: number) => hoursToPoints(words / WORDS_PER_HOUR),
 };
 
+/** Gate-to-gate points for a Field Atlas line: Naismith's rule from its
+ *  distance and climb, plus the drive, or a typical day for the discipline. */
+export function atlasPoints(text: string, heading: string): number {
+  const km = (() => {
+    const m = text.match(/(\d+(?:\.\d+)?)\s*(?:[–-]\s*(\d+(?:\.\d+)?))?\s*km\b/);
+    return m ? Number(m[2] ?? m[1]) : 0;
+  })();
+  const climb = (() => {
+    const m = text.match(/\+(\d{2,5})\s*m\b/);
+    return m ? Number(m[1]) : 0;
+  })();
+  const h = heading.toLowerCase();
+  const discipline = h.includes('div') ? 'diving' : h.includes('fish') ? 'fishing' : 'hiking';
+  const hours = km || climb
+    ? ATLAS.logisticsHours + km / ATLAS.kmPerHour + climb / ATLAS.metresClimbPerHour
+    : ATLAS.defaultHours[discipline];
+  return estimate.formula(hours);
+}
+
+/** Weeks a task's scope spans, for spreading its hours across the week. */
+export const SCOPE_WEEKS: Record<string, number> = {
+  today: 1, 'this-week': 1, 'this-month': 4, 'this-quarter': 13, 'this-year': 52, lifetime: 52,
+};
+
+/** Points earned by finishing parts `before`..`after` of a group: the same
+ *  cumulative rounding the engine uses, so a prediction matches exactly. */
+export function partGain(points: number, count: number, before: number, after: number): number {
+  const a = Math.min(count, Math.max(before, after));
+  return Math.round((points * a) / count) - Math.round((points * before) / count);
+}
+
 /** Pages that make one point at a tier, for display. */
 export function pagesPerPoint(tier: Tier): number {
   return MINUTES_PER_POINT / (READING_TIERS[tier].minutesPerPage * FORMULA_FACTOR);
@@ -130,6 +161,12 @@ export interface TemplateField {
   hint?: string;
 }
 
+/** Every template asks this: it is what the 50-hour limit adds up. */
+const WEEKLY: TemplateField = {
+  key: 'weeklyHours', label: 'Hours a week it will take while active', kind: 'number',
+  hint: `counts toward the ${WEEKLY_HOURS}-hour week`,
+};
+
 export const TEMPLATES: Record<TemplateId, { label: string; fields: TemplateField[] }> = {
   'exam-prep': {
     label: 'Exam prep',
@@ -139,6 +176,7 @@ export const TEMPLATES: Record<TemplateId, { label: string; fields: TemplateFiel
       { key: 'hoursEach', label: 'Your gut hours for one part', kind: 'number' },
       { key: 'repeatUnit', label: 'Something you can repeat', kind: 'text', optional: true, hint: 'past paper' },
       { key: 'repeatHours', label: 'Hours one takes, all in', kind: 'number', optional: true },
+      WEEKLY,
     ],
   },
   book: {
@@ -146,6 +184,7 @@ export const TEMPLATES: Record<TemplateId, { label: string; fields: TemplateFiel
     fields: [
       { key: 'pages', label: 'Pages', kind: 'number' },
       { key: 'tier', label: 'Tier', kind: 'tier' },
+      WEEKLY,
     ],
   },
   course: {
@@ -155,6 +194,7 @@ export const TEMPLATES: Record<TemplateId, { label: string; fields: TemplateFiel
       { key: 'unit', label: 'What is one part called?', kind: 'text', hint: 'module, week, section' },
       { key: 'count', label: 'How many parts?', kind: 'number' },
       { key: 'lane', label: 'Lane', kind: 'lane' },
+      WEEKLY,
     ],
   },
   task: {
@@ -163,6 +203,7 @@ export const TEMPLATES: Record<TemplateId, { label: string; fields: TemplateFiel
       { key: 'hours', label: 'Your gut hours for the whole thing', kind: 'number' },
       { key: 'count', label: 'How many milestones?', kind: 'number', hint: '1 if it is one piece' },
       { key: 'lane', label: 'Lane', kind: 'lane' },
+      WEEKLY,
     ],
   },
 };
