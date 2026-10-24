@@ -44,14 +44,13 @@
  */
 
 import { revalidatePath } from 'next/cache';
-import { createGunzip } from 'node:zlib';
-import { Readable } from 'node:stream';
-import { extract as tarExtract } from 'tar-stream';
 import { parseFile, ParseError, type ParsedFile } from './parse';
 import { getServerAdminClient } from '../supabase';
 import { deriveAndWriteLiveState } from '../content/derive';
 import { authorDay } from '../content/streak';
 import { ACTIVITY_KEY, PATHS_KEY, writeStateIfChanged } from '../content/vault-state';
+import { fetchVaultMarkdown, vaultRepo } from './tarball';
+import { recomputeScore } from '../score/store';
 import {
   buildRegistry, extractWikilinks, resolveTarget, urlFor,
   type SlugRegistryEntry,
@@ -75,69 +74,22 @@ export interface SyncOptions {
 }
 
 export async function syncVault(opts: SyncOptions = {}): Promise<SyncResult> {
-  const owner  = process.env.VAULT_REPO_OWNER;
-  const repo   = process.env.VAULT_REPO_NAME;
-  const branch = process.env.VAULT_REPO_BRANCH || 'main';
-  const pat    = process.env.GITHUB_PAT;
-
-  if (!owner || !repo || !pat) {
-    throw new Error('VAULT_REPO_OWNER, VAULT_REPO_NAME, GITHUB_PAT must be set');
-  }
+  const { owner, repo, branch, headers } = vaultRepo();
 
   const result: SyncResult = {
     parsed: 0, upserted: {}, deleted: {}, errors: [], warnings: [],
   };
 
-  const headers = {
-    Authorization: `Bearer ${pat}`,
-    Accept: 'application/vnd.github+json',
-    'X-GitHub-Api-Version': '2022-11-28',
-    'User-Agent': 'husayngokal-vault-sync',
-  };
-
-  /* 1+2. Fetch the whole repo as a single gzipped tarball and untar it in
-     memory. One GitHub request regardless of file count (see header). The
-     tarball endpoint 302s to a pre-signed codeload URL; fetch follows it,
-     and undici drops the Authorization header on that cross-origin hop —
-     which is fine, the signed URL needs no auth. last_edited_at still
-     comes from opts.fileTimestamps (the webhook's push payload). */
-  const tarUrl = `https://api.github.com/repos/${owner}/${repo}/tarball/${branch}`;
-  const tarRes = await fetch(tarUrl, { headers, cache: 'no-store' });
-  if (!tarRes.ok) {
-    throw new Error(`GitHub tarball API failed (${tarRes.status}): ${await tarRes.text()}`);
-  }
-  const tarballGz = Buffer.from(await tarRes.arrayBuffer());
-
-  const contents: { path: string; content: string; lastEditedAt: string | null }[] = [];
-  await new Promise<void>((resolve, reject) => {
-    const extract = tarExtract();
-    extract.on('entry', (header, stream, next) => {
-      /* Every entry is under a top-level `<owner>-<repo>-<sha>/` directory
-         GitHub adds; strip that first segment for the vault-relative path. */
-      const rel = header.name.replace(/^[^/]+\//, '');
-      if (header.type !== 'file' || !rel.endsWith('.md')) {
-        stream.on('end', next);
-        stream.resume();               // drain + skip non-markdown entries
-        return;
-      }
-      const chunks: Buffer[] = [];
-      stream.on('data', (c) => { chunks.push(c as Buffer); });
-      stream.on('end', () => {
-        contents.push({
-          path: rel,
-          content: Buffer.concat(chunks).toString('utf8'),
-          lastEditedAt: opts.fileTimestamps?.get(rel) ?? null,
-        });
-        next();
-      });
-      stream.on('error', reject);
-    });
-    extract.on('finish', resolve);
-    extract.on('error', reject);
-    const gunzip = createGunzip();
-    gunzip.on('error', reject);
-    Readable.from(tarballGz).pipe(gunzip).pipe(extract);
-  });
+  /* 1+2. The whole repo as a single gzipped tarball, untarred in memory:
+     one GitHub request regardless of file count (see header and
+     lib/vault/tarball.ts). last_edited_at still comes from
+     opts.fileTimestamps (the webhook's push payload). */
+  const files = await fetchVaultMarkdown();
+  const contents = files.map((f) => ({
+    path: f.path,
+    content: f.content,
+    lastEditedAt: opts.fileTimestamps?.get(f.path) ?? null,
+  }));
 
   /* 3. Parse each + attach last_edited_at into the row payload */
   const parsed: ParsedFile[] = [];
@@ -340,6 +292,14 @@ export async function syncVault(opts: SyncOptions = {}): Promise<SyncResult> {
     result.warnings.push(`vault bookkeeping failed: ${(err as Error).message}`);
   }
 
+  /* 6b. The score: recomputed from every file, stored in current_state.
+        Only written when it changed (it is broadcast like the rest). */
+  try {
+    await recomputeScore(db, files);
+  } catch (err) {
+    result.warnings.push(`score recompute failed: ${(err as Error).message}`);
+  }
+
   /* 6. Re-derive currently_* live-state rows from the freshly-upserted
         content. Realtime broadcasts to subscribers. */
   try {
@@ -370,6 +330,9 @@ export async function syncVault(opts: SyncOptions = {}): Promise<SyncResult> {
       { index: '/life/changed-my-mind', detail: undefined           },
       { index: '/life/plan',           detail: '/life/plan/[slug]'  },
       { index: '/life/tasks',          detail: undefined            },
+      { index: '/life/scoring',        detail: undefined            },
+      { index: '/field-atlas',         detail: undefined            },
+      { index: '/bucket-list',         detail: undefined            },
       { index: '/ideas',               detail: '/ideas/[slug]'      },
       { index: '/sitemap.xml',         detail: undefined            },
     ];
@@ -384,7 +347,7 @@ export async function syncVault(opts: SyncOptions = {}): Promise<SyncResult> {
   return result;
 }
 
-const INDEXED_TABLES = new Set(['library_books', 'tasks', 'projects', 'living_entries']);
+const INDEXED_TABLES = new Set(['library_books', 'tasks', 'projects', 'living_entries', 'courses', 'study_credentials']);
 
 function sortKeys(index: Record<string, Record<string, string>>): Record<string, Record<string, string>> {
   const out: Record<string, Record<string, string>> = {};

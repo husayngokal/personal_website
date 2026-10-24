@@ -16,6 +16,7 @@
     "vault:export": "tsx --env-file=.env scripts/export-vault.ts",
     "vault:sync": "tsx --env-file=.env scripts/vault-sync.ts",
     "derive": "tsx --env-file=.env scripts/derive-now.ts",
+    "score": "tsx --env-file=.env scripts/score-now.ts",
     "remarkable:import": "tsx scripts/remarkable-import.ts",
     "library:enrich": "tsx scripts/library-enrich.ts",
     "library:dedup": "tsx scripts/library-dedup.ts",

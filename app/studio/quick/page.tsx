@@ -1,8 +1,9 @@
 /*
  * Studio quick updates — the one-tap page.
  *
- * The things that change often and by a small amount (a book's progress,
- * a task getting done, a hike logged) should not need a form. This page
+ * The things that change often and by a small amount (a chapter done, a
+ * page reached, a past paper sat, a hike logged) should not need a form.
+ * Every tap scores: the bar at the top moves with it. This page
  * lists them from Postgres and each button is a single request to
  * /api/studio/quick, which commits the edit to the vault.
  *
@@ -10,8 +11,8 @@
  */
 
 import { getServerAdminClient, isSupabaseConfigured } from '@/lib/supabase';
-import { getActivityDays } from '@/lib/content/vault-state';
 import { listDoneItems } from '@/lib/vault/done-items';
+import { readScore } from '@/lib/score/store';
 import { QuickBoard, type QuickData } from './QuickBoard';
 import styles from '../studio.module.css';
 
@@ -22,23 +23,19 @@ export default async function QuickPage() {
     return <p className={styles.error}>The database is not configured here.</p>;
   }
   const db = getServerAdminClient();
-  const [books, tasks, projects, atlas, days] = await Promise.all([
-    db.from('library_books').select('slug,title,author,status,progress_pct')
-      .eq('status', 'reading').order('progress_pct', { ascending: false, nullsFirst: false }),
-    db.from('tasks').select('slug,title,status,scope,priority,category')
+  const [tasks, projects, atlas, score] = await Promise.all([
+    db.from('tasks').select('slug,title,status,scope,priority,category,recurrence')
       .in('status', ['open', 'in-progress', 'blocked'])
       .order('priority', { ascending: true, nullsFirst: false }).order('ordinal', { ascending: true, nullsFirst: false }),
     db.from('projects').select('slug,title,status').in('status', ['active', 'paused', 'dormant']).order('title'),
     db.from('living_entries').select('slug,title,body').eq('slug', 'field-atlas').maybeSingle(),
-    getActivityDays(db),
+    readScore(db),
   ]);
 
   const data: QuickData = {
-    books: (books.data ?? []).map((b) => ({
-      slug: b.slug, title: b.title, author: b.author, status: b.status, progressPct: b.progress_pct ?? 0,
-    })),
     tasks: (tasks.data ?? []).map((t) => ({
       slug: t.slug, title: t.title, status: t.status, scope: t.scope, category: t.category ?? null,
+      recurrence: t.recurrence ?? null,
     })),
     projects: (projects.data ?? []).map((p) => ({
       slug: p.slug, title: p.title, status: p.status,
@@ -46,7 +43,7 @@ export default async function QuickPage() {
     atlas: atlas.data
       ? { slug: atlas.data.slug, title: atlas.data.title, groups: listDoneItems(atlas.data.body ?? '') }
       : null,
-    activeDays: days,
+    score,
   };
 
   return (

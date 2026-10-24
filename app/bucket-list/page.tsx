@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation';
 import { getLivingEntry } from '@/lib/content/living';
 import { LivingEntryView } from '@/components/LivingEntryView';
+import { SurfaceProgress } from '@/components/SurfaceProgress';
+import { getScoreState } from '@/lib/content/score';
 
 /*
  * Bucket list — "The List." Sky, sea, mountains, machines. A public
@@ -21,7 +23,16 @@ export const metadata = {
 };
 
 export default async function BucketListPage() {
-  const entry = await getLivingEntry('bucket-list');
+  const [entry, score] = await Promise.all([getLivingEntry('bucket-list'), getScoreState()]);
   if (!entry) notFound();
-  return <LivingEntryView entry={entry} kicker="Living · The List" />;
+  const progress = score ? (
+    <SurfaceProgress
+      label="Done from The List"
+      done={score.tallies.list.done}
+      total={score.tallies.list.total}
+      unit="items"
+      weekPoints={score.surfaces.list.weekPoints}
+    />
+  ) : null;
+  return <LivingEntryView entry={entry} kicker="Living · The List" progress={progress} />;
 }

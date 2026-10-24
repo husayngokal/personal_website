@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { getScoreState } from '@/lib/content/score';
+import { SurfaceProgress } from '@/components/SurfaceProgress';
 import { Eyebrow, Chip } from '@/components/Primitives';
 import { getTasks } from '@/lib/content/tasks';
 import { renderMarkdown } from '@/lib/markdown';
@@ -76,9 +78,10 @@ export default async function TasksPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [tasks, sp] = await Promise.all([
+  const [tasks, sp, score] = await Promise.all([
     getTasks(),
     searchParams,
+    getScoreState(),
   ]);
 
   const statusFilter   = stringOf(sp.status);
@@ -138,6 +141,16 @@ export default async function TasksPage({
         ask me about. Each varies in difficulty and length. All 
         published here for accountability.
       </p>
+
+      {score && (
+        <SurfaceProgress
+          label="Current tasks"
+          done={score.tallies.tasks.done}
+          total={score.tallies.tasks.total}
+          unit="done"
+          weekPoints={score.surfaces.tasks.weekPoints}
+        />
+      )}
 
       <div className={styles.filterRow}>
         <FilterPill href="/life/tasks" label="All" count={tasks.length} active={!statusFilter && !categoryFilter} />

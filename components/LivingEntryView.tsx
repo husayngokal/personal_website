@@ -20,15 +20,18 @@ interface LivingEntryViewProps {
   /** Number under the title, e.g. "17" in "17. Living · Bucket List".
    *  Optional — when omitted, just the title row prints. */
   kicker?: string;
+  /** Rendered under the dek: the surface's progress bar. */
+  progress?: React.ReactNode;
 }
 
-export async function LivingEntryView({ entry, kicker }: LivingEntryViewProps) {
+export async function LivingEntryView({ entry, kicker, progress }: LivingEntryViewProps) {
   const html = await renderMarkdown(entry.body, 'living_entries');
   return (
     <article className={styles.page}>
       {kicker && <p className={styles.kicker}>{kicker}</p>}
       <h1 className={styles.title}>{entry.title}</h1>
       {entry.summary && <p className={styles.dek}>{entry.summary}</p>}
+      {progress}
       <div className={styles.body} dangerouslySetInnerHTML={{ __html: html }} />
     </article>
   );

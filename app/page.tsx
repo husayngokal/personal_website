@@ -16,6 +16,8 @@ import { getProjects } from '@/lib/content/projects';
 // import { getMentalModels } from '@/lib/content/mental-models';
 import { getLifePrinciples } from '@/lib/content/life';
 import { getWriteups } from '@/lib/content/writeups';
+import { getScoreState } from '@/lib/content/score';
+import { ScoreBoard } from '@/components/ScoreBoard';
 import styles from './page.module.css';
 
 /* ISR, not force-dynamic. The homepage is the navigation hub, so it has
@@ -40,12 +42,13 @@ export const revalidate = 60;
 
 export default async function HomePage() {
   const [
-    initialState, working, NOTEBOOK_POSTS, BOOKS, PROJECTS, LIFE_PRINCIPLES, WRITEUPS,
+    initialState, working, NOTEBOOK_POSTS, BOOKS, PROJECTS, LIFE_PRINCIPLES, WRITEUPS, score,
   ] = await Promise.all([
     getLiveState(),
     getCurrentWorking(),
     getNotebookPosts(),
     getBooks(), getProjects(), getLifePrinciples(), getWriteups(),
+    getScoreState(),
   ]);
 
   const recentEssays = [...NOTEBOOK_POSTS]
@@ -99,11 +102,23 @@ export default async function HomePage() {
         </div>
       </section>
 
+      {/* -- This week: the score -------------------------------------- */}
+      {score && (
+        <section className={styles.section} id="this-week">
+          <div className={styles.sectionInner}>
+            <div className={styles.sectionHead}>
+              <Eyebrow number="02">This week</Eyebrow>
+            </div>
+            <ScoreBoard initial={score} />
+          </div>
+        </section>
+      )}
+
       {/* -- Featured Notebook strip --------------------------------- */}
       <section className={styles.section}>
         <div className={styles.sectionInner}>
           <div className={styles.sectionHead}>
-            <Eyebrow number="02">From the notebook</Eyebrow>
+            <Eyebrow number="03">From the notebook</Eyebrow>
             <Link href="/notebook" className={styles.sectionLink}>
               all posts →
             </Link>
@@ -131,7 +146,7 @@ export default async function HomePage() {
       {/* -- From across the site ------------------------------------ */}
       <section className={styles.section}>
         <div className={styles.sectionInner}>
-          <Eyebrow number="03">From across the site</Eyebrow>
+          <Eyebrow number="04">From across the site</Eyebrow>
           <div className={styles.acrossGrid}>
             {acrossBook && (
               <Link href={`/library/${acrossBook.slug}`} className={styles.acrossItem}>

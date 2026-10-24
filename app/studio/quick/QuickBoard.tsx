@@ -7,23 +7,24 @@
  * appears at the bottom.
  */
 
-import { useMemo, useState } from 'react';
-import { authorDay, computeStreak } from '@/lib/content/streak';
+import { useState } from 'react';
 import type { QuickRequest } from '@/lib/studio/quick';
 import type { DoneGroup } from '@/lib/vault/done-items';
+import type { ItemView, ScoreState } from '@/lib/score/compute';
+import { READING_TIERS, TEMPLATES, type TemplateId } from '@/lib/score/rules';
 import styles from './quick.module.css';
 
-interface Book { slug: string; title: string; author: string; status: string; progressPct: number }
-interface Task { slug: string; title: string; status: string; scope: string; category: string | null }
+interface Task { slug: string; title: string; status: string; scope: string; category: string | null; recurrence: string | null }
 interface Project { slug: string; title: string; status: string }
 
 export interface QuickData {
-  books: Book[];
   tasks: Task[];
   projects: Project[];
   atlas: { slug: string; title: string; groups: DoneGroup[] } | null;
-  activeDays: string[];
+  score: ScoreState | null;
 }
+
+type ScoreSlice = Pick<ScoreState, 'week' | 'lifetime' | 'streak' | 'items'>;
 
 interface ApiOk {
   ok: true;
@@ -31,6 +32,8 @@ interface ApiOk {
   summary: string;
   undo: QuickRequest | null;
   line?: string;
+  gained?: number;
+  score?: ScoreSlice | null;
 }
 
 type Note = { kind: 'ok'; text: string; undo: QuickRequest | null } | { kind: 'error'; text: string };
@@ -38,26 +41,28 @@ type Note = { kind: 'ok'; text: string; undo: QuickRequest | null } | { kind: 'e
 const THIS_WEEK = new Set(['today', 'this-week']);
 const SOON = new Set(['this-month', 'this-quarter', 'this-year']);
 
+/* What the plate shows: everything scored and active, except plain tasks
+   (their Done button below scores them) and whole-surface items. */
+function onPlate(i: ItemView): boolean {
+  if (!i.active || i.surface === 'atlas') return false;
+  if (i.surface === 'tasks') return i.repeat.length > 0 || i.parts.some((g) => g.unit !== 'task');
+  return true;
+}
+
 export function QuickBoard({ initial }: { initial: QuickData }) {
-  const [books, setBooks] = useState(initial.books);
   const [tasks, setTasks] = useState(initial.tasks);
   const [projects, setProjects] = useState(initial.projects);
   const [groups, setGroups] = useState(initial.atlas?.groups ?? []);
-  const [activeDays, setActiveDays] = useState(initial.activeDays);
+  const [score, setScore] = useState<ScoreSlice | null>(initial.score);
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<Note | null>(null);
-
-  const streak = useMemo(() => computeStreak(activeDays), [activeDays]);
 
   /* Apply the server's row patch to local state. Used for both a tap and
      its undo, which is why it is keyed on the request, not the button. */
   function reflect(req: QuickRequest, res: ApiOk) {
     const r = res.row;
-    if (req.target === 'book') {
-      setBooks((list) => list.map((b) => b.slug !== req.slug ? b : {
-        ...b, status: String(r.status ?? b.status), progressPct: Number(r.progress_pct ?? b.progressPct),
-      }));
-    } else if (req.target === 'task') {
+    if (res.score) setScore(res.score);
+    if (req.target === 'task') {
       setTasks((list) => list.map((t) => t.slug !== req.slug ? t : {
         ...t, status: String(r.status ?? t.status), scope: String(r.scope ?? t.scope),
       }));
@@ -92,9 +97,12 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
         return;
       }
       reflect(req, j as ApiOk);
-      const today = authorDay();
-      setActiveDays((d) => (d.includes(today) ? d : [...d, today]));
-      setNote({ kind: 'ok', text: (j as ApiOk).summary, undo: (j as ApiOk).undo });
+      const gained = (j as ApiOk).gained ?? 0;
+      setNote({
+        kind: 'ok',
+        text: `${(j as ApiOk).summary}${gained > 0 ? ` · +${gained}` : gained < 0 ? ` · ${gained}` : ''}`,
+        undo: (j as ApiOk).undo,
+      });
     } catch (err) {
       setNote({ kind: 'error', text: (err as Error).message });
     } finally {
@@ -102,8 +110,8 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
     }
   }
 
-  const reading = books.filter((b) => b.status === 'reading');
-  const open = tasks.filter((t) => t.status !== 'done');
+  const plate = (score?.items ?? []).filter(onPlate);
+  const open = tasks.filter((t) => t.status !== 'done' && !t.recurrence);
   const week = open.filter((t) => THIS_WEEK.has(t.scope));
   const soon = open.filter((t) => SOON.has(t.scope));
   const later = open.filter((t) => !THIS_WEEK.has(t.scope) && !SOON.has(t.scope));
@@ -125,44 +133,63 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
 
   return (
     <div className={styles.board}>
-      {/* -- Streak --------------------------------------------------- */}
-      <section className={styles.streak} aria-label="Activity streak">
-        <div className={styles.streakFigure}>
-          <span className={styles.streakNum}>{streak.weeks}</span>
-          <span className={styles.streakUnit}>week streak</span>
-        </div>
-        <ol className={styles.weeks} aria-label="Last 12 weeks, oldest first">
-          {streak.recent.map((on, i) => (
-            <li
-              key={i}
-              className={`${styles.week} ${on ? styles.weekOn : ''} ${i === streak.recent.length - 1 ? styles.weekNow : ''}`}
-              aria-label={`${i === streak.recent.length - 1 ? 'This week' : `${streak.recent.length - 1 - i} weeks ago`}: ${on ? 'active' : 'nothing logged'}`}
-            />
-          ))}
-        </ol>
-        <p className={styles.streakNote}>
-          {streak.thisWeekActive
-            ? `This week is counted. ${streak.daysThisWeek} active ${streak.daysThisWeek === 1 ? 'day' : 'days'} so far.`
-            : streak.weeks > 0
-              ? 'Nothing logged this week yet. One tap below keeps the streak alive.'
-              : 'No streak running. One tap below starts one.'}
-        </p>
-      </section>
+      {/* -- This week ------------------------------------------------ */}
+      {score && <WeekCard score={score} load={initial.score?.load ?? null} />}
 
-      {/* -- Reading -------------------------------------------------- */}
-      <Section title="Reading" count={reading.length} empty="No books marked as reading.">
-        {reading.map((b) => (
-          <li key={b.slug} className={styles.row}>
+      {/* -- On the plate --------------------------------------------- */}
+      <Section title="On the plate" count={plate.length} empty="Nothing active is scored. Mark something as reading, studying or this week.">
+        {plate.map((i) => (
+          <li key={i.key} className={styles.row}>
             <div className={styles.rowText}>
-              <span className={styles.rowTitle}>{b.title}</span>
-              <span className={styles.rowMeta}>{b.author} · {b.progressPct}%</span>
+              <span className={styles.rowTitle}>{i.title}</span>
+              <span className={styles.rowMeta}>
+                {[i.summary, i.lane, i.weekPoints ? `+${i.weekPoints} this week` : null].filter(Boolean).join(' · ')}
+              </span>
+              {i.total > 0 && (
+                <span className={styles.miniTrack} aria-hidden="true"><span className={styles.miniFill} style={{ width: `${i.pct}%` }} /></span>
+              )}
             </div>
-            <div className={styles.rowActions}>
-              <Btn primary busy={busy === `${b.slug}:5`} disabled={!!busy || b.progressPct >= 100} onClick={() => send({ target: 'book', slug: b.slug, action: 'bump', by: 5 }, `${b.slug}:5`)}>+5%</Btn>
-              <Btn primary busy={busy === `${b.slug}:10`} disabled={!!busy || b.progressPct >= 100} onClick={() => send({ target: 'book', slug: b.slug, action: 'bump', by: 10 }, `${b.slug}:10`)}>+10%</Btn>
-              <Btn busy={busy === `${b.slug}:fin`} disabled={!!busy} onClick={() => send({ target: 'book', slug: b.slug, action: 'finish' }, `${b.slug}:fin`)}>Finished</Btn>
-              <Btn busy={busy === `${b.slug}:shelve`} disabled={!!busy} onClick={() => send({ target: 'book', slug: b.slug, action: 'shelve' }, `${b.slug}:shelve`)}>Shelve</Btn>
-            </div>
+            {i.needsSetup ? (
+              <SetupForm
+                template={i.needsSetup as TemplateId}
+                busy={busy === `${i.key}:setup`}
+                disabled={!!busy}
+                onSubmit={(inputs) => send({ target: 'score', table: i.table, slug: i.slug, action: 'setup', template: i.needsSetup as TemplateId, inputs }, `${i.key}:setup`)}
+              />
+            ) : (
+              <div className={styles.rowActions}>
+                {i.parts.map((g) => g.unit === 'page' ? (
+                  <PageLog
+                    key={`p${g.index}`}
+                    at={g.done}
+                    of={g.count}
+                    busy={busy === `${i.key}:page`}
+                    disabled={!!busy}
+                    onLog={(page) => send({ target: 'score', table: i.table, slug: i.slug, action: 'page', page }, `${i.key}:page`)}
+                  />
+                ) : (
+                  <Btn
+                    key={`p${g.index}`}
+                    primary
+                    busy={busy === `${i.key}:p${g.index}`}
+                    disabled={!!busy || g.done >= g.count}
+                    onClick={() => send({ target: 'score', table: i.table, slug: i.slug, action: 'part', group: g.index }, `${i.key}:p${g.index}`)}
+                  >
+                    {g.name ? `${g.name}: ` : ''}{g.unit} done
+                  </Btn>
+                ))}
+                {i.repeat.map((g) => (
+                  <Btn
+                    key={`r${g.index}`}
+                    busy={busy === `${i.key}:r${g.index}`}
+                    disabled={!!busy}
+                    onClick={() => send({ target: 'score', table: i.table, slug: i.slug, action: 'repeat', group: g.index }, `${i.key}:r${g.index}`)}
+                  >
+                    {g.unit} +{g.points}
+                  </Btn>
+                ))}
+              </div>
+            )}
           </li>
         ))}
       </Section>
@@ -262,6 +289,102 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
   );
 }
 
+function WeekCard({ score, load }: { score: ScoreSlice; load: ScoreState['load'] | null }) {
+  const { week, lifetime, streak } = score;
+  const bar = 200;
+  const q = Math.min(100, (week.quest / bar) * 100);
+  const c = Math.min(100 - q, (week.curiosityCounted / bar) * 100);
+  return (
+    <section className={styles.streak} aria-label="This week">
+      <div className={styles.streakFigure}>
+        <span className={styles.streakNum}>{week.bar}</span>
+        <span className={styles.streakUnit}>of {bar} this week{week.full ? ' · full' : ''}</span>
+      </div>
+      <div className={styles.weekTrack} aria-hidden="true">
+        <span className={styles.weekQuest} style={{ width: `${q}%` }} />
+        <span className={styles.weekCur} style={{ width: `${c}%`, left: `${q}%` }} />
+      </div>
+      <p className={styles.streakNote}>
+        Quests {week.quest} · curiosity {week.curiosityCounted} of 80
+        {' · '}level {lifetime.level} · {lifetime.points} lifetime · {streak} full {streak === 1 ? 'week' : 'weeks'} in a row
+        {load && load.hours > 0 ? ` · ${load.hours} of ${load.capacity} hours committed` : ''}
+      </p>
+    </section>
+  );
+}
+
+function SetupForm({ template, busy, disabled, onSubmit }: {
+  template: TemplateId; busy: boolean; disabled: boolean;
+  onSubmit: (inputs: Record<string, string | number>) => void;
+}) {
+  const spec = TEMPLATES[template];
+  const [vals, setVals] = useState<Record<string, string>>({});
+  const set = (k: string, v: string) => setVals((x) => ({ ...x, [k]: v }));
+  return (
+    <form
+      className={styles.setup}
+      onSubmit={(e) => {
+        e.preventDefault();
+        const inputs: Record<string, string | number> = {};
+        for (const f of spec.fields) {
+          const v = vals[f.key];
+          if (v === undefined || v === '') continue;
+          inputs[f.key] = f.kind === 'number' ? Number(v) : v;
+        }
+        onSubmit(inputs);
+      }}
+    >
+      <p className={styles.setupHead}>Set up scoring · {spec.label}. Points are frozen once saved.</p>
+      {spec.fields.map((f) => (
+        <label key={f.key} className={styles.setupField}>
+          <span>{f.label}{f.optional ? ' (optional)' : ''}</span>
+          {f.kind === 'tier' ? (
+            <select value={vals[f.key] ?? 'normal'} onChange={(e) => set(f.key, e.target.value)}>
+              {Object.entries(READING_TIERS).map(([k, t]) => <option key={k} value={k}>{t.label} · {t.example}</option>)}
+            </select>
+          ) : f.kind === 'lane' ? (
+            <select value={vals[f.key] ?? ''} onChange={(e) => set(f.key, e.target.value)}>
+              <option value="">Default for this kind</option>
+              <option value="quest">Quest</option>
+              <option value="curiosity">Curiosity</option>
+            </select>
+          ) : (
+            <input
+              type={f.kind === 'number' ? 'number' : 'text'}
+              inputMode={f.kind === 'number' ? 'decimal' : undefined}
+              step="any"
+              min={f.kind === 'number' ? 0 : undefined}
+              placeholder={f.hint}
+              required={!f.optional}
+              value={vals[f.key] ?? ''}
+              onChange={(e) => set(f.key, e.target.value)}
+            />
+          )}
+        </label>
+      ))}
+      <Btn primary busy={busy} disabled={disabled} onClick={() => undefined} submit>Save</Btn>
+    </form>
+  );
+}
+
+function PageLog({ at, of, busy, disabled, onLog }: {
+  at: number; of: number; busy: boolean; disabled: boolean; onLog: (page: number) => void;
+}) {
+  const [page, setPage] = useState('');
+  return (
+    <form
+      className={styles.pageLog}
+      onSubmit={(e) => { e.preventDefault(); const n = Number(page); if (n > at) { onLog(n); setPage(''); } }}
+    >
+      <label>
+        <span className={styles.srOnly}>Page you are on</span>
+        <input type="number" inputMode="numeric" min={at + 1} max={of} placeholder={`page (now ${at})`} value={page} onChange={(e) => setPage(e.target.value)} />
+      </label>
+      <Btn primary busy={busy} disabled={disabled || !page || Number(page) <= at} onClick={() => undefined} submit>Log page</Btn>
+    </form>
+  );
+}
+
 function Section({ title, count, empty, children }: { title: string; count: number; empty?: string; children: React.ReactNode }) {
   return (
     <section className={styles.section}>
@@ -271,12 +394,12 @@ function Section({ title, count, empty, children }: { title: string; count: numb
   );
 }
 
-function Btn({ children, onClick, primary, busy, disabled }: {
-  children: React.ReactNode; onClick: () => void; primary?: boolean; busy?: boolean; disabled?: boolean;
+function Btn({ children, onClick, primary, busy, disabled, submit }: {
+  children: React.ReactNode; onClick: () => void; primary?: boolean; busy?: boolean; disabled?: boolean; submit?: boolean;
 }) {
   return (
     <button
-      type="button"
+      type={submit ? 'submit' : 'button'}
       className={`${styles.btn} ${primary ? styles.btnPrimary : ''} ${busy ? styles.btnBusy : ''}`}
       onClick={onClick}
       disabled={disabled}

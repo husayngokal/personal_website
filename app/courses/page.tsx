@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { Eyebrow, Chip, StatusPill } from '@/components/Primitives';
+import { Eyebrow, Chip, StatusPill, ProgressBar } from '@/components/Primitives';
+import { getScoreState } from '@/lib/content/score';
 import { UniversityChip } from '@/components/UniversityChip';
 import { getCourses } from '@/lib/content/courses';
 import { getUniversity, UNIVERSITIES } from '@/lib/universities';
@@ -33,7 +34,8 @@ const STATUS_ORDER: Record<string, number> = {
 };
 
 export default async function CoursesIndex() {
-  const courses = await getCourses();
+  const [courses, score] = await Promise.all([getCourses(), getScoreState()]);
+  const progress = new Map((score?.items ?? []).filter((i) => i.surface === 'courses' && i.total > 0).map((i) => [i.slug, i]));
 
   /* Sort: status (studying first), then by order, then code */
   const sorted = [...courses].sort((a, b) => {
@@ -112,6 +114,12 @@ export default async function CoursesIndex() {
                   {c.code && <span className={styles.code}>{c.code}</span>}
                 </p>
                 <p className={styles.cardTitle}>{c.title}</p>
+                {progress.has(c.slug) && (
+                  <p className={styles.cardProgress}>
+                    <ProgressBar pct={progress.get(c.slug)!.pct} />
+                    <span className={styles.cardProgressText}>{progress.get(c.slug)!.summary}</span>
+                  </p>
+                )}
                 <p className={styles.cardMetaBottom}>
                   <StatusPill status={c.status as never} label={c.status} />
                   {c.estTotalHours && (

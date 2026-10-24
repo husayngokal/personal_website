@@ -3,6 +3,8 @@ import { Eyebrow, ProgressBar, StatusPill } from '@/components/Primitives';
 import { OpenBookMark } from '@/components/marks/OpenBookMark';
 import { BookCover } from '@/components/BookCover';
 import { getBooks, getPlanSummary, PLAN_TARGET, PLAN_YEAR } from '@/lib/content/library';
+import { getScoreState } from '@/lib/content/score';
+import { SurfaceProgress } from '@/components/SurfaceProgress';
 import styles from './library.module.css';
 
 export const revalidate = 60; // ISR — regenerates every 60s in the background; vault webhook calls revalidatePath() on push for immediate freshness
@@ -47,7 +49,7 @@ export default async function LibraryIndex({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  const [BOOKS, plan, sp] = await Promise.all([getBooks(), getPlanSummary(), searchParams]);
+  const [BOOKS, plan, sp, score] = await Promise.all([getBooks(), getPlanSummary(), searchParams, getScoreState()]);
   const statusFilter = stringOf(sp.status);
   const yearFilter   = stringOf(sp.year);
   const pct = Math.round((plan.finished / PLAN_TARGET) * 100);
@@ -101,6 +103,19 @@ export default async function LibraryIndex({
           </p>
         </div>
       </section>
+
+      {score && (() => {
+        const reading = score.items.filter((i) => i.surface === 'library' && i.active);
+        return (
+          <SurfaceProgress
+            label="Reading this week"
+            weekPoints={score.surfaces.library.weekPoints}
+            note={reading.length === 0
+              ? 'nothing on the plate right now'
+              : `${reading.length} ${reading.length === 1 ? 'book' : 'books'} on the plate`}
+          />
+        );
+      })()}
 
       <div className={styles.layout}>
         <aside className={styles.sidebar}>

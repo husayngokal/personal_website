@@ -22,7 +22,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { getStudioSession } from '@/lib/studio/session';
 import { getFile, putFile } from '@/lib/studio/github';
-import { applyQuick, QuickError, QUICK_TARGETS, type QuickRequest, type QuickResult } from '@/lib/studio/quick';
+import { applyQuick, QuickError, specFor, type QuickRequest, type QuickResult } from '@/lib/studio/quick';
+import { fetchVaultMarkdown } from '@/lib/vault/tarball';
+import { readScore, recomputeScore } from '@/lib/score/store';
 import { getServerAdminClient, isSupabaseConfigured } from '@/lib/supabase';
 import { getVaultPath, markActiveToday } from '@/lib/content/vault-state';
 import { deriveAndWriteLiveState } from '@/lib/content/derive';
@@ -35,7 +37,8 @@ const REVALIDATE: Record<string, string[]> = {
   book: ['/', '/library', '/library/[slug]'],
   task: ['/', '/life/tasks'],
   project: ['/', '/projects', '/projects/[slug]'],
-  atlas: ['/field-atlas'],
+  atlas: ['/', '/field-atlas'],
+  score: ['/', '/life/tasks', '/library', '/library/[slug]', '/courses', '/courses/[slug]', '/study/credentials/[slug]', '/projects'],
 };
 
 export async function POST(req: NextRequest) {
@@ -48,7 +51,7 @@ export async function POST(req: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'malformed-body' }, { status: 400 });
   }
-  const spec = QUICK_TARGETS[body?.target];
+  const spec = body && typeof body === 'object' ? specFor(body as { target: QuickRequest['target']; table?: string }) : null;
   if (!spec || typeof body.slug !== 'string' || !/^[\w.-]{1,200}$/.test(body.slug)) {
     return NextResponse.json({ error: 'bad-request' }, { status: 400 });
   }
@@ -64,6 +67,7 @@ export async function POST(req: NextRequest) {
 
   const today = authorDay();
   let result: QuickResult | null = null;
+  let committed = '';
   try {
     /* Two attempts: if the file changed between our read and our write
        (a sync cannot do that, but Obsidian on another device can), read
@@ -81,6 +85,7 @@ export async function POST(req: NextRequest) {
       }
       try {
         await putFile(session.token, { path, content: computed.raw, sha: file.sha, message: `studio: ${computed.summary}` });
+        committed = computed.raw;
         result = computed;
       } catch (err) {
         const msg = (err as Error).message;
@@ -99,17 +104,32 @@ export async function POST(req: NextRequest) {
 
   /* Write-through. Committed already, so nothing below may fail the tap. */
   try {
-    await db.from(spec.table).update(result.row).eq('slug', body.slug);
+    if (Object.keys(result.row).length) await db.from(spec.table).update(result.row).eq('slug', body.slug);
     await markActiveToday(db);
     await deriveAndWriteLiveState(db);
-    for (const p of REVALIDATE[body.target] ?? []) {
-      revalidatePath(p, p.includes('[') ? 'page' : undefined);
-    }
   } catch (err) {
     console.error(`[studio/quick] write-through failed for ${path}: ${(err as Error).message}`);
   }
 
+  /* The score, recomputed from the whole vault with the file just
+     committed laid over it (the tarball can lag a commit by seconds).
+     The sync that follows the commit recomputes it again anyway. */
+  let score = null;
+  let gained = 0;
+  try {
+    const before = await readScore(db);
+    score = await recomputeScore(db, await fetchVaultMarkdown(), { path, content: committed });
+    gained = score.lifetime.points - (before?.lifetime.points ?? 0);
+  } catch (err) {
+    console.error(`[studio/quick] score recompute failed: ${(err as Error).message}`);
+  }
+  for (const p of REVALIDATE[body.target] ?? []) {
+    try { revalidatePath(p, p.includes('[') ? 'page' : undefined); } catch { /* best effort */ }
+  }
+
   return NextResponse.json({
     ok: true, path, row: result.row, summary: result.summary, undo: result.undo, line: result.line,
+    gained,
+    score: score ? { week: score.week, lifetime: score.lifetime, streak: score.streak, items: score.items } : null,
   });
 }

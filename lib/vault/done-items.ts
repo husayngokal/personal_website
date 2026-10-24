@@ -4,21 +4,28 @@
  * An item is one numbered line; done is marked in the text itself, the
  * convention established when the first hikes were logged:
  *
- *   6. Mushrif Park · Dubai · easy.                 open
- *   6. ~~Mushrif Park · Dubai · easy.~~ · **done**  done
+ *   6. Mushrif Park · Dubai · easy.                                   open
+ *   6. ~~Mushrif Park · Dubai · easy.~~ · **done**                    done (before scoring)
+ *   6. ~~Mushrif Park · Dubai · easy.~~ · **done 2026-10-26 · 24 points**
+ *
+ * The dated form is what Studio writes since scoring began: the day the
+ * outing was logged and the points it earned, frozen in the line so a
+ * later change to the rules never rewrites it.
  *
  * Numbers restart per discipline, so the line's full text is the item's
  * identity. Pure module, no I/O.
  */
 
 const ITEM = /^(\d+)\. (.+)$/;
-const DONE = /^~~(.+)~~ · \*\*done\*\*$/;
+const DONE = /^~~(.+)~~ · \*\*done(?: (\d{4}-\d{2}-\d{2}))?(?: · (\d+) points?)?\*\*$/;
 
 export interface DoneItem {
   line: string;       // the exact source line (identity for toggling)
   number: number;
   text: string;       // without the done markup
   done: boolean;
+  date?: string;      // day logged, when known
+  points?: number;    // points frozen at logging, when known
 }
 
 export interface DoneGroup {
@@ -30,7 +37,12 @@ function parseLine(line: string): DoneItem | null {
   const m = line.match(ITEM);
   if (!m) return null;
   const d = m[2].match(DONE);
-  return { line, number: Number(m[1]), text: d ? d[1] : m[2], done: Boolean(d) };
+  if (!d) return { line, number: Number(m[1]), text: m[2], done: false };
+  return {
+    line, number: Number(m[1]), text: d[1], done: true,
+    ...(d[2] ? { date: d[2] } : {}),
+    ...(d[3] ? { points: Number(d[3]) } : {}),
+  };
 }
 
 /* Group numbered items under their top-level "# N · NAME · COUNT" heading.
@@ -65,8 +77,11 @@ function titleCase(s: string): string {
 
 /* Flip one item. `line` must match exactly one line in the file, in the
    state the caller believes it is in; anything else means the file moved
-   on since the page loaded, and the caller should reload. */
-export function setItemDone(raw: string, line: string, done: boolean): { raw: string; line: string } {
+   on since the page loaded, and the caller should reload. `stamp` dates
+   the outing and freezes its points. */
+export function setItemDone(
+  raw: string, line: string, done: boolean, stamp?: { day: string; points: number },
+): { raw: string; line: string } {
   const eol = raw.includes('\r\n') ? '\r\n' : '\n';
   const lines = raw.split(eol);
   const hits = lines.reduce<number[]>((acc, l, i) => (l === line ? [...acc, i] : acc), []);
@@ -74,7 +89,14 @@ export function setItemDone(raw: string, line: string, done: boolean): { raw: st
   const item = parseLine(line);
   if (!item) throw new Error('not a numbered item');
   if (item.done === done) return { raw, line };
-  const next = done ? `${item.number}. ~~${item.text}~~ · **done**` : `${item.number}. ${item.text}`;
+  const mark = stamp ? `**done ${stamp.day} · ${stamp.points} ${stamp.points === 1 ? 'point' : 'points'}**` : '**done**';
+  const next = done ? `${item.number}. ~~${item.text}~~ · ${mark}` : `${item.number}. ${item.text}`;
   lines[hits[0]] = next;
   return { raw: lines.join(eol), line: next };
+}
+
+/** The item's name, without number, done markup or detail. */
+export function itemLabel(line: string): string {
+  const item = parseLine(line);
+  return (item?.text ?? line).split(' · ')[0];
 }

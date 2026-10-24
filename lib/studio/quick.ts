@@ -22,11 +22,26 @@
 
 import matter from 'gray-matter';
 import { patchFrontmatter, type ScalarChange } from '../vault/frontmatter-patch';
-import { setItemDone } from '../vault/done-items';
+import { itemLabel, listDoneItems, setItemDone } from '../vault/done-items';
 import { parseFile } from '../vault/parse';
+import { TEMPLATES, type TemplateId } from '../score/rules';
+import {
+  buildFromTemplate, logParts, logRepeat, partsDone, readBlock, setScoreBlock,
+  type ScoreBlock, type TemplateInputs,
+} from '../score/block';
+import { atlasPoints, effectiveBlock, itemFromFile, plural } from '../score/items';
 
 export type FrontmatterTarget = 'book' | 'task' | 'project';
-export type QuickTarget = FrontmatterTarget | 'atlas';
+export type QuickTarget = FrontmatterTarget | 'atlas' | 'score';
+
+/* Tables whose items carry a score block, and where their files live. */
+export const SCORE_TABLES: Record<string, { folder: string | null; keys: string[]; columns: string[] }> = {
+  library_books:     { folder: 'library',           keys: ['status', 'progress-pct', 'finished'], columns: ['status', 'progress_pct', 'finished'] },
+  tasks:             { folder: null,                keys: [],                                      columns: [] },
+  courses:           { folder: 'courses',           keys: [],                                      columns: [] },
+  study_credentials: { folder: 'study/credentials', keys: [],                                      columns: [] },
+  projects:          { folder: 'projects',          keys: [],                                      columns: [] },
+};
 
 export type QuickRequest =
   | { target: 'book'; slug: string; action: 'bump'; by: number }
@@ -34,7 +49,12 @@ export type QuickRequest =
   | { target: 'task'; slug: string; action: 'done' | 'reopen' | 'this-week' | 'later' }
   | { target: 'project'; slug: string; action: 'set-active'; on: boolean }
   | { target: 'atlas'; slug: string; action: 'done' | 'undone'; line: string }
-  | { target: FrontmatterTarget; slug: string; action: 'restore'; fields: Record<string, ScalarChange> };
+  | { target: FrontmatterTarget; slug: string; action: 'restore'; fields: Record<string, ScalarChange> }
+  | { target: 'score'; table: string; slug: string; action: 'part'; group: number; qty?: number }
+  | { target: 'score'; table: string; slug: string; action: 'repeat'; group: number }
+  | { target: 'score'; table: string; slug: string; action: 'page'; page: number }
+  | { target: 'score'; table: string; slug: string; action: 'setup'; template: TemplateId; inputs: TemplateInputs }
+  | { target: 'score'; table: string; slug: string; action: 'restore-block'; block: ScoreBlock | null; fields?: Record<string, ScalarChange> };
 
 interface TargetSpec {
   table: string;
@@ -51,7 +71,17 @@ export const QUICK_TARGETS: Record<QuickTarget, TargetSpec> = {
   task:    { table: 'tasks',          folder: null,       keys: ['status', 'scope', 'completed'],      columns: ['status', 'scope', 'completed'] },
   project: { table: 'projects',       folder: 'projects', keys: ['status'],                            columns: ['status'] },
   atlas:   { table: 'living_entries', folder: 'living',   keys: [],                                    columns: ['body'] },
+  /* table/folder/keys/columns for score requests come from SCORE_TABLES,
+     keyed by the request's own `table`; see specFor(). */
+  score:   { table: '',               folder: null,       keys: [],                                    columns: [] },
 };
+
+/** The target spec for a request, resolving score requests by table. */
+export function specFor(req: { target: QuickTarget; table?: string }): TargetSpec | null {
+  if (req.target !== 'score') return QUICK_TARGETS[req.target] ?? null;
+  const t = req.table ? SCORE_TABLES[req.table] : undefined;
+  return t ? { table: req.table!, ...t } : null;
+}
 
 export interface QuickResult {
   raw: string;                       // new file content
@@ -119,8 +149,9 @@ function changesFor(req: QuickRequest, fm: Record<string, unknown>, today: strin
 }
 
 export function applyQuick(req: QuickRequest, path: string, raw: string, today: string): QuickResult {
-  const spec = QUICK_TARGETS[req.target];
+  const spec = specFor(req as { target: QuickTarget; table?: string });
   if (!spec) throw new QuickError('bad-request', 'unknown target');
+  if (req.target === 'score') return finish(applyScore(req, path, raw, today), path, spec);
 
   let next = raw;
   let summary: string;
@@ -130,16 +161,23 @@ export function applyQuick(req: QuickRequest, path: string, raw: string, today: 
   if (req.target === 'atlas') {
     if (req.action !== 'done' && req.action !== 'undone') throw new QuickError('bad-request', 'unknown action');
     if (typeof req.line !== 'string' || !req.line) throw new QuickError('bad-request', 'missing item');
+    /* Logging an outing dates it and freezes its points into the line. */
+    let stamp: { day: string; points: number } | undefined;
+    if (req.action === 'done') {
+      const group = listDoneItems(matter(raw).content).find((g) => g.items.some((i) => i.line === req.line));
+      const item = group?.items.find((i) => i.line === req.line);
+      if (group && item) stamp = { day: today, points: atlasPoints(item.text, group.heading) };
+    }
     let flipped: { raw: string; line: string };
     try {
-      flipped = setItemDone(raw, req.line, req.action === 'done');
+      flipped = setItemDone(raw, req.line, req.action === 'done', stamp);
     } catch (err) {
       throw new QuickError('stale', (err as Error).message);
     }
     next = flipped.raw;
     line = flipped.line;
-    const label = req.line.replace(/^\d+\. /, '').replace(/^~~|~~ · \*\*done\*\*$/g, '').split(' · ')[0];
-    summary = `${label}: ${req.action === 'done' ? 'logged as done' : 'marked not done'}`;
+    const label = itemLabel(req.line);
+    summary = `${label}: ${req.action === 'done' ? `logged as done${stamp ? `, +${stamp.points}` : ''}` : 'marked not done'}`;
     undo = { target: 'atlas', slug: req.slug, action: req.action === 'done' ? 'undone' : 'done', line };
   } else {
     const fm = matter(raw).data as Record<string, unknown>;
@@ -155,21 +193,122 @@ export function applyQuick(req: QuickRequest, path: string, raw: string, today: 
     undo = { target: req.target, slug: req.slug, action: 'restore', fields: previous };
   }
 
-  /* The gate: the edited file must still be a file the sync accepts, and
-     must still land in the table we think we are editing. */
+  return finish({ raw: next, changed: next !== raw, row: {}, summary, undo, line }, path, spec);
+}
+
+/* The gate: the edited file must still be a file the sync accepts, and
+   must still land in the table we think we are editing. */
+function finish(result: QuickResult, path: string, spec: TargetSpec): QuickResult {
   let parsed;
   try {
-    parsed = parseFile(path, next);
+    parsed = parseFile(path, result.raw);
   } catch (err) {
     throw new QuickError('invalid-result', `edit would break the file: ${(err as Error).message}`);
   }
   if (!parsed || parsed.ignored || parsed.table !== spec.table) {
-    throw new QuickError('invalid-result', `${path} is not a ${req.target} file`);
+    throw new QuickError('invalid-result', `${path} is not a ${spec.table} file`);
   }
-
   const source = parsed.row as Record<string, unknown>;
   const row: Record<string, unknown> = {};
   for (const c of spec.columns) row[c] = source[c] ?? null;
+  return { ...result, row };
+}
 
-  return { raw: next, changed: next !== raw, row, summary, undo, line };
+type ScoreRequest = Extract<QuickRequest, { target: 'score' }>;
+
+/* Score actions: log a part, a repeat or a page, set an item up from a
+   template, or put a block back (undo). Every one works from the file's
+   current block, never from what the page last showed. */
+function applyScore(req: ScoreRequest, path: string, raw: string, today: string): QuickResult {
+  const fm = matter(raw).data as Record<string, unknown>;
+  const title = String(fm.title ?? req.slug);
+  const own = readBlock(fm);
+  const prevFields: Record<string, ScalarChange> = {};
+  const undo = (fields?: Record<string, ScalarChange>): QuickRequest => ({
+    target: 'score', table: req.table, slug: req.slug, action: 'restore-block', block: own,
+    ...(fields && Object.keys(fields).length ? { fields } : {}),
+  });
+
+  if (req.action === 'restore-block') {
+    const allowed = SCORE_TABLES[req.table]?.keys ?? [];
+    let next = setScoreBlock(raw, req.block ?? null);
+    if (req.fields) {
+      for (const k of Object.keys(req.fields)) {
+        if (!allowed.includes(k)) throw new QuickError('bad-request', `cannot restore ${k}`);
+      }
+      next = patchFrontmatter(next, req.fields);
+    }
+    return { raw: next, changed: next !== raw, row: {}, summary: `${title}: undone`, undo: null };
+  }
+
+  if (req.action === 'setup') {
+    if (own) throw new QuickError('bad-request', 'this item is already set up; its points are frozen');
+    if (!(req.template in TEMPLATES)) throw new QuickError('bad-request', 'unknown template');
+    const item = itemFromFile({ path, content: raw });
+    if (!item) throw new QuickError('bad-request', 'this file cannot be scored');
+    let block: ScoreBlock;
+    try {
+      block = buildFromTemplate(req.template, req.inputs ?? {}, item.surface);
+    } catch (err) {
+      throw new QuickError('bad-request', (err as Error).message);
+    }
+    const next = setScoreBlock(raw, block);
+    const total = block.parts.reduce((s, g) => s + g.points, 0);
+    return { raw: next, changed: true, row: {}, summary: `${title}: set up, ${total} points in all`, undo: undo() };
+  }
+
+  /* Logging. An item scored by defaults (a plain or recurring task) gets
+     those defaults frozen into its file on the first log. */
+  let block = own;
+  if (!block) {
+    const item = itemFromFile({ path, content: raw });
+    if (!item || (!item.parts.length && !item.repeat.length)) {
+      throw new QuickError('bad-request', 'set this item up for scoring first');
+    }
+    block = effectiveBlock(item);
+  }
+
+  let nextBlock: ScoreBlock;
+  let verb: string;
+  const fields: Record<string, ScalarChange> = {};
+  try {
+    if (req.action === 'part') {
+      const g = block.parts[req.group];
+      if (!g) throw new Error('no such part');
+      nextBlock = logParts(block, req.group, req.qty ?? 1, today);
+      const n = partsDone(nextBlock.parts[req.group]) - partsDone(g);
+      verb = `${n > 1 ? `${n} ${plural(g.unit)}` : g.unit} done (${partsDone(nextBlock.parts[req.group])} of ${g.count})`;
+    } else if (req.action === 'repeat') {
+      const g = block.repeat[req.group];
+      if (!g) throw new Error('no such repeatable');
+      nextBlock = logRepeat(block, req.group, today);
+      verb = `${g.unit} logged, +${g.points}`;
+    } else if (req.action === 'page') {
+      const gi = block.parts.findIndex((g) => g.unit === 'page');
+      if (gi === -1) throw new Error('this book is not set up with pages');
+      const g = block.parts[gi];
+      const page = Math.round(Number(req.page));
+      const at = partsDone(g);
+      if (!Number.isFinite(page) || page <= at) throw new Error(`you are already on page ${at}`);
+      nextBlock = logParts(block, gi, page - at, today);
+      const reached = partsDone(nextBlock.parts[gi]);
+      prevFields['progress-pct'] = fm['progress-pct'] === undefined ? null : Number(fm['progress-pct']);
+      fields['progress-pct'] = Math.round((reached / g.count) * 100);
+      if (reached >= g.count) {
+        prevFields.status = fm.status === undefined ? null : String(fm.status);
+        prevFields.finished = fm.finished instanceof Date ? fm.finished.toISOString().slice(0, 10) : (fm.finished as string | undefined) ?? null;
+        fields.status = 'finished';
+        fields.finished = today;
+      }
+      verb = reached >= g.count ? 'finished' : `on page ${reached} of ${g.count}`;
+    } else {
+      throw new Error('unknown action');
+    }
+  } catch (err) {
+    throw new QuickError('bad-request', (err as Error).message);
+  }
+
+  let next = setScoreBlock(raw, nextBlock);
+  if (Object.keys(fields).length) next = patchFrontmatter(next, fields);
+  return { raw: next, changed: true, row: {}, summary: `${title}: ${verb}`, undo: undo(prevFields) };
 }

@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation';
 import { getLivingEntry } from '@/lib/content/living';
 import { LivingEntryView } from '@/components/LivingEntryView';
+import { SurfaceProgress } from '@/components/SurfaceProgress';
+import { getScoreState } from '@/lib/content/score';
 
 /*
  * Field Atlas — the body's domain, GCC edition. 92 entries across
@@ -22,7 +24,16 @@ export const metadata = {
 };
 
 export default async function FieldAtlasPage() {
-  const entry = await getLivingEntry('field-atlas');
+  const [entry, score] = await Promise.all([getLivingEntry('field-atlas'), getScoreState()]);
   if (!entry) notFound();
-  return <LivingEntryView entry={entry} kicker="Living · The Field Atlas" />;
+  const progress = score ? (
+    <SurfaceProgress
+      label="Outings logged"
+      done={score.tallies.atlas.done}
+      total={score.tallies.atlas.total}
+      unit="outings"
+      weekPoints={score.surfaces.atlas.weekPoints}
+    />
+  ) : null;
+  return <LivingEntryView entry={entry} kicker="Living · The Field Atlas" progress={progress} />;
 }
