@@ -342,3 +342,15 @@
 .btn { transition: transform 90ms var(--ease), background var(--hover-ms) var(--ease), border-color var(--hover-ms) var(--ease); }
 .btn:active:not(:disabled) { transform: scale(0.94); }
 @media (prefers-reduced-motion: reduce) { .btn:active:not(:disabled) { transform: none; } }
+
+.allDone {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 var(--space-m);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  font-family: var(--font-sans);
+  font-size: var(--type-ui);
+  color: var(--text-strong);
+}

@@ -342,7 +342,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
               />
             ) : (
               <div className={styles.rowActions}>
-                {i.parts.filter((g) => g.unit === 'page' || g.current).map((g) => g.unit === 'page' ? (
+                {liveGroups(i).map((g) => g.unit === 'page' ? (
                   <PageLog
                     key={`p${g.index}`}
                     at={g.done}
@@ -361,6 +361,11 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
                   >
                     {g.name ? `${g.name}: ` : ''}{g.unit} done
                   </Btn>
+                ))}
+                {finishedUnits(i).map((u) => (
+                  <span key={`f${u.unit}`} className={styles.allDone}>
+                    All {u.count} {u.count === 1 ? u.unit : pluralUnit(u.unit)} done
+                  </span>
                 ))}
                 {i.repeat.map((g) => (
                   <Btn
@@ -576,6 +581,33 @@ function SetupForm({ template, busy, disabled, onSubmit }: {
       <Btn primary busy={busy} disabled={disabled} onClick={() => undefined} submit>Save</Btn>
     </form>
   );
+}
+
+/* Which part buttons to show, worked out here from the parts (which a
+   tap updates at once), not from the server's last word: for each unit,
+   the first group still unfinished. A finished unit shows no button, the
+   moment its last part is tapped. Page groups always show their logger
+   until the book is done. */
+function liveGroups(i: ItemView): ItemView['parts'] {
+  const seen = new Set<string>();
+  return i.parts.filter((g) => {
+    if (g.done >= g.count || seen.has(g.unit)) return false;
+    seen.add(g.unit);
+    return true;
+  });
+}
+
+/* Units with every group finished, for an "all done" note in place of
+   the button. */
+function finishedUnits(i: ItemView): { unit: string; count: number }[] {
+  const units = [...new Set(i.parts.map((g) => g.unit))];
+  return units
+    .map((unit) => {
+      const gs = i.parts.filter((g) => g.unit === unit);
+      return { unit, count: gs.reduce((n, g) => n + g.count, 0), done: gs.every((g) => g.done >= g.count) };
+    })
+    .filter((u) => u.done)
+    .map(({ unit, count }) => ({ unit, count }));
 }
 
 /* The progress line, worked out here from the parts so a tap shows
