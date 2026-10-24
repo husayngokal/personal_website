@@ -16,9 +16,10 @@ import type { QuickRequest } from '@/lib/studio/quick';
 import type { DoneGroup } from '@/lib/vault/done-items';
 import type { ItemView, ScoreState } from '@/lib/score/compute';
 import { READING_TIERS, TEMPLATES, type TemplateId } from '@/lib/score/rules';
+import { IDLE, TIMER_KEY, elapsedMs, hms, hoursLabel, type TimerNow } from '@/lib/score/time';
 
 interface SwapPlateItem { table: string; slug: string; title: string; hours: number | null; parkable: boolean }
-interface SwapState { req: QuickRequest; key: string; detail: string; plate: SwapPlateItem[] }
+interface SwapState { retry: () => void; detail: string; plate: SwapPlateItem[] }
 import styles from './quick.module.css';
 
 interface Task { slug: string; title: string; status: string; scope: string; category: string | null; recurrence: string | null }
@@ -29,9 +30,10 @@ export interface QuickData {
   projects: Project[];
   atlas: { slug: string; title: string; groups: DoneGroup[] } | null;
   score: ScoreState | null;
+  timer: TimerNow;
 }
 
-type ScoreSlice = Pick<ScoreState, 'week' | 'lifetime' | 'streak' | 'items'> & { load?: ScoreState['load'] };
+type ScoreSlice = Pick<ScoreState, 'week' | 'lifetime' | 'streak' | 'items'> & { load?: ScoreState['load']; time?: ScoreState['time'] };
 
 interface ApiOk {
   ok: true;
@@ -87,7 +89,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
         const h = hold.current;
         if (h && Date.now() < h.until && v.lifetime.points < h.points) return;
         if (h && v.lifetime.points >= h.points) hold.current = null;
-        setScore({ week: v.week, lifetime: v.lifetime, streak: v.streak, items: v.items, load: v.load });
+        setScore({ week: v.week, lifetime: v.lifetime, streak: v.streak, items: v.items, load: v.load, time: v.time });
       })
       .subscribe();
     return () => { void supabase.removeChannel(channel); };
@@ -214,7 +216,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
       if (!res.ok) {
         rollback();
         if (j.error === 'over-capacity') {
-          setSwap({ req, key, detail: j.detail, plate: j.plate ?? [] });
+          setSwap({ retry: () => { void send(req, key); }, detail: j.detail, plate: j.plate ?? [] });
           return;
         }
         setNote({
@@ -287,6 +289,50 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
       {/* -- This week ------------------------------------------------ */}
       {score && <WeekCard score={score} load={score.load ?? initial.score?.load ?? null} />}
 
+      {/* -- Timer ---------------------------------------------------- */}
+      <TimerCard
+        initial={initial.timer}
+        plate={(score?.items ?? []).filter((i) => i.active)}
+        weekMinutes={score?.time?.weekMinutes ?? 0}
+        onLogged={(minutes, key, text) => {
+          setScore((sc) => sc && {
+            ...sc,
+            time: sc.time ? { ...sc.time, weekMinutes: sc.time.weekMinutes + minutes } : sc.time,
+            items: sc.items.map((it) => it.key !== key ? it : { ...it, weekMinutes: (it.weekMinutes ?? 0) + minutes }),
+          });
+          setNote({ kind: 'ok', text, undo: null });
+        }}
+        onError={(text) => setNote({ kind: 'error', text })}
+      />
+
+      {/* -- Add to this week ----------------------------------------- */}
+      <AddToWeek
+        busy={busy}
+        onAdd={async (form) => {
+          if (busy) return false;
+          setBusy('plan');
+          try {
+            const res = await fetch('/api/studio/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
+            const j = await res.json();
+            if (!res.ok) {
+              if (j.error === 'over-capacity') {
+                setSwap({ retry: () => { void fetch('/api/studio/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) }).then(async (r) => { const k = await r.json(); setNote(r.ok ? { kind: 'ok', text: `${k.summary}. It shows here in a few seconds.`, undo: null } : { kind: 'error', text: k.detail || k.error }); }); }, detail: j.detail, plate: j.plate ?? [] });
+                return false;
+              }
+              setNote({ kind: 'error', text: j.detail || j.error || 'Could not add it.' });
+              return false;
+            }
+            setNote({ kind: 'ok', text: `${j.summary}. It shows on the plate in a few seconds.`, undo: null });
+            return true;
+          } catch (err) {
+            setNote({ kind: 'error', text: (err as Error).message });
+            return false;
+          } finally {
+            setBusy(null);
+          }
+        }}
+      />
+
       {/* -- Swap: the week is full ----------------------------------- */}
       {swap && (
         <section className={styles.swap} role="alertdialog" aria-label="Over the weekly hours">
@@ -314,7 +360,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
             ))}
           </ul>
           <div className={styles.rowActions}>
-            <Btn primary disabled={!!busy} onClick={() => { const sw = swap; setSwap(null); void send(sw.req, sw.key); }}>Try again</Btn>
+            <Btn primary disabled={!!busy} onClick={() => { const sw = swap; setSwap(null); sw.retry(); }}>Try again</Btn>
             <Btn disabled={!!busy} onClick={() => setSwap(null)}>Cancel</Btn>
           </div>
         </section>
@@ -327,7 +373,10 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
             <div className={styles.rowText}>
               <span className={styles.rowTitle}>{i.title}</span>
               <span className={styles.rowMeta}>
-                {[liveSummary(i), i.lane, i.weekPoints ? `+${i.weekPoints} this week` : null].filter(Boolean).join(' · ')}
+                {[
+                  liveSummary(i), i.lane, i.weekPoints ? `+${i.weekPoints} this week` : null,
+                  i.weekMinutes || i.weeklyHours ? `${hoursLabel(i.weekMinutes ?? 0)} timed${i.weeklyHours ? ` of ${i.weeklyHours} h` : ''}` : null,
+                ].filter(Boolean).join(' · ')}
               </span>
               {i.total > 0 && (
                 <span className={styles.miniTrack} aria-hidden="true"><span className={styles.miniFill} style={{ width: `${livePct(i)}%` }} /></span>
@@ -377,15 +426,6 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
                     {g.unit} +{g.points}
                   </Btn>
                 ))}
-                {i.table !== 'study_credentials' && (
-                  <Btn
-                    busy={busy === `${i.key}:park`}
-                    disabled={!!busy}
-                    onClick={() => send({ target: 'score', table: i.table, slug: i.slug, action: 'park' }, `${i.key}:park`)}
-                  >
-                    Off the plate
-                  </Btn>
-                )}
               </div>
             )}
             {!i.needsSetup && i.parts.length > 0 && !i.parts.some((g) => g.unit === 'page') && (
@@ -395,9 +435,41 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
                 send={(req, key) => send({ target: 'score', table: i.table, slug: i.slug, ...req } as QuickRequest, key)}
               />
             )}
+            <details className={styles.parts}>
+              <summary className={styles.partsHead}>More</summary>
+              <div className={styles.moreBody}>
+                <p className={styles.setupHead}>
+                  Takes it off the plate and frees its {i.weeklyHours ?? 0} hours a week. Nothing logged is lost.
+                  {i.table === 'study_credentials' ? ' The exam keeps its date; it just stops counting toward the week.' : ''}
+                </p>
+                <HoldButton
+                  disabled={!!busy}
+                  onDone={() => send({ target: 'score', table: i.table, slug: i.slug, action: 'park' }, `${i.key}:park`)}
+                >
+                  Hold to take off the plate
+                </HoldButton>
+              </div>
+            </details>
           </li>
         ))}
       </Section>
+
+      {(score?.items ?? []).some((i) => i.parked) && (
+        <details className={styles.fold}>
+          <summary className={styles.foldHead}>Off the plate <span className={styles.count}>{(score?.items ?? []).filter((i) => i.parked).length}</span></summary>
+          <ul className={styles.rows}>
+            {(score?.items ?? []).filter((i) => i.parked).map((i) => (
+              <li key={i.key} className={`${styles.row} ${styles.rowSwitch}`}>
+                <div className={styles.rowText}>
+                  <span className={styles.rowTitle}>{i.title}</span>
+                  <span className={styles.rowMeta}>{liveSummary(i)}{i.weeklyHours ? ` · ${i.weeklyHours} h a week` : ''}</span>
+                </div>
+                <Btn busy={busy === `${i.key}:unpark`} disabled={!!busy} onClick={() => send({ target: 'score', table: i.table, slug: i.slug, action: 'unpark' }, `${i.key}:unpark`)}>Back on the plate</Btn>
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
 
       {/* -- Building ------------------------------------------------- */}
       <Section title="Building" count={projects.length} empty="No projects yet.">
@@ -491,6 +563,233 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
         </div>
       )}
     </div>
+  );
+}
+
+/* Press and hold to confirm: a deliberate act, not a stray tap. Letting go
+   early cancels. Works with a held Space or Enter too. */
+function HoldButton({ ms = 1500, disabled, onDone, children }: {
+  ms?: number; disabled?: boolean; onDone: () => void; children: React.ReactNode;
+}) {
+  const [p, setP] = useState(0);
+  const raf = useRef<number | null>(null);
+  const t0 = useRef(0);
+  const stop = () => { if (raf.current) cancelAnimationFrame(raf.current); raf.current = null; setP(0); };
+  const start = () => {
+    if (disabled || raf.current) return;
+    t0.current = performance.now();
+    const tick = (now: number) => {
+      const k = Math.min(1, (now - t0.current) / ms);
+      setP(k);
+      if (k >= 1) { raf.current = null; setP(0); onDone(); return; }
+      raf.current = requestAnimationFrame(tick);
+    };
+    raf.current = requestAnimationFrame(tick);
+  };
+  useEffect(() => () => { if (raf.current) cancelAnimationFrame(raf.current); }, []);
+  return (
+    <button
+      type="button"
+      className={styles.hold}
+      disabled={disabled}
+      onPointerDown={start}
+      onPointerUp={stop}
+      onPointerLeave={stop}
+      onPointerCancel={stop}
+      onKeyDown={(e) => { if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) { e.preventDefault(); start(); } }}
+      onKeyUp={(e) => { if (e.key === ' ' || e.key === 'Enter') stop(); }}
+      onContextMenu={(e) => e.preventDefault()}
+    >
+      <span className={styles.holdFill} style={{ width: `${p * 100}%` }} aria-hidden="true" />
+      <span className={styles.holdText}>{children}</span>
+    </button>
+  );
+}
+
+/* The timer: one session at a time, shared across devices through one
+   current_state row. Elapsed time comes from timestamps, so a closed tab
+   or a sleeping phone loses nothing. Logged time is a record, never points. */
+function TimerCard({ initial, plate, weekMinutes, onLogged, onError }: {
+  initial: TimerNow;
+  plate: ItemView[];
+  weekMinutes: number;
+  onLogged: (minutes: number, key: string | null, text: string) => void;
+  onError: (text: string) => void;
+}) {
+  const [t, setT] = useState<TimerNow>(initial);
+  const [, setTick] = useState(0);
+  const [pick, setPick] = useState<string>(plate[0]?.key ?? '__other');
+  const [other, setOther] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [manual, setManual] = useState({ key: plate[0]?.key ?? '__other', label: '', minutes: '', date: '' });
+
+  useEffect(() => {
+    if (!t.active || t.pausedAt) return;
+    const id = window.setInterval(() => setTick((n) => n + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [t.active, t.pausedAt]);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    const supabase = getBrowserClient();
+    const channel = supabase
+      .channel(`timer_${Math.random().toString(36).slice(2, 10)}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'current_state', filter: `key=eq.${TIMER_KEY}` }, (payload) => {
+        const v = (payload.new as { value?: TimerNow } | null)?.value;
+        if (v) setT({ ...IDLE, ...v });
+      })
+      .subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, []);
+
+  async function call(body: Record<string, unknown>) {
+    setBusy(true);
+    try {
+      const res = await fetch('/api/studio/timer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const j = await res.json();
+      if (j.timer) setT({ ...IDLE, ...j.timer });
+      if (!res.ok) { onError(res.status === 401 ? 'Signed out. Reload and sign in again.' : j.detail || j.error || 'Timer error.'); return null; }
+      return j;
+    } catch (err) {
+      onError((err as Error).message);
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const labelFor = (key: string, text: string) => key === '__other' ? text.trim() || 'Untitled' : plate.find((i) => i.key === key)?.title ?? 'Untitled';
+  const running = t.active;
+  const paused = !!t.pausedAt;
+
+  return (
+    <section className={styles.timer} aria-label="Timer">
+      <div className={styles.timerTop}>
+        <p className={styles.timerClock} aria-live="off">
+          {running && !paused && <span className={styles.timerDot} aria-hidden="true" />}
+          {hms(elapsedMs(t))}
+        </p>
+        <p className={styles.timerWeek}>{hoursLabel(weekMinutes)} timed this week</p>
+      </div>
+
+      {running ? (
+        <>
+          <p className={styles.timerLabel}>{paused ? 'Paused · ' : ''}{t.label}</p>
+          <div className={styles.rowActions}>
+            {paused
+              ? <Btn primary disabled={busy} onClick={() => void call({ action: 'resume' })}>Resume</Btn>
+              : <Btn disabled={busy} onClick={() => void call({ action: 'pause' })}>Pause</Btn>}
+            <Btn
+              primary
+              disabled={busy}
+              onClick={async () => {
+                const j = await call({ action: 'stop' });
+                if (j?.session) onLogged(j.session.minutes, j.session.key, `Timed ${hoursLabel(j.session.minutes)} on ${j.session.label}`);
+              }}
+            >
+              Stop and log
+            </Btn>
+          </div>
+          <details className={styles.parts}>
+            <summary className={styles.partsHead}>Discard</summary>
+            <div className={styles.moreBody}>
+              <HoldButton disabled={busy} onDone={() => void call({ action: 'discard' })}>Hold to throw this session away</HoldButton>
+            </div>
+          </details>
+        </>
+      ) : (
+        <form
+          className={styles.timerStart}
+          onSubmit={(e) => { e.preventDefault(); void call({ action: 'start', key: pick === '__other' ? null : pick, label: labelFor(pick, other) }); }}
+        >
+          <label className={styles.setupField}>
+            <span>What are you timing?</span>
+            <select value={pick} onChange={(e) => setPick(e.target.value)}>
+              {plate.map((i) => <option key={i.key} value={i.key}>{i.title}</option>)}
+              <option value="__other">Something else</option>
+            </select>
+          </label>
+          {pick === '__other' && (
+            <label className={styles.setupField}>
+              <span>Call it</span>
+              <input value={other} placeholder="Hackathon, reading, admin" onChange={(e) => setOther(e.target.value)} />
+            </label>
+          )}
+          <Btn primary disabled={busy} onClick={() => undefined} submit>Start</Btn>
+        </form>
+      )}
+
+      <details className={styles.parts}>
+        <summary className={styles.partsHead}>Add time by hand</summary>
+        <form
+          className={styles.partsAdd}
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const j = await call({
+              action: 'log', key: manual.key === '__other' ? null : manual.key, label: labelFor(manual.key, manual.label),
+              minutes: Number(manual.minutes), date: manual.date || undefined,
+            });
+            if (j?.session) {
+              onLogged(j.session.minutes, j.session.key, `Logged ${hoursLabel(j.session.minutes)} on ${j.session.label}`);
+              setManual((m) => ({ ...m, minutes: '', label: '' }));
+            }
+          }}
+        >
+          <div className={styles.partsGrid}>
+            <label className={styles.setupField}>
+              <span>On</span>
+              <select value={manual.key} onChange={(e) => setManual({ ...manual, key: e.target.value })}>
+                {plate.map((i) => <option key={i.key} value={i.key}>{i.title}</option>)}
+                <option value="__other">Something else</option>
+              </select>
+            </label>
+            {manual.key === '__other' && (
+              <label className={styles.setupField}><span>Call it</span><input value={manual.label} onChange={(e) => setManual({ ...manual, label: e.target.value })} /></label>
+            )}
+            <label className={styles.setupField}><span>Minutes</span><input required type="number" min={1} max={960} inputMode="numeric" value={manual.minutes} onChange={(e) => setManual({ ...manual, minutes: e.target.value })} /></label>
+            <label className={styles.setupField}><span>Day (blank for today)</span><input type="date" value={manual.date} onChange={(e) => setManual({ ...manual, date: e.target.value })} /></label>
+          </div>
+          <Btn primary disabled={busy} onClick={() => undefined} submit>Log it</Btn>
+        </form>
+      </details>
+    </section>
+  );
+}
+
+/* Put something new on this week's plate: a quest or a curiosity. */
+function AddToWeek({ busy, onAdd }: {
+  busy: string | null;
+  onAdd: (form: { title: string; lane: string; hours: number; count: number; weeklyHours: number }) => Promise<boolean>;
+}) {
+  const [f, setF] = useState({ title: '', lane: 'quest', hours: '', count: '1', weeklyHours: '' });
+  return (
+    <details className={styles.fold}>
+      <summary className={styles.foldHead}>Add to this week</summary>
+      <form
+        className={styles.partsAdd}
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const ok = await onAdd({ title: f.title, lane: f.lane, hours: Number(f.hours), count: Number(f.count) || 1, weeklyHours: Number(f.weeklyHours) });
+          if (ok) setF({ title: '', lane: f.lane, hours: '', count: '1', weeklyHours: '' });
+        }}
+      >
+        <p className={styles.setupHead}>A new task on the plate for this week. Its points are worked out from your gut hours (doubled) and frozen.</p>
+        <div className={styles.partsGrid}>
+          <label className={styles.setupField}><span>What is it?</span><input required value={f.title} placeholder="AI Collusion Research Sprint" onChange={(e) => setF({ ...f, title: e.target.value })} /></label>
+          <label className={styles.setupField}>
+            <span>Lane</span>
+            <select value={f.lane} onChange={(e) => setF({ ...f, lane: e.target.value })}>
+              <option value="quest">Quest</option>
+              <option value="curiosity">Curiosity</option>
+            </select>
+          </label>
+          <label className={styles.setupField}><span>Your gut hours, all in</span><input required type="number" min={0} step="any" inputMode="decimal" value={f.hours} onChange={(e) => setF({ ...f, hours: e.target.value })} /></label>
+          <label className={styles.setupField}><span>Milestones</span><input required type="number" min={1} inputMode="numeric" value={f.count} onChange={(e) => setF({ ...f, count: e.target.value })} /></label>
+          <label className={styles.setupField}><span>Hours a week</span><input required type="number" min={0} step="any" inputMode="decimal" value={f.weeklyHours} onChange={(e) => setF({ ...f, weeklyHours: e.target.value })} /></label>
+        </div>
+        <Btn primary busy={busy === 'plan'} disabled={!!busy} onClick={() => undefined} submit>Add to the plate</Btn>
+      </form>
+    </details>
   );
 }
 

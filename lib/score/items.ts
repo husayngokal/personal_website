@@ -22,6 +22,7 @@ import {
   type Lane, type TemplateId,
 } from './rules';
 import { parseDone, readBlock, type PartGroup, type RepeatGroup, type ScoreBlock } from './block';
+import { parseSessions, type Session } from './time';
 
 export type Surface =
   | 'tasks' | 'library' | 'courses' | 'exams' | 'projects'
@@ -46,6 +47,7 @@ export interface ScoreItem {
   href: string | null;
   lane: Lane;
   active: boolean;          // on the plate right now
+  parked: boolean;          // taken off the plate by its score block
   private: boolean;
   hasBlock: boolean;
   needsSetup: TemplateId | null;
@@ -62,6 +64,7 @@ export interface Tally { done: number; total: number }
 export interface Extracted {
   items: ScoreItem[];
   tallies: { tasks: Tally; atlas: Tally; list: Tally };
+  sessions: Session[];
 }
 
 export interface VaultSource { path: string; content: string }
@@ -165,6 +168,7 @@ function fromFile(src: VaultSource): ScoreItem | null {
     href: isPrivate ? null : hrefFor(surface, parsed.slug),
     lane: block?.lane ?? DEFAULT_LANE[surface] ?? 'curiosity',
     active: false,
+    parked: block?.parked === true,
     private: isPrivate,
     hasBlock: !!block,
     needsSetup: null,
@@ -246,6 +250,8 @@ function fromFile(src: VaultSource): ScoreItem | null {
     }
   }
 
+  if (base.parked) { base.active = false; base.needsSetup = null; }
+
   const events: ScoreEvent[] = [];
   for (const g of base.parts) events.push(...partEvents(base, g));
   for (const g of base.repeat) events.push(...repeatEvents(base, g));
@@ -286,7 +292,7 @@ function atlasItem(src: VaultSource, tallies: Extracted['tallies']): ScoreItem |
   return {
     key: src.path, table: 'living_entries', surface: 'atlas', slug: 'field-atlas',
     title: 'The Field Atlas', href: '/field-atlas', lane: DEFAULT_LANE.atlas,
-    active: false, private: false, hasBlock: false, needsSetup: null,
+    active: false, parked: false, private: false, hasBlock: false, needsSetup: null,
     parts: [], repeat: [], outcome: null, weeklyHours: null, deadline: null, events,
   };
 }
@@ -328,8 +334,13 @@ export function extractAll(files: VaultSource[]): Extracted {
     tasks: { done: 0, total: 0 }, atlas: { done: 0, total: 0 }, list: { done: 0, total: 0 },
   };
   const items: ScoreItem[] = [];
+  const sessions: Session[] = [];
   for (const f of files) {
     if (!f.path.endsWith('.md')) continue;
+    if (f.path.startsWith('time/')) {
+      sessions.push(...parseSessions(f.content));
+      continue;
+    }
     if (f.path === 'living/field-atlas.md') {
       const a = atlasItem(f, tallies);
       if (a) items.push(a);
@@ -360,5 +371,5 @@ export function extractAll(files: VaultSource[]): Extracted {
       tallies.tasks.total++;
     } catch { /* reported by the sync */ }
   }
-  return { items, tallies };
+  return { items, tallies, sessions };
 }

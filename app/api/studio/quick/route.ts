@@ -25,9 +25,7 @@ import { getFile, putFile } from '@/lib/studio/github';
 import { applyQuick, QuickError, specFor, type QuickRequest, type QuickResult } from '@/lib/studio/quick';
 import { fetchVaultMarkdown } from '@/lib/vault/tarball';
 import { readScore, recomputeScore } from '@/lib/score/store';
-import { itemFromFile } from '@/lib/score/items';
-import { WEEKLY_HOURS } from '@/lib/score/rules';
-import type { ScoreState } from '@/lib/score/compute';
+import { overCapacity } from '@/lib/score/capacity';
 import { getServerAdminClient, isSupabaseConfigured } from '@/lib/supabase';
 import { getVaultPath, markActiveToday } from '@/lib/content/vault-state';
 import { deriveAndWriteLiveState } from '@/lib/content/derive';
@@ -144,28 +142,4 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     ok: true, path, row: result.row, summary: result.summary, undo: result.undo, line: result.line,
   });
-}
-
-/** Would this edit push the active load past the week? Compares the
- *  item's hours a week before and after the edit against the stored load.
- *  Only an increase can be refused, so taking things off always works. */
-function overCapacity(score: ScoreState | null, path: string, raw: string) {
-  if (!score) return null;
-  const item = itemFromFile({ path, content: raw });
-  if (!item || !item.active) return null;
-  const prev = score.items.find((i) => i.key === path);
-  const was = prev?.active ? prev.weeklyHours ?? 0 : 0;
-  const will = item.weeklyHours ?? 0;
-  if (will <= was) return null;
-  const load = Math.round((score.load.hours - was + will) * 10) / 10;
-  if (load <= WEEKLY_HOURS) return null;
-  return {
-    detail: `That would put ${load} hours a week on the plate, over the ${WEEKLY_HOURS}. Take something off first.`,
-    load,
-    capacity: WEEKLY_HOURS,
-    adding: Math.round((will - was) * 10) / 10,
-    plate: score.items
-      .filter((i) => i.active && (i.weeklyHours ?? 0) > 0 && i.key !== path)
-      .map((i) => ({ table: i.table, slug: i.slug, title: i.title, hours: i.weeklyHours, parkable: i.table !== 'study_credentials' })),
-  };
 }

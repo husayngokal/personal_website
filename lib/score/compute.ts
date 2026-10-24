@@ -15,6 +15,7 @@ import {
 } from './rules';
 import { partsDone } from './block';
 import { plural, type Extracted, type ScoreEvent, type ScoreItem, type Surface, type Tally } from './items';
+import type { Session } from './time';
 
 export interface WeekTotals {
   start: string;
@@ -47,6 +48,8 @@ export interface ItemView {
   href: string | null;
   lane: Lane;
   active: boolean;
+  parked: boolean;              // off the plate by its score block (an exam)
+  weekMinutes: number;          // time logged against it this week
   hasBlock: boolean;            // carries its own frozen score block
   needsSetup: string | null;
   earned: number;               // points of finished parts (prior work included)
@@ -78,6 +81,8 @@ export interface ScoreState {
   tallies: { tasks: Tally; atlas: Tally; list: Tally };
   load: { hours: number; capacity: number };
   recent: ScoreEvent[];         // newest first
+  /** Timed hours (a log; never points). */
+  time: { weekMinutes: number; byKey: Record<string, number>; recent: Session[] };
 }
 
 const SURFACES: Surface[] = ['tasks', 'library', 'courses', 'exams', 'projects', 'atlas', 'list', 'notebook', 'writeups'];
@@ -103,7 +108,7 @@ function totalsFor(start: string, events: ScoreEvent[]): WeekTotals {
   };
 }
 
-function itemView(item: ScoreItem, weekPoints: number): ItemView {
+function itemView(item: ScoreItem, weekPoints: number, weekMinutes = 0): ItemView {
   let earned = 0, total = 0;
   const seen = new Set<string>();
   const parts: ItemGroupView[] = item.parts.map((g, index) => {
@@ -132,6 +137,7 @@ function itemView(item: ScoreItem, weekPoints: number): ItemView {
   return {
     key: item.key, table: item.table, slug: item.slug, surface: item.surface,
     title: item.title, href: item.href, lane: item.lane, active: item.active,
+    parked: item.parked, weekMinutes,
     hasBlock: item.hasBlock, needsSetup: item.needsSetup,
     earned, total, pct: total ? Math.round((earned / total) * 100) : 0, summary,
     weekPoints, weeklyHours: item.weeklyHours, deadline: item.deadline, outcome: item.outcome,
@@ -141,7 +147,7 @@ function itemView(item: ScoreItem, weekPoints: number): ItemView {
 }
 
 export function computeScore(extracted: Extracted, today: string = authorDay()): ScoreState {
-  const { items, tallies } = extracted;
+  const { items, tallies, sessions } = extracted;
   const thisWeek = weekStart(today);
 
   /* Everything that counts: on or after the epoch, not in the future. */
@@ -185,9 +191,18 @@ export function computeScore(extracted: Extracted, today: string = authorDay()):
     surfaces[e.surface].weekPoints += e.points;
   }
 
+  /* Time this week, per item and in all. */
+  const weekSessions = sessions.filter((x) => weekStart(x.date) === thisWeek && x.date <= today);
+  const byKey: Record<string, number> = {};
+  for (const x of weekSessions) if (x.key) byKey[x.key] = (byKey[x.key] ?? 0) + x.minutes;
+  const weekMinutes = weekSessions.reduce((n, x) => n + x.minutes, 0);
+  const recentSessions = [...sessions]
+    .sort((a, b) => `${b.date} ${b.to}`.localeCompare(`${a.date} ${a.to}`))
+    .slice(0, 12);
+
   const views = items
-    .filter((i) => i.active || weekByItem.has(i.key))
-    .map((i) => itemView(i, weekByItem.get(i.key) ?? 0))
+    .filter((i) => i.active || i.parked || weekByItem.has(i.key))
+    .map((i) => itemView(i, weekByItem.get(i.key) ?? 0, byKey[i.key] ?? 0))
     .sort((a, b) =>
       Number(b.active) - Number(a.active) ||
       (a.lane === b.lane ? 0 : a.lane === 'quest' ? -1 : 1) ||
@@ -219,5 +234,6 @@ export function computeScore(extracted: Extracted, today: string = authorDay()):
     tallies,
     load: { hours: load, capacity: WEEKLY_HOURS },
     recent: events.slice(0, 15),
+    time: { weekMinutes, byKey, recent: recentSessions },
   };
 }

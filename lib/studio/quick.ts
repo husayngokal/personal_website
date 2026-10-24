@@ -26,7 +26,7 @@ import { itemLabel, listDoneItems, setItemDone } from '../vault/done-items';
 import { parseFile } from '../vault/parse';
 import { TEMPLATES, estimate, type TemplateId } from '../score/rules';
 import {
-  addGroup, buildFromTemplate, editGroup, logParts, logRepeat, partsDone, readBlock, removeGroup, setScoreBlock,
+  addGroup, buildFromTemplate, cloneBlock, editGroup, logParts, logRepeat, partsDone, readBlock, removeGroup, setScoreBlock,
   type ScoreBlock, type TemplateInputs,
 } from '../score/block';
 import { atlasPoints, effectiveBlock, itemFromFile, plural } from '../score/items';
@@ -37,7 +37,7 @@ export type QuickTarget = FrontmatterTarget | 'atlas' | 'score';
 /* Tables whose items carry a score block, and where their files live. */
 export const SCORE_TABLES: Record<string, { folder: string | null; keys: string[]; columns: string[] }> = {
   library_books:     { folder: 'library',           keys: ['status', 'progress-pct', 'finished'], columns: ['status', 'progress_pct', 'finished'] },
-  tasks:             { folder: null,                keys: ['status', 'scope', 'completed'],        columns: ['status', 'scope', 'completed'] },
+  tasks:             { folder: 'tasks',             keys: ['status', 'scope', 'completed'],        columns: ['status', 'scope', 'completed'] },
   courses:           { folder: 'courses',           keys: ['status', 'finished'],                  columns: ['status', 'finished'] },
   study_credentials: { folder: 'study/credentials', keys: [],                                      columns: [] },
   projects:          { folder: 'projects',          keys: ['status'],                              columns: ['status'] },
@@ -67,6 +67,7 @@ export type QuickRequest =
   | { target: 'score'; table: string; slug: string; action: 'edit-group'; group: number; name?: string; count?: number; prior?: number }
   | { target: 'score'; table: string; slug: string; action: 'remove-group'; group: number }
   | { target: 'score'; table: string; slug: string; action: 'park' }
+  | { target: 'score'; table: string; slug: string; action: 'unpark' }
   | { target: 'score'; table: string; slug: string; action: 'restore-block'; block: ScoreBlock | null; fields?: Record<string, ScalarChange> };
 
 interface TargetSpec {
@@ -81,7 +82,7 @@ interface TargetSpec {
 
 export const QUICK_TARGETS: Record<QuickTarget, TargetSpec> = {
   book:    { table: 'library_books',  folder: 'library',  keys: ['status', 'progress-pct', 'finished'], columns: ['status', 'progress_pct', 'finished'] },
-  task:    { table: 'tasks',          folder: null,       keys: ['status', 'scope', 'completed'],      columns: ['status', 'scope', 'completed'] },
+  task:    { table: 'tasks',          folder: 'tasks',       keys: ['status', 'scope', 'completed'],      columns: ['status', 'scope', 'completed'] },
   project: { table: 'projects',       folder: 'projects', keys: ['status'],                            columns: ['status'] },
   atlas:   { table: 'living_entries', folder: 'living',   keys: [],                                    columns: ['body'] },
   /* table/folder/keys/columns for score requests come from SCORE_TABLES,
@@ -270,9 +271,21 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string)
     return { raw: next, changed: true, row: {}, summary: `${title}: set up, ${total} points in all`, undo: undo() };
   }
 
-  if (req.action === 'park') {
+  if (req.action === 'park' || req.action === 'unpark') {
+    /* An exam's date and pending state are someone else's facts, so it
+       comes off the plate by a flag in its score block, not a status. */
+    if (req.table === 'study_credentials') {
+      const base: ScoreBlock = own ?? { parts: [], repeat: [] };
+      const next = setScoreBlock(raw, { ...cloneBlock(base), parked: req.action === 'park' ? true : undefined });
+      return {
+        raw: next, changed: next !== raw, row: {},
+        summary: `${title}: ${req.action === 'park' ? 'off the plate' : 'back on the plate'}`,
+        undo: { target: 'score', table: req.table, slug: req.slug, action: 'restore-block', block: own },
+      };
+    }
+    if (req.action === 'unpark') throw new QuickError('bad-request', 'bring this back by marking it current');
     const park = PARK[req.table];
-    if (!park) throw new QuickError('bad-request', 'an exam comes off the plate by being sat, not parked');
+    if (!park) throw new QuickError('bad-request', 'this cannot be taken off the plate here');
     const prev: Record<string, ScalarChange> = {};
     for (const k of Object.keys(park)) prev[k] = scalar(fm[k]);
     const next = patchFrontmatter(raw, park);

@@ -52,6 +52,9 @@ export interface ScoreBlock {
   tier?: Tier;
   weeklyHours?: number;
   outcome?: number;
+  /** Taken off the plate without changing the item's own status (how an
+   *  exam comes off: its date and pending state stay true). */
+  parked?: boolean;
   parts: PartGroup[];
   repeat: RepeatGroup[];
 }
@@ -131,6 +134,7 @@ export function readBlock(fm: Record<string, unknown>): ScoreBlock | null {
     tier,
     weeklyHours: num(r['weekly-hours']),
     outcome: num(r.outcome),
+    parked: r.parked === true ? true : undefined,
     parts,
     repeat,
   };
@@ -148,6 +152,7 @@ export function serializeBlock(b: ScoreBlock): string[] {
   if (b.tier) out.push(`  tier: ${q(b.tier)}`);
   if (b.weeklyHours !== undefined) out.push(`  weekly-hours: ${b.weeklyHours}`);
   if (b.outcome !== undefined) out.push(`  outcome: ${b.outcome}`);
+  if (b.parked) out.push('  parked: true');
   if (b.parts.length) {
     out.push('  parts:');
     for (const g of b.parts) {

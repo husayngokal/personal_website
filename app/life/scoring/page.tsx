@@ -128,6 +128,13 @@ export default function ScoringPage() {
         this-quarter one). Backlog counts for nothing until it is swapped in.
       </p>
 
+      <h2 className={styles.h2}>Time</h2>
+      <p>
+        Hours can be timed, but they never earn points. Points come from finished work; time is a
+        record of where the hours went, set against the hours each thing was planned to take. The
+        two are kept apart on purpose: sitting at the desk is not the same as getting something done.
+      </p>
+
       <h2 className={styles.h2}>Finishing</h2>
       <p>
         An item reaches 100% when its last part is done. A task then closes as done and a course as
