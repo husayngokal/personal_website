@@ -1,13 +1,20 @@
 /*
- * Timed sessions: the hours, kept beside the points but never turned into
- * them. Points come only from finished work; time is a log, for seeing
- * where the hours go and how they compare with what was planned.
+ * Timed sessions: the hours. Mostly a record, for seeing where the hours
+ * go against what was planned. Time spent on work that already has its own
+ * button (a chapter, flashcard reviews) never scores, because the button
+ * does. Time on work with no button of its own (supplementary reading, a
+ * one-off) scores at half rate, confirmed at stop (rules.ts).
  *
  * Sessions live in the vault, one file per month, one line per session:
  *
  *   time/2026-10.md
  *   - 2026-10-24 · 09:12 to 10:42 · 90 min · study/credentials/sqe-1.md · SQE 1
  *   - 2026-10-24 · 14:00 to 14:45 · 45 min · - · Reading on AI governance
+ *   - 2026-10-26 · 16:00 to 17:40 · 100 min · study/credentials/ics-shipping-law.md · Textbook · scores 3 (quest)
+ *
+ * A session that scores carries its points frozen at the end of the line
+ * (work with no button of its own, at half rate; see rules.ts). The rest
+ * are a record only.
  *
  * Day and times are Dubai time. The fourth field is the vault path of the
  * item the time went to, or "-" for anything else; the last is a label.
@@ -23,9 +30,11 @@ export interface Session {
   minutes: number;
   key: string | null;   // vault path of the item, or null
   label: string;
+  /** Present when the session scores: points frozen at stop, and lane. */
+  scores?: { points: number; lane: 'quest' | 'curiosity' };
 }
 
-const LINE = /^- (\d{4}-\d{2}-\d{2}) · (\d{2}:\d{2}) to (\d{2}:\d{2}) · (\d+) min · (\S+) · (.*)$/;
+const LINE = /^- (\d{4}-\d{2}-\d{2}) · (\d{2}:\d{2}) to (\d{2}:\d{2}) · (\d+) min · (\S+) · (.*?)(?: · scores (\d+) \((quest|curiosity)\))?$/;
 
 export function parseSessions(body: string): Session[] {
   const out: Session[] = [];
@@ -35,6 +44,7 @@ export function parseSessions(body: string): Session[] {
     out.push({
       date: m[1], from: m[2], to: m[3], minutes: Number(m[4]),
       key: m[5] === '-' ? null : m[5], label: m[6].trim(),
+      ...(m[7] ? { scores: { points: Number(m[7]), lane: m[8] as 'quest' | 'curiosity' } } : {}),
     });
   }
   return out;
@@ -43,7 +53,8 @@ export function parseSessions(body: string): Session[] {
 const clean = (s: string) => s.replace(/[\r\n·]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140);
 
 export function formatSession(s: Session): string {
-  return `- ${s.date} · ${s.from} to ${s.to} · ${Math.max(1, Math.round(s.minutes))} min · ${s.key ?? '-'} · ${clean(s.label) || 'Untitled'}`;
+  const tail = s.scores ? ` · scores ${Math.max(0, Math.round(s.scores.points))} (${s.scores.lane})` : '';
+  return `- ${s.date} · ${s.from} to ${s.to} · ${Math.max(1, Math.round(s.minutes))} min · ${s.key ?? '-'} · ${clean(s.label) || 'Untitled'}${tail}`;
 }
 
 export function sessionFile(date: string): string {
@@ -54,7 +65,7 @@ export function sessionFile(date: string): string {
 export function appendSession(existing: string | null, s: Session): string {
   const line = formatSession(s);
   if (!existing || !existing.trim()) {
-    return `# Time, ${s.date.slice(0, 7)}\n\nTimed sessions, Dubai time. Hours are a log; they never score.\n\n${line}\n`;
+    return `# Time, ${s.date.slice(0, 7)}\n\nTimed sessions, Dubai time. A session scores only when the line ends with its points.\n\n${line}\n`;
   }
   return existing.replace(/\s*$/, '\n') + line + '\n';
 }
@@ -83,9 +94,12 @@ export interface TimerNow {
   pausedMs: number;           // total paused so far
   key: string | null;
   label: string;
+  /** Does this session score (work with no button of its own), and in
+   *  which lane. Null: a record only. */
+  scores: 'quest' | 'curiosity' | null;
 }
 
-export const IDLE: TimerNow = { active: false, startedAt: null, pausedAt: null, pausedMs: 0, key: null, label: '' };
+export const IDLE: TimerNow = { active: false, startedAt: null, pausedAt: null, pausedMs: 0, key: null, label: '', scores: null };
 
 export function elapsedMs(t: TimerNow, now = Date.now()): number {
   if (!t.active || !t.startedAt) return 0;

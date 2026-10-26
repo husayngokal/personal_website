@@ -13,7 +13,7 @@ import { authorDay, weekStart } from '../content/streak';
 import {
   CURIOSITY_CAP, LEVEL_SIZE, SCORE_EPOCH, WEEKLY_BAR, WEEKLY_HOURS, type Lane,
 } from './rules';
-import { partsDone } from './block';
+import { partsDone, repeatCount } from './block';
 import { plural, type Extracted, type ScoreEvent, type ScoreItem, type Surface, type Tally } from './items';
 import type { Session } from './time';
 
@@ -61,7 +61,7 @@ export interface ItemView {
   deadline: string | null;
   outcome: { points: number; achieved: string | null } | null;
   parts: ItemGroupView[];
-  repeat: { index: number; unit: string; points: number; count: number }[];
+  repeat: { index: number; unit: string; points: number; per: number | null; kind: string | null; count: number }[];
 }
 
 export interface ScoreState {
@@ -85,7 +85,7 @@ export interface ScoreState {
   time: { weekMinutes: number; byKey: Record<string, number>; recent: Session[] };
 }
 
-const SURFACES: Surface[] = ['tasks', 'library', 'courses', 'exams', 'projects', 'atlas', 'list', 'notebook', 'writeups'];
+const SURFACES: Surface[] = ['tasks', 'library', 'courses', 'exams', 'projects', 'atlas', 'list', 'notebook', 'writeups', 'timer'];
 
 function addDays(isoDay: string, n: number): string {
   const d = new Date(`${isoDay}T00:00:00Z`);
@@ -132,7 +132,7 @@ function itemView(item: ScoreItem, weekPoints: number, weekMinutes = 0): ItemVie
   const rep = item.repeat[0];
   const summary = unit
     ? `${doneSum} of ${countSum} ${countSum === 1 ? unit : plural(unit)}${now?.name ? ` · now ${now.name}` : ''}`
-    : rep ? `${rep.done.length} ${rep.done.length === 1 ? rep.unit : plural(rep.unit)} logged`
+    : rep ? `${repeatCount(rep)} ${repeatCount(rep) === 1 ? rep.unit : plural(rep.unit)} logged`
     : item.needsSetup ? 'not set up for scoring yet' : '';
   return {
     key: item.key, table: item.table, slug: item.slug, surface: item.surface,
@@ -142,7 +142,9 @@ function itemView(item: ScoreItem, weekPoints: number, weekMinutes = 0): ItemVie
     earned, total, pct: total ? Math.round((earned / total) * 100) : 0, summary,
     weekPoints, weeklyHours: item.weeklyHours, deadline: item.deadline, outcome: item.outcome,
     parts,
-    repeat: item.repeat.map((g, index) => ({ index, unit: g.unit, points: g.points, count: g.done.length })),
+    repeat: item.repeat.map((g, index) => ({
+      index, unit: g.unit, points: g.points, per: g.per ?? null, kind: g.kind ?? null, count: repeatCount(g),
+    })),
   };
 }
 
@@ -150,9 +152,22 @@ export function computeScore(extracted: Extracted, today: string = authorDay()):
   const { items, tallies, sessions } = extracted;
   const thisWeek = weekStart(today);
 
+  /* Timed sessions that score (frozen points in their log line) are
+     events too, on the item they were timed against or on their own. */
+  const byPath = new Map(items.map((i) => [i.key, i]));
+  const timedEvents: ScoreEvent[] = sessions
+    .filter((x) => x.scores && x.scores.points > 0)
+    .map((x) => {
+      const it = x.key ? byPath.get(x.key) : undefined;
+      return {
+        date: x.date, points: x.scores!.points, lane: x.scores!.lane, kind: 'repeat' as const,
+        key: it?.key ?? `time:${x.label}`, surface: it?.surface ?? 'timer',
+        label: `${it?.title ?? x.label} · timed ${x.minutes} min`,
+      };
+    });
+
   /* Everything that counts: on or after the epoch, not in the future. */
-  const events = items
-    .flatMap((i) => i.events)
+  const events = [...items.flatMap((i) => i.events), ...timedEvents]
     .filter((e) => e.date >= SCORE_EPOCH && e.date <= today)
     .sort((a, b) => b.date.localeCompare(a.date) || b.points - a.points);
 

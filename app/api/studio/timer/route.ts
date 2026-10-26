@@ -22,11 +22,15 @@ import { fetchVaultMarkdown } from '@/lib/vault/tarball';
 import {
   IDLE, TIMER_KEY, appendSession, dubaiParts, elapsedMs, sessionFile, type Session, type TimerNow,
 } from '@/lib/score/time';
+import { timedPoints } from '@/lib/score/rules';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
-type Body = { action?: string; key?: string | null; label?: string; minutes?: number; date?: string };
+type Body = {
+  action?: string; key?: string | null; label?: string; minutes?: number; date?: string;
+  scores?: 'quest' | 'curiosity' | null; focusedMinutes?: number;
+};
 
 export async function POST(req: NextRequest) {
   const session = await getStudioSession();
@@ -46,12 +50,13 @@ export async function POST(req: NextRequest) {
   };
   const key = typeof body.key === 'string' && /^[\w./-]{1,200}\.md$/.test(body.key) ? body.key : null;
   const label = String(body.label ?? '').trim().slice(0, 140);
+  const lane = body.scores === 'quest' || body.scores === 'curiosity' ? body.scores : null;
 
   try {
     switch (body.action) {
       case 'start': {
         if (t.active) return NextResponse.json({ error: 'running', detail: 'A timer is already running. Stop it first.', timer: t }, { status: 409 });
-        const next: TimerNow = { active: true, startedAt: now, pausedAt: null, pausedMs: 0, key, label: label || 'Untitled' };
+        const next: TimerNow = { active: true, startedAt: now, pausedAt: null, pausedMs: 0, key, label: label || 'Untitled', scores: lane };
         await save(next);
         return NextResponse.json({ ok: true, timer: next });
       }
@@ -79,6 +84,13 @@ export async function POST(req: NextRequest) {
           const minutes = Math.max(1, Math.round(elapsedMs(t, now) / 60000));
           const a = dubaiParts(t.startedAt), b = dubaiParts(now);
           s = { date: a.date, from: a.hm, to: b.hm, minutes, key: t.key, label: t.label };
+          /* A scoring session: the focused minutes you confirm (never more
+             than the timer ran) set the points, frozen into the line. */
+          if (t.scores) {
+            const f = Number(body.focusedMinutes);
+            const focused = Number.isFinite(f) ? Math.max(0, Math.min(minutes, Math.round(f))) : minutes;
+            s.scores = { points: timedPoints(focused), lane: t.scores };
+          }
         } else {
           const minutes = Math.round(Number(body.minutes));
           if (!Number.isFinite(minutes) || minutes < 1 || minutes > 16 * 60) {
@@ -89,6 +101,7 @@ export async function POST(req: NextRequest) {
           const endMs = date === today.date ? now : Date.parse(`${date}T20:00:00+04:00`);
           const startMs = Math.max(Date.parse(`${date}T00:00:00+04:00`), endMs - minutes * 60000);
           s = { date, from: dubaiParts(startMs).hm, to: dubaiParts(endMs).hm, minutes, key, label: label || 'Untitled' };
+          if (lane) s.scores = { points: timedPoints(minutes), lane };
         }
 
         /* Append to the month's file; two tries if it moved underneath us. */

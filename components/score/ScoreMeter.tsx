@@ -1,9 +1,9 @@
 'use client';
 
 /*
- * The meter: this week's number out of the bar, the bar itself (quests
- * then curiosity, both solid orange, split by a hairline), and three
- * figures: level, lifetime, full weeks in a row. Nothing else.
+ * The meter: this week's number out of the bar, the bar itself (one solid
+ * orange fill; the lanes are not shown), and three figures: level,
+ * lifetime, full weeks in a row. Nothing else.
  *
  * Presentational. The number rolls up when it rises and the bar flares as
  * it fills; both settle instantly under prefers-reduced-motion.
@@ -42,8 +42,7 @@ export function ScoreMeter({
     last.current = week.bar;
   }, [week.bar]);
 
-  const q = Math.min(100, (week.quest / barMax) * 100);
-  const c = Math.min(100 - q, (week.curiosityCounted / barMax) * 100);
+  const pct = Math.min(100, (week.bar / barMax) * 100);
 
   return (
     <div className={`${styles.meter} ${compact ? styles.compact : ''}`}>
@@ -67,15 +66,14 @@ export function ScoreMeter({
         aria-valuemax={barMax}
         aria-valuenow={Math.min(week.bar, barMax)}
       >
-        <span className={styles.fill} style={{ width: `${q}%` }} />
-        <span className={`${styles.fill} ${styles.fillCur}`} style={{ left: `${q}%`, width: `${c}%` }} />
+        <span className={styles.fill} style={{ width: `${pct}%` }} />
       </div>
 
-      <p className={styles.legend}>
-        <span>Quests {week.quest}</span>
-        <span>Curiosity {week.curiosityCounted} of {cap}</span>
-        {week.full && <span className={styles.full}>Full{week.extra > 0 ? ` · +${week.extra} extra` : ''}</span>}
-      </p>
+      {week.full && (
+        <p className={styles.legend}>
+          <span className={styles.full}>Full{week.extra > 0 ? ` · +${week.extra} extra` : ''}</span>
+        </p>
+      )}
       {children}
     </div>
   );

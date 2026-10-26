@@ -24,9 +24,9 @@ import matter from 'gray-matter';
 import { patchFrontmatter, type ScalarChange } from '../vault/frontmatter-patch';
 import { itemLabel, listDoneItems, setItemDone } from '../vault/done-items';
 import { parseFile } from '../vault/parse';
-import { TEMPLATES, estimate, type TemplateId } from '../score/rules';
+import { ACTIVITIES, TEMPLATES, activityRate, countGain, estimate, type ActivityKind, type TemplateId } from '../score/rules';
 import {
-  addGroup, buildFromTemplate, cloneBlock, editGroup, logParts, logRepeat, partsDone, readBlock, removeGroup, setScoreBlock,
+  addActivity, addGroup, buildFromTemplate, cloneBlock, editGroup, logParts, logRepeat, partsDone, readBlock, removeActivity, removeGroup, repeatCount, setScoreBlock,
   type ScoreBlock, type TemplateInputs,
 } from '../score/block';
 import { atlasPoints, effectiveBlock, itemFromFile, plural } from '../score/items';
@@ -60,7 +60,9 @@ export type QuickRequest =
   | { target: 'atlas'; slug: string; action: 'done' | 'undone'; line: string }
   | { target: FrontmatterTarget; slug: string; action: 'restore'; fields: Record<string, ScalarChange> }
   | { target: 'score'; table: string; slug: string; action: 'part'; group: number; qty?: number }
-  | { target: 'score'; table: string; slug: string; action: 'repeat'; group: number }
+  | { target: 'score'; table: string; slug: string; action: 'repeat'; group: number; qty?: number }
+  | { target: 'score'; table: string; slug: string; action: 'add-activity'; kind: string; paperHours?: number; unit?: string; minutesPerUnit?: number }
+  | { target: 'score'; table: string; slug: string; action: 'remove-activity'; group: number }
   | { target: 'score'; table: string; slug: string; action: 'page'; page: number }
   | { target: 'score'; table: string; slug: string; action: 'setup'; template: TemplateId; inputs: TemplateInputs }
   | { target: 'score'; table: string; slug: string; action: 'add-group'; unit: string; name?: string; count: number; hours: number; basis: 'gut' | 'measured' }
@@ -353,8 +355,25 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string)
     } else if (req.action === 'repeat') {
       const g = block.repeat[req.group];
       if (!g) throw new Error('no such repeatable');
-      nextBlock = logRepeat(block, req.group, today);
-      verb = `${g.unit} logged, +${g.points}`;
+      const qty = Math.max(1, Math.round(Number(req.qty ?? 1)));
+      nextBlock = logRepeat(block, req.group, today, qty);
+      const c = repeatCount(g);
+      const gained = g.per ? countGain(g.per, c, c + qty) : g.points * qty;
+      verb = `${qty > 1 ? `${qty} ${plural(g.unit)}` : g.unit} logged, +${gained}`;
+    } else if (req.action === 'add-activity') {
+      if (!(req.kind in ACTIVITIES)) throw new Error('unknown activity');
+      const kind = req.kind as ActivityKind;
+      const spec = ACTIVITIES[kind];
+      const rate = activityRate(kind, { paperHours: req.paperHours, minutesPerUnit: req.minutesPerUnit });
+      const unit = kind === 'other' ? String(req.unit ?? '').trim() : spec.unit;
+      nextBlock = addActivity(block, { unit, kind, ...rate });
+      const each = rate.per ? (rate.per >= 1 ? `1 point per ${Math.round(rate.per * 10) / 10} ${plural(unit)}` : `${Math.round((1 / rate.per) * 10) / 10} points each`) : `${rate.points} points each`;
+      verb = `added ${kind === 'other' ? unit : spec.label.toLowerCase()} (${each})`;
+    } else if (req.action === 'remove-activity') {
+      const g = block.repeat[req.group];
+      if (!g) throw new Error('no such activity');
+      nextBlock = removeActivity(block, req.group);
+      verb = `removed ${g.unit}`;
     } else if (req.action === 'page') {
       const gi = block.parts.findIndex((g) => g.unit === 'page');
       if (gi === -1) throw new Error('this book is not set up with pages');

@@ -18,7 +18,7 @@ import matter from 'gray-matter';
 import { parseFile } from '../vault/parse';
 import { listDoneItems } from '../vault/done-items';
 import {
-  DEFAULT_LANE, RECURRING_GUT_HOURS, SCOPE_WEEKS, SCORE_EPOCH, TASK_GUT_HOURS, atlasPoints, estimate,
+  DEFAULT_LANE, RECURRING_GUT_HOURS, SCOPE_WEEKS, SCORE_EPOCH, TASK_GUT_HOURS, atlasPoints, countGain, estimate,
   type Lane, type TemplateId,
 } from './rules';
 import { parseDone, readBlock, type PartGroup, type RepeatGroup, type ScoreBlock } from './block';
@@ -26,7 +26,7 @@ import { parseSessions, type Session } from './time';
 
 export type Surface =
   | 'tasks' | 'library' | 'courses' | 'exams' | 'projects'
-  | 'atlas' | 'list' | 'notebook' | 'writeups';
+  | 'atlas' | 'list' | 'notebook' | 'writeups' | 'timer';
 
 export interface ScoreEvent {
   date: string;
@@ -99,6 +99,7 @@ function hrefFor(surface: Surface, slug: string): string {
     case 'writeups': return `/writeups/${slug}`;
     case 'atlas': return '/field-atlas';
     case 'list': return '/bucket-list';
+    case 'timer': return '/life/scoring';
   }
 }
 
@@ -126,13 +127,23 @@ function partEvents(item: Omit<ScoreItem, 'events'>, g: PartGroup): ScoreEvent[]
 }
 
 function repeatEvents(item: Omit<ScoreItem, 'events'>, g: RepeatGroup): ScoreEvent[] {
-  return g.done
+  const entries = g.done
     .map(parseDone)
     .filter((e): e is NonNullable<typeof e> => !!e)
-    .map((e) => ({
-      date: e.date, points: g.points * e.qty, lane: item.lane, kind: 'repeat' as const,
-      key: item.key, surface: item.surface, label: `${item.title} · ${g.unit}`,
-    }));
+    .sort((a, b) => a.date.localeCompare(b.date));
+  /* Counted activities (40 cards a point) round over the running total,
+     so many small logs add up to exactly what one big one would. */
+  let n = 0;
+  return entries.map((e) => {
+    const before = n;
+    n += e.qty;
+    const points = g.per ? countGain(g.per, before, n) : g.points * e.qty;
+    const what = e.qty > 1 ? `${e.qty} ${plural(g.unit)}` : g.unit;
+    return {
+      date: e.date, points, lane: item.lane, kind: 'repeat' as const,
+      key: item.key, surface: item.surface, label: `${item.title} · ${what}`,
+    };
+  });
 }
 
 export function plural(unit: string): string {

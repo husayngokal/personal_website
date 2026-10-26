@@ -4,6 +4,7 @@ import {
   ATLAS, CURIOSITY_CAP, FORMULA_FACTOR, GUT_FACTOR, LEVEL_SIZE, MINUTES_PER_POINT,
   READING_TIERS, RECURRING_GUT_HOURS, SCORE_EPOCH, TASK_GUT_HOURS, WEEKLY_BAR, WEEKLY_HOURS,
   WORDS_PER_HOUR, estimate, pagesPerPoint, type Tier,
+  ACTIVITIES, RETRIEVAL_FACTOR, TIMED_FACTOR, TIMED_SESSION_CAP_MIN, activityRate, type ActivityKind,
 } from '@/lib/score/rules';
 import { shortDay } from '@/lib/score/format';
 import styles from './scoring.module.css';
@@ -128,11 +129,42 @@ export default function ScoringPage() {
         this-quarter one). Backlog counts for nothing until it is swapped in.
       </p>
 
+      <h2 className={styles.h2}>Activities</h2>
+      <p>
+        Understanding the material is half of passing. The other half is the work around it, and it
+        scores by count against a fixed rate: realistic minutes per unit, turned into points.
+        <strong> Retrieval practice earns {RETRIEVAL_FACTOR}&times;</strong>: recalling from memory is what
+        turns understanding into marks, and it is the work least likely to happen on its own. Making
+        flashcards never scores; they are made by AI.
+      </p>
+      <table className={styles.table}>
+        <thead>
+          <tr><th>Activity</th><th>Points</th><th>Basis</th></tr>
+        </thead>
+        <tbody>
+          {(Object.keys(ACTIVITIES) as ActivityKind[]).filter((k) => k !== 'other').map((k) => {
+            const a = ACTIVITIES[k];
+            const r = k === 'past-paper' ? activityRate(k, { paperHours: 3 }) : activityRate(k);
+            return (
+              <tr key={k}>
+                <td>{a.label}</td>
+                <td>{r.per ? (r.per >= 1 ? `1 per ${fmt(r.per)} ${a.unit}s` : `${fmt(1 / r.per)} per ${a.unit}`) : `${r.points} for a 3-hour paper`}</td>
+                <td>{a.basis}{a.retrieval ? `, ${RETRIEVAL_FACTOR}× as retrieval` : ''}.</td>
+              </tr>
+            );
+          })}
+          <tr><td>{ACTIVITIES.other.label}</td><td>worked out</td><td>{ACTIVITIES.other.basis}.</td></tr>
+        </tbody>
+      </table>
+
       <h2 className={styles.h2}>Time</h2>
       <p>
-        Hours can be timed, but they never earn points. Points come from finished work; time is a
-        record of where the hours went, set against the hours each thing was planned to take. The
-        two are kept apart on purpose: sitting at the desk is not the same as getting something done.
+        Time spent on something that already has its own button (a chapter, flashcard reviews) is a
+        record only; the button scores the work. Time on work with no button of its own, like
+        supplementary reading or a one-off, scores at <strong>half rate</strong>: {fmt(60 / MINUTES_PER_POINT * TIMED_FACTOR)} points
+        an hour. Hours are input, not output, and a timer cannot tell focus from drift. At the end of a
+        session the focused minutes are confirmed, never more than the timer ran, and one session counts
+        for at most {TIMED_SESSION_CAP_MIN / 60} hours. Its points are frozen into the log.
       </p>
 
       <h2 className={styles.h2}>Finishing</h2>

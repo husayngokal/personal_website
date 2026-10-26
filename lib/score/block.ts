@@ -42,7 +42,12 @@ export interface PartGroup {
 
 export interface RepeatGroup {
   unit: string;
+  /** Points per unit (a past paper). Ignored when `per` is set. */
   points: number;
+  /** Units per point, for counted activities (40 flashcard reviews). */
+  per?: number;
+  /** The activity kind from rules.ts, when it came from the menu. */
+  kind?: string;
   done: string[];
 }
 
@@ -127,8 +132,15 @@ export function readBlock(fm: Record<string, unknown>): ScoreBlock | null {
     if (!g || typeof g !== 'object') continue;
     const o = g as Record<string, unknown>;
     const points = num(o.points);
-    if (points === undefined || points < 0) continue;
-    repeat.push({ unit: str(o.unit) ?? 'session', points: Math.round(points), done: doneList(o.done) });
+    const per = num(o.per);
+    if ((points === undefined || points < 0) && !(per && per > 0)) continue;
+    repeat.push({
+      unit: str(o.unit) ?? 'session',
+      points: Math.round(points ?? 0),
+      ...(per && per > 0 ? { per } : {}),
+      ...(str(o.kind) ? { kind: str(o.kind) } : {}),
+      done: doneList(o.done),
+    });
   }
 
   return {
@@ -182,7 +194,9 @@ export function serializeBlock(b: ScoreBlock): string[] {
     out.push('  repeat:');
     for (const g of b.repeat) {
       out.push(`    - unit: ${q(g.unit)}`);
-      out.push(`      points: ${g.points}`);
+      if (g.kind) out.push(`      kind: ${q(g.kind)}`);
+      if (g.per) out.push(`      per: ${g.per}`);
+      else out.push(`      points: ${g.points}`);
       out.push(`      done: ${list(g.done)}`);
     }
   }
@@ -241,12 +255,40 @@ export function logParts(b: ScoreBlock, groupIndex: number, qty: number, day: st
   return next;
 }
 
-export function logRepeat(b: ScoreBlock, groupIndex: number, day: string): ScoreBlock {
+export function logRepeat(b: ScoreBlock, groupIndex: number, day: string, qty = 1): ScoreBlock {
   const next = cloneBlock(b);
   const g = next.repeat[groupIndex];
   if (!g) throw new Error('no such repeatable');
   if (!ISO_DAY.test(day)) throw new Error('bad day');
-  g.done.push(day);
+  const n = Math.round(Number(qty));
+  if (!Number.isFinite(n) || n < 1) throw new Error('how many must be at least 1');
+  g.done.push(n > 1 ? `${day} +${n}` : day);
+  return next;
+}
+
+/** Units logged on a repeat group so far. */
+export function repeatCount(g: RepeatGroup): number {
+  return g.done.reduce((n, e) => n + (parseDone(e)?.qty ?? 0), 0);
+}
+
+export function addActivity(b: ScoreBlock, g: { unit: string; kind: string; per?: number; points?: number }): ScoreBlock {
+  const next = cloneBlock(b);
+  if (!g.unit.trim()) throw new Error('an activity needs a unit');
+  if (next.repeat.some((x) => x.kind === g.kind && x.unit === g.unit)) throw new Error('that activity is already here');
+  next.repeat.push({
+    unit: g.unit.trim(), kind: g.kind,
+    points: Math.round(g.points ?? 0), ...(g.per ? { per: g.per } : {}),
+    done: [],
+  });
+  return next;
+}
+
+export function removeActivity(b: ScoreBlock, index: number): ScoreBlock {
+  const next = cloneBlock(b);
+  const g = next.repeat[index];
+  if (!g) throw new Error('no such activity');
+  if (g.done.length > 0) throw new Error(`${g.unit} already has logged work; it cannot be removed`);
+  next.repeat.splice(index, 1);
   return next;
 }
 

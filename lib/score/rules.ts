@@ -146,6 +146,83 @@ export function pagesPerPoint(tier: Tier): number {
   return MINUTES_PER_POINT / (READING_TIERS[tier].minutesPerPage * FORMULA_FACTOR);
 }
 
+/* -- Activities -------------------------------------------------------
+ * The work around the material: everything done to actually pass, beyond
+ * understanding the chapters. Each kind has a unit you log a count of and
+ * a realistic time per unit; points follow from that, never typed in.
+ *
+ * Retrieval practice (recalling from memory: flashcard reviews, practice
+ * questions, past papers) is what turns understanding into marks, and it
+ * is the hardest work to make yourself do. It earns RETRIEVAL_FACTOR on
+ * its time. First-pass learning (a statute, a case) does not.
+ *
+ * Making flashcards never scores: they are made by AI.
+ */
+
+export const RETRIEVAL_FACTOR = 1.5;
+
+export type ActivityKind = 'flashcard-review' | 'mcq' | 'written-question' | 'past-paper' | 'statute' | 'case' | 'other';
+
+export interface ActivitySpec {
+  label: string;
+  unit: string;
+  minutesPerUnit?: number;
+  retrieval: boolean;
+  /** What setting it up asks: a past paper's official length, or (for
+   *  anything else) a unit and your gut minutes per unit. */
+  asks?: 'paperHours' | 'custom';
+  basis: string;
+}
+
+export const ACTIVITIES: Record<ActivityKind, ActivitySpec> = {
+  'flashcard-review': { label: 'Flashcard reviews', unit: 'card', minutesPerUnit: 0.25, retrieval: true, basis: '15 seconds a card, including failed cards relearned' },
+  mcq: { label: 'Practice questions, multiple choice', unit: 'question', minutesPerUnit: 2.7, retrieval: true, basis: '1.7 minutes to answer (the SQE pace) and 1 to review' },
+  'written-question': { label: 'Practice questions, written', unit: 'question', minutesPerUnit: 45, retrieval: true, basis: '36 minutes to answer (five to a 3-hour paper) and 9 to review' },
+  'past-paper': { label: 'Past paper', unit: 'past paper', retrieval: true, asks: 'paperHours', basis: 'its official length, and half again to mark it' },
+  statute: { label: 'Learning statutes', unit: 'statute', minutesPerUnit: 10, retrieval: false, basis: '10 minutes to read, understand and note one' },
+  case: { label: 'Learning cases', unit: 'case', minutesPerUnit: 8, retrieval: false, basis: '8 minutes for the facts, the ratio and the principle' },
+  other: { label: 'Something else (your estimate, doubled)', unit: '', retrieval: false, asks: 'custom', basis: 'your gut minutes per unit, doubled like every gut estimate' },
+};
+
+/** A past paper is marked as well as sat. */
+export const PAPER_MARKING_FACTOR = 1.5;
+
+/** Frozen numbers for a new activity: either units per point (counts) or
+ *  points per unit (a past paper). */
+export function activityRate(kind: ActivityKind, opts: { paperHours?: number; minutesPerUnit?: number } = {}): { per?: number; points?: number } {
+  const a = ACTIVITIES[kind];
+  if (kind === 'past-paper') {
+    const h = Number(opts.paperHours);
+    if (!Number.isFinite(h) || h <= 0) throw new Error("a past paper needs its official length in hours");
+    return { points: hoursToPoints(h * PAPER_MARKING_FACTOR * RETRIEVAL_FACTOR) };
+  }
+  const m = kind === 'other' ? Number(opts.minutesPerUnit) * GUT_FACTOR : (a.minutesPerUnit ?? 0) * (a.retrieval ? RETRIEVAL_FACTOR : 1);
+  if (!Number.isFinite(m) || m <= 0) throw new Error('minutes per unit must be a positive number');
+  return { per: Math.round((MINUTES_PER_POINT / m) * 1000) / 1000 };
+}
+
+/** Points a run of counted units earns: cumulative rounding over the whole
+ *  log, so small logs add up exactly. */
+export function countGain(per: number, before: number, after: number): number {
+  return Math.round(after / per) - Math.round(before / per);
+}
+
+/* -- Timed work -------------------------------------------------------
+ * Time scores only for work with no button of its own (supplementary
+ * reading, a one-off), at half its real rate: hours are input, not output,
+ * and a timer cannot tell focus from drift. At stop you confirm the
+ * focused minutes (never more than the timer ran); one session counts for
+ * at most three hours. Points are frozen into the log line.
+ */
+
+export const TIMED_FACTOR = 0.5;
+export const TIMED_SESSION_CAP_MIN = 180;
+
+export function timedPoints(focusedMinutes: number): number {
+  const m = Math.max(0, Math.min(TIMED_SESSION_CAP_MIN, Math.round(focusedMinutes)));
+  return Math.round((m / MINUTES_PER_POINT) * TIMED_FACTOR);
+}
+
 /* -- Templates -------------------------------------------------------
  * What Studio asks when something new is set up for scoring. Each one
  * takes two or three rough answers and returns a frozen score block.

@@ -11,7 +11,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ScoreMeter } from '@/components/score/ScoreMeter';
 import { emitScoreFx, setSoundOn, soundOn, unlockAudio } from '@/lib/score/fx';
 import { getBrowserClient, isSupabaseConfigured } from '@/lib/supabase';
-import { TASK_GUT_HOURS, atlasPoints, estimate, partGain } from '@/lib/score/rules';
+import { ACTIVITIES, TASK_GUT_HOURS, atlasPoints, countGain, estimate, partGain, timedPoints, type ActivityKind } from '@/lib/score/rules';
 import type { QuickRequest } from '@/lib/studio/quick';
 import type { DoneGroup } from '@/lib/vault/done-items';
 import type { ItemView, ScoreState } from '@/lib/score/compute';
@@ -118,7 +118,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
   /* What a tap is worth, worked out here from the same frozen numbers
      the server uses, so the effects can fire the instant the button goes
      down instead of after the commit. Null when it cannot be known. */
-  function predict(req: QuickRequest): { gained: number; lane: 'quest' | 'curiosity'; itemKey?: string; group?: number; qty?: number } | null {
+  function predict(req: QuickRequest): { gained: number; lane: 'quest' | 'curiosity'; itemKey?: string; group?: number; qty?: number; repeatGroup?: number } | null {
     if (!score) return null;
     if (req.target === 'score') {
       const it = score.items.find((i) => i.table === req.table && i.slug === req.slug);
@@ -131,7 +131,10 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
       }
       if (req.action === 'repeat') {
         const g = it.repeat[req.group];
-        return g ? { gained: g.points, lane: it.lane, itemKey: it.key } : null;
+        if (!g) return null;
+        const qty = Math.max(1, Math.round(Number(req.qty ?? 1)));
+        const gained = g.per ? countGain(g.per, g.count, g.count + qty) : g.points * qty;
+        return { gained, lane: it.lane, itemKey: it.key, repeatGroup: g.index, qty };
       }
       if (req.action === 'page') {
         const g = it.parts.find((x) => x.unit === 'page');
@@ -168,6 +171,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
       ...i,
       weekPoints: i.weekPoints + sign * p.gained,
       parts: i.parts.map((g) => g.index !== p.group ? g : { ...g, done: Math.min(g.count, g.done + sign * (p.qty ?? 0)), logged: g.logged + sign }),
+      repeat: i.repeat.map((g) => g.index !== p.repeatGroup ? g : { ...g, count: g.count + sign * (p.qty ?? 1) }),
     });
     return {
       ...sl, week: w, items,
@@ -294,12 +298,26 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
         initial={initial.timer}
         plate={(score?.items ?? []).filter((i) => i.active)}
         weekMinutes={score?.time?.weekMinutes ?? 0}
-        onLogged={(minutes, key, text) => {
-          setScore((sc) => sc && {
-            ...sc,
-            time: sc.time ? { ...sc.time, weekMinutes: sc.time.weekMinutes + minutes } : sc.time,
-            items: sc.items.map((it) => it.key !== key ? it : { ...it, weekMinutes: (it.weekMinutes ?? 0) + minutes }),
-          });
+        onLogged={(minutes, key, text, scored) => {
+          const snap = score;
+          let next: ScoreSlice | null = snap && {
+            ...snap,
+            time: snap.time ? { ...snap.time, weekMinutes: snap.time.weekMinutes + minutes } : snap.time,
+            items: snap.items.map((it) => it.key !== key ? it : { ...it, weekMinutes: (it.weekMinutes ?? 0) + minutes }),
+          };
+          if (next && snap && scored && scored.points > 0) {
+            const gainedSlice: ScoreSlice = withGain(next, { gained: scored.points, lane: scored.lane });
+            next = gainedSlice;
+            const now = Date.now();
+            run.current = now - run.current.at < 90_000 ? { at: now, n: run.current.n + 1 } : { at: now, n: 1 };
+            hold.current = { points: gainedSlice.lifetime.points, until: now + 60_000 };
+            emitScoreFx({
+              before: snap.week, after: gainedSlice.week, barMax: 200,
+              levelBefore: snap.lifetime.level, levelAfter: gainedSlice.lifetime.level,
+              gained: scored.points, origin: press.current ?? undefined, combo: run.current.n, sound: true,
+            });
+          }
+          if (next) setScore(next);
           setNote({ kind: 'ok', text, undo: null });
         }}
         onError={(text) => setNote({ kind: 'error', text })}
@@ -416,7 +434,17 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
                     All {u.count} {u.count === 1 ? u.unit : pluralUnit(u.unit)} done
                   </span>
                 ))}
-                {i.repeat.map((g) => (
+                {i.repeat.map((g) => g.per ? (
+                  <CountLog
+                    key={`r${g.index}`}
+                    unit={g.unit}
+                    per={g.per}
+                    logged={g.count}
+                    busy={busy === `${i.key}:r${g.index}`}
+                    disabled={!!busy}
+                    onLog={(qty) => send({ target: 'score', table: i.table, slug: i.slug, action: 'repeat', group: g.index, qty }, `${i.key}:r${g.index}`)}
+                  />
+                ) : (
                   <Btn
                     key={`r${g.index}`}
                     busy={busy === `${i.key}:r${g.index}`}
@@ -613,7 +641,7 @@ function TimerCard({ initial, plate, weekMinutes, onLogged, onError }: {
   initial: TimerNow;
   plate: ItemView[];
   weekMinutes: number;
-  onLogged: (minutes: number, key: string | null, text: string) => void;
+  onLogged: (minutes: number, key: string | null, text: string, scored: { points: number; lane: 'quest' | 'curiosity' } | null) => void;
   onError: (text: string) => void;
 }) {
   const [t, setT] = useState<TimerNow>(initial);
@@ -621,7 +649,14 @@ function TimerCard({ initial, plate, weekMinutes, onLogged, onError }: {
   const [pick, setPick] = useState<string>(plate[0]?.key ?? '__other');
   const [other, setOther] = useState('');
   const [busy, setBusy] = useState(false);
-  const [manual, setManual] = useState({ key: plate[0]?.key ?? '__other', label: '', minutes: '', date: '' });
+  const [manual, setManual] = useState({ key: plate[0]?.key ?? '__other', label: '', minutes: '', date: '', scores: 'none' });
+  /* Does this session score? On a plate item: no by default (its buttons
+     score its work); "other work on it" scores at half rate in its lane.
+     Something else: curiosity by default, or quest. */
+  const [scores, setScores] = useState<'none' | 'quest' | 'curiosity'>('none');
+  const [confirm, setConfirm] = useState<string | null>(null);   // focused minutes being confirmed at stop
+  const laneOf = (key: string) => plate.find((i) => i.key === key)?.lane ?? 'curiosity';
+  useEffect(() => { setScores(pick === '__other' ? 'curiosity' : 'none'); }, [pick]);
 
   useEffect(() => {
     if (!t.active || t.pausedAt) return;
@@ -674,7 +709,7 @@ function TimerCard({ initial, plate, weekMinutes, onLogged, onError }: {
 
       {running ? (
         <>
-          <p className={styles.timerLabel}>{paused ? 'Paused · ' : ''}{t.label}</p>
+          <p className={styles.timerLabel}>{paused ? 'Paused · ' : ''}{t.label}{t.scores ? ` · scores as ${t.scores}, half rate` : ''}</p>
           <div className={styles.rowActions}>
             {paused
               ? <Btn primary disabled={busy} onClick={() => void call({ action: 'resume' })}>Resume</Btn>
@@ -683,13 +718,44 @@ function TimerCard({ initial, plate, weekMinutes, onLogged, onError }: {
               primary
               disabled={busy}
               onClick={async () => {
+                if (t.scores) { setConfirm(String(Math.max(1, Math.round(elapsedMs(t) / 60000)))); return; }
                 const j = await call({ action: 'stop' });
-                if (j?.session) onLogged(j.session.minutes, j.session.key, `Timed ${hoursLabel(j.session.minutes)} on ${j.session.label}`);
+                if (j?.session) onLogged(j.session.minutes, j.session.key, `Timed ${hoursLabel(j.session.minutes)} on ${j.session.label}`, null);
               }}
             >
               Stop and log
             </Btn>
           </div>
+          {confirm !== null && (
+            <form
+              className={styles.partsAdd}
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const ran = Math.max(1, Math.round(elapsedMs(t) / 60000));
+                const focused = Math.max(0, Math.min(ran, Math.round(Number(confirm))));
+                const j = await call({ action: 'stop', focusedMinutes: focused });
+                setConfirm(null);
+                if (j?.session) {
+                  const sc = j.session.scores ?? null;
+                  onLogged(j.session.minutes, j.session.key, `Timed ${hoursLabel(j.session.minutes)} on ${j.session.label}${sc ? `, +${sc.points}` : ''}`, sc);
+                }
+              }}
+            >
+              <p className={styles.setupHead}>
+                It ran {Math.max(1, Math.round(elapsedMs(t) / 60000))} minutes. How many were focused? Take out the breaks; it can only go down. Up to 3 hours of one session counts, at half rate.
+              </p>
+              <div className={styles.partsGrid}>
+                <label className={styles.setupField}>
+                  <span>Focused minutes</span>
+                  <input type="number" min={0} max={Math.max(1, Math.round(elapsedMs(t) / 60000))} inputMode="numeric" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+                </label>
+              </div>
+              <div className={styles.rowActions}>
+                <Btn primary disabled={busy} onClick={() => undefined} submit>Log +{timedPoints(Number(confirm) || 0)}</Btn>
+                <Btn disabled={busy} onClick={() => setConfirm(null)}>Keep timing</Btn>
+              </div>
+            </form>
+          )}
           <details className={styles.parts}>
             <summary className={styles.partsHead}>Discard</summary>
             <div className={styles.moreBody}>
@@ -700,7 +766,10 @@ function TimerCard({ initial, plate, weekMinutes, onLogged, onError }: {
       ) : (
         <form
           className={styles.timerStart}
-          onSubmit={(e) => { e.preventDefault(); void call({ action: 'start', key: pick === '__other' ? null : pick, label: labelFor(pick, other) }); }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            void call({ action: 'start', key: pick === '__other' ? null : pick, label: labelFor(pick, other), scores: scores === 'none' ? null : scores });
+          }}
         >
           <label className={styles.setupField}>
             <span>What are you timing?</span>
@@ -715,6 +784,23 @@ function TimerCard({ initial, plate, weekMinutes, onLogged, onError }: {
               <input value={other} placeholder="Hackathon, reading, admin" onChange={(e) => setOther(e.target.value)} />
             </label>
           )}
+          <label className={styles.setupField}>
+            <span>Points</span>
+            <select value={scores} onChange={(e) => setScores(e.target.value as 'none' | 'quest' | 'curiosity')}>
+              {pick === '__other' ? (
+                <>
+                  <option value="curiosity">Scores as curiosity, at half rate</option>
+                  <option value="quest">Scores as a quest, at half rate</option>
+                  <option value="none">Just a record</option>
+                </>
+              ) : (
+                <>
+                  <option value="none">Just a record (its buttons score this work)</option>
+                  <option value={laneOf(pick)}>Other work on it, no button: scores at half rate</option>
+                </>
+              )}
+            </select>
+          </label>
           <Btn primary disabled={busy} onClick={() => undefined} submit>Start</Btn>
         </form>
       )}
@@ -728,9 +814,11 @@ function TimerCard({ initial, plate, weekMinutes, onLogged, onError }: {
             const j = await call({
               action: 'log', key: manual.key === '__other' ? null : manual.key, label: labelFor(manual.key, manual.label),
               minutes: Number(manual.minutes), date: manual.date || undefined,
+              scores: manual.scores === 'none' ? null : manual.scores,
             });
             if (j?.session) {
-              onLogged(j.session.minutes, j.session.key, `Logged ${hoursLabel(j.session.minutes)} on ${j.session.label}`);
+              const sc = j.session.scores ?? null;
+              onLogged(j.session.minutes, j.session.key, `Logged ${hoursLabel(j.session.minutes)} on ${j.session.label}${sc ? `, +${sc.points}` : ''}`, sc);
               setManual((m) => ({ ...m, minutes: '', label: '' }));
             }
           }}
@@ -748,6 +836,14 @@ function TimerCard({ initial, plate, weekMinutes, onLogged, onError }: {
             )}
             <label className={styles.setupField}><span>Minutes</span><input required type="number" min={1} max={960} inputMode="numeric" value={manual.minutes} onChange={(e) => setManual({ ...manual, minutes: e.target.value })} /></label>
             <label className={styles.setupField}><span>Day (blank for today)</span><input type="date" value={manual.date} onChange={(e) => setManual({ ...manual, date: e.target.value })} /></label>
+            <label className={styles.setupField}>
+              <span>Points</span>
+              <select value={manual.scores} onChange={(e) => setManual({ ...manual, scores: e.target.value })}>
+                <option value="none">Just a record</option>
+                <option value={manual.key === '__other' ? 'curiosity' : laneOf(manual.key)}>No button for this work: half rate</option>
+                {manual.key === '__other' && <option value="quest">No button, as a quest: half rate</option>}
+              </select>
+            </label>
           </div>
           <Btn primary disabled={busy} onClick={() => undefined} submit>Log it</Btn>
         </form>
@@ -933,6 +1029,8 @@ function pluralUnit(u: string): string {
 }
 
 type GroupAction =
+  | { action: 'add-activity'; kind: string; paperHours?: number; unit?: string; minutesPerUnit?: number }
+  | { action: 'remove-activity'; group: number }
   | { action: 'part'; group: number }
   | { action: 'edit-group'; group: number; name?: string; count?: number; prior?: number }
   | { action: 'remove-group'; group: number }
@@ -953,6 +1051,7 @@ function PartsEditor({ item, busy, send }: {
           <GroupRow key={`${item.key}-${g.index}-${g.count}-${g.prior}-${g.name ?? ''}`} itemKey={item.key} g={g} busy={busy} send={send} />
         ))}
       </ul>
+      <ActivityEditor item={item} busy={busy} send={send} />
       <form
         className={styles.partsAdd}
         onSubmit={(e) => {
@@ -981,6 +1080,68 @@ function PartsEditor({ item, busy, send }: {
         <Btn primary busy={busy === `${item.key}:add`} disabled={!!busy} onClick={() => undefined} submit>Add group</Btn>
       </form>
     </details>
+  );
+}
+
+/* The activities on an item (flashcard reviews, practice questions, past
+   papers...): pick from the menu in rules.ts, never type a point value.
+   One with nothing logged can be removed. */
+function ActivityEditor({ item, busy, send }: {
+  item: ItemView; busy: string | null; send: (req: GroupAction, key: string) => void;
+}) {
+  const kinds = Object.keys(ACTIVITIES) as ActivityKind[];
+  const [kind, setKind] = useState<ActivityKind>('flashcard-review');
+  const [paperHours, setPaperHours] = useState('');
+  const [unit, setUnit] = useState('');
+  const [mins, setMins] = useState('');
+  const spec = ACTIVITIES[kind];
+  return (
+    <div className={styles.partsAdd}>
+      <p className={styles.setupHead}>Activities: the work around the material. Rates come from the rules, not from you.</p>
+      <ul className={styles.partsList}>
+        {item.repeat.map((g) => (
+          <li key={g.index} className={styles.groupRow}>
+            <p className={styles.groupTitle}>
+              {g.unit} · {g.per ? (g.per >= 1 ? `1 point per ${Math.round(g.per * 10) / 10} ${pluralUnit(g.unit)}` : `${Math.round((1 / g.per) * 10) / 10} points each`) : `${g.points} points each`} · {g.count} logged
+            </p>
+            {g.count === 0 && (
+              <Btn busy={busy === `${item.key}:ra${g.index}`} disabled={!!busy} onClick={() => send({ action: 'remove-activity', group: g.index }, `${item.key}:ra${g.index}`)}>Remove</Btn>
+            )}
+          </li>
+        ))}
+      </ul>
+      <form
+        className={styles.partsGrid}
+        onSubmit={(e) => {
+          e.preventDefault();
+          send({
+            action: 'add-activity', kind,
+            ...(kind === 'past-paper' ? { paperHours: Number(paperHours) } : {}),
+            ...(kind === 'other' ? { unit, minutesPerUnit: Number(mins) } : {}),
+          }, `${item.key}:aa`);
+        }}
+      >
+        <label className={styles.setupField}>
+          <span>Add an activity</span>
+          <select value={kind} onChange={(e) => setKind(e.target.value as ActivityKind)}>
+            {kinds.map((k) => <option key={k} value={k}>{ACTIVITIES[k].label}</option>)}
+          </select>
+        </label>
+        {spec.asks === 'paperHours' && (
+          <label className={styles.setupField}><span>Official length in hours</span><input required type="number" min={0} step="any" inputMode="decimal" value={paperHours} onChange={(e) => setPaperHours(e.target.value)} /></label>
+        )}
+        {spec.asks === 'custom' && (
+          <>
+            <label className={styles.setupField}><span>One unit is a</span><input required value={unit} placeholder="essay plan" onChange={(e) => setUnit(e.target.value)} /></label>
+            <label className={styles.setupField}><span>Your gut minutes for one</span><input required type="number" min={0} step="any" inputMode="decimal" value={mins} onChange={(e) => setMins(e.target.value)} /></label>
+          </>
+        )}
+        <div className={styles.rowActions}>
+          <Btn primary busy={busy === `${item.key}:aa`} disabled={!!busy} onClick={() => undefined} submit>Add</Btn>
+        </div>
+      </form>
+      <p className={styles.setupHead}>{spec.basis}.</p>
+    </div>
   );
 }
 
@@ -1018,6 +1179,27 @@ function GroupRow({ itemKey, g, busy, send }: {
         </div>
       </form>
     </li>
+  );
+}
+
+/* A counted activity: type how many, log it. Shows what it is worth so
+   far and the rate, so the reward is in view. */
+function CountLog({ unit, per, logged, busy, disabled, onLog }: {
+  unit: string; per: number; logged: number; busy: boolean; disabled: boolean; onLog: (qty: number) => void;
+}) {
+  const [n, setN] = useState('');
+  const q = Math.round(Number(n));
+  const worth = q > 0 ? countGain(per, logged, logged + q) : 0;
+  return (
+    <form className={styles.pageLog} onSubmit={(e) => { e.preventDefault(); if (q > 0) { onLog(q); setN(''); } }}>
+      <label>
+        <span className={styles.srOnly}>How many {pluralUnit(unit)}</span>
+        <input type="number" inputMode="numeric" min={1} placeholder={`${pluralUnit(unit)} (${logged} so far)`} value={n} onChange={(e) => setN(e.target.value)} />
+      </label>
+      <Btn primary busy={busy} disabled={disabled || !(q > 0)} onClick={() => undefined} submit>
+        {q > 0 ? `Log +${worth}` : `Log ${pluralUnit(unit)}`}
+      </Btn>
+    </form>
   );
 }
 
