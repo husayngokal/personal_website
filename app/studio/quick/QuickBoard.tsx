@@ -256,7 +256,8 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
   const open = tasks.filter((t) => t.status !== 'done' && !t.recurrence);
   const week = open.filter((t) => THIS_WEEK.has(t.scope));
   const soon = open.filter((t) => SOON.has(t.scope));
-  const later = open.filter((t) => !THIS_WEEK.has(t.scope) && !SOON.has(t.scope));
+  const backlog = open.filter((t) => t.scope === 'lifetime' && t.category === 'backlog');
+  const later = open.filter((t) => !THIS_WEEK.has(t.scope) && !SOON.has(t.scope) && !(t.scope === 'lifetime' && t.category === 'backlog'));
 
   const taskRow = (t: Task) => {
     const sized = score?.items.find((i) => i.table === 'tasks' && i.slug === t.slug);
@@ -280,8 +281,15 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
         <Btn primary busy={busy === `${t.slug}:done`} disabled={!!busy} onClick={() => send({ target: 'task', slug: t.slug, action: 'done' }, `${t.slug}:done`)}>Done</Btn>
         {THIS_WEEK.has(t.scope)
           ? <Btn busy={busy === `${t.slug}:later`} disabled={!!busy} onClick={() => send({ target: 'task', slug: t.slug, action: 'later' }, `${t.slug}:later`)}>Not now</Btn>
-          : <Btn busy={busy === `${t.slug}:week`} disabled={!!busy} onClick={() => send({ target: 'task', slug: t.slug, action: 'this-week' }, `${t.slug}:week`)}>This week</Btn>}
+          : null}
       </div>
+      {!THIS_WEEK.has(t.scope) && (
+        <BringOn
+          busy={busy === `${t.slug}:on`}
+          disabled={!!busy}
+          onBring={(p) => send({ target: 'score', table: 'tasks', slug: t.slug, action: 'activate', ...p }, `${t.slug}:on`)}
+        />
+      )}
     </li>
     );
   };
@@ -342,7 +350,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
               setNote({ kind: 'error', text: j.detail || j.error || 'Could not add it.' });
               return false;
             }
-            setNote({ kind: 'ok', text: `${j.summary}. It shows on the plate in a few seconds.`, undo: null });
+            setNote({ kind: 'ok', text: form.place === 'backlog' ? `${j.summary}. Reload to see it under Backlog.` : `${j.summary}. It shows on the plate in a few seconds.`, undo: null });
             return true;
           } catch (err) {
             setNote({ kind: 'error', text: (err as Error).message });
@@ -564,6 +572,12 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
         <Section title="This month, quarter or year" count={soon.length}>
           {soon.map(taskRow)}
         </Section>
+      )}
+      {backlog.length > 0 && (
+        <details className={styles.fold}>
+          <summary className={styles.foldHead}>Backlog <span className={styles.count}>{backlog.length}</span></summary>
+          <ul className={styles.rows}>{backlog.map(taskRow)}</ul>
+        </details>
       )}
       {later.length > 0 && (
         <details className={styles.fold}>
@@ -885,12 +899,13 @@ function TimerCard({ initial, plate, weekMinutes, onLogged, onError }: {
    week are not asked: they are the pace its due date needs. */
 function AddToWeek({ busy, onAdd }: {
   busy: string | null;
-  onAdd: (form: { title: string; lane: string; hours: number; milestones: string[]; due?: string; weeklyHours?: number }) => Promise<boolean>;
+  onAdd: (form: { title: string; lane: string; hours: number; milestones: string[]; due?: string; weeklyHours?: number; place: 'plate' | 'backlog' }) => Promise<boolean>;
 }) {
-  const [f, setF] = useState({ title: '', lane: 'quest', hours: '', milestones: '', due: '', weekly: '' });
+  const [f, setF] = useState({ title: '', lane: 'quest', hours: '', milestones: '', due: '', weekly: '', place: 'plate' as 'plate' | 'backlog' });
+  const toBacklog = f.place === 'backlog';
   return (
     <details className={styles.fold}>
-      <summary className={styles.foldHead}>Add to this week</summary>
+      <summary className={styles.foldHead}>Add something</summary>
       <form
         className={styles.partsAdd}
         onSubmit={async (e) => {
@@ -898,16 +913,24 @@ function AddToWeek({ busy, onAdd }: {
           const ok = await onAdd({
             title: f.title, lane: f.lane, hours: Number(f.hours),
             milestones: f.milestones.split(/\r?\n/).map((x) => x.trim()).filter(Boolean),
-            due: f.due || undefined,
-            weeklyHours: f.due ? undefined : Number(f.weekly),
+            due: toBacklog ? undefined : f.due || undefined,
+            weeklyHours: toBacklog || f.due ? undefined : Number(f.weekly),
+            place: f.place,
           });
-          if (ok) setF({ title: '', lane: f.lane, hours: '', milestones: '', due: '', weekly: '' });
+          if (ok) setF({ title: '', lane: f.lane, hours: '', milestones: '', due: '', weekly: '', place: f.place });
         }}
       >
         <p className={styles.setupHead}>
           A new task on the plate. Points come from your gut hours for the whole thing, doubled and frozen. With a due date, its hours a week are the pace that date needs; with none, you say how many hours a week you will give it.
         </p>
         <div className={styles.partsGrid}>
+          <label className={styles.setupField}>
+            <span>Where</span>
+            <select value={f.place} onChange={(e) => setF({ ...f, place: e.target.value as 'plate' | 'backlog' })}>
+              <option value="plate">On the plate this week</option>
+              <option value="backlog">Backlog (no hours committed yet)</option>
+            </select>
+          </label>
           <label className={styles.setupField}><span>What is it?</span><input required value={f.title} placeholder="AI Collusion Research Sprint" onChange={(e) => setF({ ...f, title: e.target.value })} /></label>
           <label className={styles.setupField}>
             <span>Lane</span>
@@ -917,8 +940,10 @@ function AddToWeek({ busy, onAdd }: {
             </select>
           </label>
           <label className={styles.setupField}><span>Your gut hours for all of it</span><input required type="number" min={0} step="any" inputMode="decimal" value={f.hours} onChange={(e) => setF({ ...f, hours: e.target.value })} /></label>
-          <label className={styles.setupField}><span>Due date (optional)</span><input type="date" value={f.due} onChange={(e) => setF({ ...f, due: e.target.value })} /></label>
-          {!f.due && (
+          {!toBacklog && (
+            <label className={styles.setupField}><span>Due date (optional)</span><input type="date" value={f.due} onChange={(e) => setF({ ...f, due: e.target.value })} /></label>
+          )}
+          {!toBacklog && !f.due && (
             <label className={styles.setupField}><span>No due date: hours a week you will give it</span><input required type="number" min={0.5} step="any" inputMode="decimal" value={f.weekly} placeholder="5" onChange={(e) => setF({ ...f, weekly: e.target.value })} /></label>
           )}
         </div>
@@ -926,7 +951,7 @@ function AddToWeek({ busy, onAdd }: {
           <span>Milestones, one per line, in order (blank if it is one piece)</span>
           <textarea rows={3} value={f.milestones} placeholder={'Spec the API\nBuild the importer\nShip it'} onChange={(e) => setF({ ...f, milestones: e.target.value })} />
         </label>
-        <Btn primary busy={busy === 'plan'} disabled={!!busy} onClick={() => undefined} submit>Add to the plate</Btn>
+        <Btn primary busy={busy === 'plan'} disabled={!!busy} onClick={() => undefined} submit>{toBacklog ? 'Add to the backlog' : 'Add to the plate'}</Btn>
       </form>
     </details>
   );
@@ -1123,6 +1148,32 @@ function PartsEditor({ item, busy, send }: {
           </label>
         </div>
         <Btn primary busy={busy === `${item.key}:add`} disabled={!!busy} onClick={() => undefined} submit>Add group</Btn>
+      </form>
+    </details>
+  );
+}
+
+/* From the backlog (or later) onto this week's plate: say how it is paced,
+   a due date or hours a week. The 50-hour check runs on the way in. */
+function BringOn({ busy, disabled, onBring }: {
+  busy: boolean; disabled: boolean; onBring: (p: { due?: string; weeklyHours?: number }) => void;
+}) {
+  const [due, setDue] = useState('');
+  const [weekly, setWeekly] = useState('');
+  return (
+    <details className={styles.parts}>
+      <summary className={styles.partsHead}>Bring onto the plate</summary>
+      <form
+        className={styles.partsAdd}
+        onSubmit={(e) => { e.preventDefault(); onBring(due ? { due } : { weeklyHours: Number(weekly) }); }}
+      >
+        <div className={styles.partsGrid}>
+          <label className={styles.setupField}><span>Due date (optional)</span><input type="date" value={due} onChange={(e) => setDue(e.target.value)} /></label>
+          {!due && (
+            <label className={styles.setupField}><span>No due date: hours a week you will give it</span><input required type="number" min={0.5} step="any" inputMode="decimal" value={weekly} placeholder="5" onChange={(e) => setWeekly(e.target.value)} /></label>
+          )}
+        </div>
+        <Btn primary busy={busy} disabled={disabled} onClick={() => undefined} submit>Bring it on</Btn>
       </form>
     </details>
   );

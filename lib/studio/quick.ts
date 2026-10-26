@@ -37,7 +37,7 @@ export type QuickTarget = FrontmatterTarget | 'atlas' | 'score';
 /* Tables whose items carry a score block, and where their files live. */
 export const SCORE_TABLES: Record<string, { folder: string | null; keys: string[]; columns: string[] }> = {
   library_books:     { folder: 'library',           keys: ['status', 'progress-pct', 'finished'], columns: ['status', 'progress_pct', 'finished'] },
-  tasks:             { folder: 'tasks',             keys: ['status', 'scope', 'completed'],        columns: ['status', 'scope', 'completed'] },
+  tasks:             { folder: 'tasks',             keys: ['status', 'scope', 'completed', 'due'],  columns: ['status', 'scope', 'completed', 'due'] },
   courses:           { folder: 'courses',           keys: ['status', 'finished'],                  columns: ['status', 'finished'] },
   study_credentials: { folder: 'study/credentials', keys: [],                                      columns: [] },
   projects:          { folder: 'projects',          keys: ['status'],                              columns: ['status'] },
@@ -66,6 +66,7 @@ export type QuickRequest =
   | { target: 'score'; table: string; slug: string; action: 'reestimate'; unit?: string }
   | { target: 'score'; table: string; slug: string; action: 'delete' }
   | { target: 'score'; table: string; slug: string; action: 'set-weekly'; hours: number }
+  | { target: 'score'; table: string; slug: string; action: 'activate'; due?: string; weeklyHours?: number }
   | { target: 'score'; table: string; slug: string; action: 'page'; page: number }
   | { target: 'score'; table: string; slug: string; action: 'setup'; template: TemplateId; inputs: TemplateInputs }
   | { target: 'score'; table: string; slug: string; action: 'add-group'; unit: string; name?: string; count: number; hours: number; basis: 'gut' | 'measured' }
@@ -281,6 +282,27 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string,
   }
 
   if (req.action === 'delete') throw new QuickError('bad-request', 'deleting is handled by the route');
+
+  if (req.action === 'activate') {
+    /* From the backlog onto this week's plate. It must say how it will be
+       paced: a due date (the pace works itself out) or hours a week. The
+       route's weekly-limit check then runs on the result. */
+    if (req.table !== 'tasks') throw new QuickError('bad-request', 'only a task is brought on this way');
+    const due = typeof req.due === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.due) && req.due >= today ? req.due : null;
+    const wh = Math.round(Number(req.weeklyHours) * 10) / 10;
+    if (!due && !(Number.isFinite(wh) && wh > 0)) throw new QuickError('bad-request', 'give it a due date, or the hours a week you will give it');
+    const prev: Record<string, ScalarChange> = { scope: scalar(fm.scope), due: scalar(fm.due) };
+    let next = patchFrontmatter(raw, { scope: 'this-week', due });
+    if (!due) {
+      const item = itemFromFile({ path, content: raw });
+      const base: ScoreBlock = own ?? (item ? effectiveBlock(item) : { parts: [], repeat: [] });
+      next = setScoreBlock(next, { ...cloneBlock(base), weeklyHours: wh });
+    }
+    return {
+      raw: next, changed: true, row: {}, summary: `${title}: on the plate${due ? `, due ${due}` : `, ${wh} hours a week`}`,
+      undo: { target: 'score', table: req.table, slug: req.slug, action: 'restore-block', block: own, fields: prev },
+    };
+  }
 
   if (req.action === 'park' || req.action === 'unpark') {
     /* Taking something off the plate changes its own status where it has

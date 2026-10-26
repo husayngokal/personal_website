@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   if (!isSupabaseConfigured()) return NextResponse.json({ error: 'no-database' }, { status: 503 });
 
-  let body: { title?: string; lane?: string; hours?: number; milestones?: string[]; due?: string; weeklyHours?: number };
+  let body: { title?: string; lane?: string; hours?: number; milestones?: string[]; due?: string; weeklyHours?: number; place?: 'plate' | 'backlog' };
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'malformed-body' }, { status: 400 }); }
 
   const title = String(body.title ?? '').replace(/[\r\n]+/g, ' ').trim();
@@ -48,9 +48,10 @@ export async function POST(req: NextRequest) {
      what you say you will give it. Either way that is what counts toward
      the weekly limit. */
   const today = authorDay();
-  const due = /^\d{4}-\d{2}-\d{2}$/.test(String(body.due ?? '')) && String(body.due) >= today ? String(body.due) : null;
+  const backlog = body.place === 'backlog';
+  const due = !backlog && /^\d{4}-\d{2}-\d{2}$/.test(String(body.due ?? '')) && String(body.due) >= today ? String(body.due) : null;
   const weekly = Number(body.weeklyHours);
-  if (!due && !(Number.isFinite(weekly) && weekly > 0)) {
+  if (!backlog && !due && !(Number.isFinite(weekly) && weekly > 0)) {
     return NextResponse.json({ error: 'bad-request', detail: 'Give it a due date, or the hours a week you will give it.' }, { status: 400 });
   }
   const names = (Array.isArray(body.milestones) ? body.milestones : [])
@@ -72,8 +73,12 @@ export async function POST(req: NextRequest) {
     } else if (names.length === 1) {
       base.parts[0] = { ...base.parts[0], unit: 'milestone', name: names[0] };
     }
-    if (!due) base.weeklyHours = Math.round(weekly * 10) / 10;
-    const head = `---\ntitle: ${JSON.stringify(title)}\nstatus: open\nscope: this-week\n${due ? `due: ${due}\n` : ''}---\n\nAdded to the plate from Studio.\n`;
+    /* The backlog: no hours committed, nothing on the plate, points frozen
+       now so they are known when it is brought on. */
+    if (!backlog && !due) base.weeklyHours = Math.round(weekly * 10) / 10;
+    const head = backlog
+      ? `---\ntitle: ${JSON.stringify(title)}\nstatus: open\nscope: lifetime\ncategory: backlog\n---\n\nAdded to the backlog from Studio.\n`
+      : `---\ntitle: ${JSON.stringify(title)}\nstatus: open\nscope: this-week\n${due ? `due: ${due}\n` : ''}---\n\nAdded to the plate from Studio.\n`;
     raw = setScoreBlock(head, base);
     parseFile(path, raw);
   } catch (err) {
@@ -107,5 +112,5 @@ export async function POST(req: NextRequest) {
     for (const p of ['/', '/life/tasks']) { try { revalidatePath(p); } catch { /* best effort */ } }
   });
 
-  return NextResponse.json({ ok: true, path, slug, summary: `${title}: on the plate this week` });
+  return NextResponse.json({ ok: true, path, slug, summary: backlog ? `${title}: in the backlog` : `${title}: on the plate this week` });
 }

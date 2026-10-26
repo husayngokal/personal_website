@@ -128,7 +128,8 @@ export default function ScoringPage() {
         own: the hours its unfinished parts are worth, over the weeks left. Fall behind and the pace
         rises; get ahead and it drops. Anything without one carries the hours a week I choose to give it.
         The limit is the same for quests and curiosity; the curiosity cap is a different thing, and only
-        limits how much of the weekly bar curiosity can fill. Anything that would push the plate over is refused
+        limits how much of the weekly bar curiosity can fill. What cannot be given hours yet goes in the
+        backlog, which counts for nothing until it is brought onto the plate with a date or hours a week. Anything that would push the plate over is refused
         until something comes off: a swap, so the load stays level. A task with no figure of its own
         takes its estimate spread over its scope (all of it in a this-week task, a thirteenth in a
         this-quarter one). Backlog counts for nothing until it is swapped in.
