@@ -17,6 +17,7 @@ import type { DoneGroup } from '@/lib/vault/done-items';
 import type { ItemView, ScoreState } from '@/lib/score/compute';
 import { READING_TIERS, TEMPLATES, type TemplateId } from '@/lib/score/rules';
 import { IDLE, TIMER_KEY, elapsedMs, hms, hoursLabel, type TimerNow } from '@/lib/score/time';
+import { shortDay } from '@/lib/score/format';
 
 interface SwapPlateItem { table: string; slug: string; title: string; hours: number | null; parkable: boolean }
 interface SwapState { retry: () => void; detail: string; plate: SwapPlateItem[] }
@@ -393,7 +394,8 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
               <span className={styles.rowMeta}>
                 {[
                   liveSummary(i), i.lane, i.weekPoints ? `+${i.weekPoints} this week` : null,
-                  i.weekMinutes || i.weeklyHours ? `${hoursLabel(i.weekMinutes ?? 0)} timed${i.weeklyHours ? ` of ${i.weeklyHours} h` : ''}` : null,
+                  i.weekMinutes || i.weeklyHours ? `${hoursLabel(i.weekMinutes ?? 0)} timed this week${i.weeklyHours ? ` of ${i.weeklyHours} h` : ''}` : null,
+                  i.paced && i.deadline ? `the pace to be ready by ${shortDay(i.deadline)}` : null,
                 ].filter(Boolean).join(' · ')}
               </span>
               {i.total > 0 && (
@@ -1031,6 +1033,7 @@ function pluralUnit(u: string): string {
 type GroupAction =
   | { action: 'add-activity'; kind: string; paperHours?: number; unit?: string; minutesPerUnit?: number }
   | { action: 'remove-activity'; group: number }
+  | { action: 'reestimate'; unit: string }
   | { action: 'part'; group: number }
   | { action: 'edit-group'; group: number; name?: string; count?: number; prior?: number }
   | { action: 'remove-group'; group: number }
@@ -1046,6 +1049,7 @@ function PartsEditor({ item, busy, send }: {
   return (
     <details className={styles.parts}>
       <summary className={styles.partsHead}>Edit parts · {item.parts.length} {item.parts.length === 1 ? 'group' : 'groups'}</summary>
+      <Reestimate item={item} busy={busy} send={send} />
       <ul className={styles.partsList}>
         {item.parts.map((g) => (
           <GroupRow key={`${item.key}-${g.index}-${g.count}-${g.prior}-${g.name ?? ''}`} itemKey={item.key} g={g} busy={busy} send={send} />
@@ -1080,6 +1084,29 @@ function PartsEditor({ item, busy, send }: {
         <Btn primary busy={busy === `${item.key}:add`} disabled={!!busy} onClick={() => undefined} submit>Add group</Btn>
       </form>
     </details>
+  );
+}
+
+/* Re-estimate from timing: once, early, from timed minutes per part.
+   Shown while it is still allowed; the server checks the same rules. */
+function Reestimate({ item, busy, send }: {
+  item: ItemView; busy: string | null; send: (req: GroupAction, key: string) => void;
+}) {
+  const unit = item.parts[0]?.unit;
+  if (!unit) return null;
+  const groups = item.parts.filter((g) => g.unit === unit);
+  const logged = groups.reduce((n, g) => n + g.logged, 0);
+  const total = groups.reduce((n, g) => n + g.count, 0);
+  if (groups.some((g) => g.reestimated) || logged < 1 || logged > Math.ceil(total / 4)) return null;
+  return (
+    <div className={styles.moreBody}>
+      <p className={styles.setupHead}>
+        Points for each {unit} are an estimate until you have timed some. Re-estimating sets them from your timed minutes per {unit}, rounded up to a whole point. Once only, and only in the first quarter.
+      </p>
+      <HoldButton disabled={!!busy} onDone={() => send({ action: 'reestimate', unit }, `${item.key}:re`)}>
+        Hold to re-estimate from my timing
+      </HoldButton>
+    </div>
   );
 }
 

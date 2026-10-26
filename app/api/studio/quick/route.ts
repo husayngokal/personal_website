@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
     for (let attempt = 0; attempt < 2 && !result; attempt++) {
       const file = await getFile(session.token, path);
       if (!file) return NextResponse.json({ error: 'not-found', path }, { status: 404 });
-      const computed = applyQuick(body, path, file.content, today);
+      const computed = applyQuick(body, path, file.content, today, { timedMinutes: cached?.time?.totalByKey?.[path] });
 
       /* The weekly limit. Anything that would push the active load past
          the week is refused before it is committed, with the plate

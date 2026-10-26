@@ -81,6 +81,7 @@ export default function ScoringPage() {
         <li><strong>Gut estimates are multiplied by {GUT_FACTOR}.</strong> I measured my own estimates running two to three times short. The low end corrects them.</li>
         <li><strong>Formula estimates are multiplied by {FORMULA_FACTOR}</strong>, for breaks and setup: pages at a reading speed, published course hours, walking time from distance and climb.</li>
         <li><strong>Measured time is used as it is</strong>: how long a past paper actually takes to sit and mark.</li>
+        <li><strong>Timing beats guessing.</strong> Once the first parts of something are done and timed, its points can be re-estimated from the real minutes per part, rounded up to a whole point. Once only, and only in the first quarter, so slow work later on is never paid more.</li>
         <li><strong>Points are frozen when something is set up.</strong> If a rule here ever changes, it applies to new things only, and the change goes in the <Link href="/life/changed-my-mind">changed-my-mind log</Link>. Points already earned are never rewritten.</li>
       </ul>
 
@@ -123,7 +124,9 @@ export default function ScoringPage() {
       <h2 className={styles.h2}>Load</h2>
       <p>
         Only what is active counts. Every active thing says how many hours a week it takes, and
-        together they cannot pass {WEEKLY_HOURS}. Anything that would push the plate over is refused
+        together they cannot pass {WEEKLY_HOURS}. Anything with a deadline works its figure out on its
+        own: the hours its unfinished parts are worth, over the weeks left. Fall behind and the pace
+        rises; get ahead and it drops. Anything that would push the plate over is refused
         until something comes off: a swap, so the load stays level. A task with no figure of its own
         takes its estimate spread over its scope (all of it in a this-week task, a thirteenth in a
         this-quarter one). Backlog counts for nothing until it is swapped in.

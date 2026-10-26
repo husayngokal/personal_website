@@ -26,7 +26,7 @@ import { itemLabel, listDoneItems, setItemDone } from '../vault/done-items';
 import { parseFile } from '../vault/parse';
 import { ACTIVITIES, TEMPLATES, activityRate, countGain, estimate, type ActivityKind, type TemplateId } from '../score/rules';
 import {
-  addActivity, addGroup, buildFromTemplate, cloneBlock, editGroup, logParts, logRepeat, partsDone, readBlock, removeActivity, removeGroup, repeatCount, setScoreBlock,
+  addActivity, addGroup, buildFromTemplate, cloneBlock, editGroup, logParts, logRepeat, partsDone, readBlock, reestimate, removeActivity, removeGroup, repeatCount, setScoreBlock,
   type ScoreBlock, type TemplateInputs,
 } from '../score/block';
 import { atlasPoints, effectiveBlock, itemFromFile, plural } from '../score/items';
@@ -63,6 +63,7 @@ export type QuickRequest =
   | { target: 'score'; table: string; slug: string; action: 'repeat'; group: number; qty?: number }
   | { target: 'score'; table: string; slug: string; action: 'add-activity'; kind: string; paperHours?: number; unit?: string; minutesPerUnit?: number }
   | { target: 'score'; table: string; slug: string; action: 'remove-activity'; group: number }
+  | { target: 'score'; table: string; slug: string; action: 'reestimate'; unit?: string }
   | { target: 'score'; table: string; slug: string; action: 'page'; page: number }
   | { target: 'score'; table: string; slug: string; action: 'setup'; template: TemplateId; inputs: TemplateInputs }
   | { target: 'score'; table: string; slug: string; action: 'add-group'; unit: string; name?: string; count: number; hours: number; basis: 'gut' | 'measured' }
@@ -164,10 +165,14 @@ function changesFor(req: QuickRequest, fm: Record<string, unknown>, today: strin
   throw new QuickError('bad-request', 'unknown action');
 }
 
-export function applyQuick(req: QuickRequest, path: string, raw: string, today: string): QuickResult {
+/** Facts the server supplies that a single file cannot: all-time timed
+ *  minutes on this item, for re-estimating. */
+export interface QuickContext { timedMinutes?: number }
+
+export function applyQuick(req: QuickRequest, path: string, raw: string, today: string, ctx: QuickContext = {}): QuickResult {
   const spec = specFor(req as { target: QuickTarget; table?: string });
   if (!spec) throw new QuickError('bad-request', 'unknown target');
-  if (req.target === 'score') return finish(applyScore(req, path, raw, today), path, spec);
+  if (req.target === 'score') return finish(applyScore(req, path, raw, today, ctx), path, spec);
 
   let next = raw;
   let summary: string;
@@ -235,7 +240,7 @@ type ScoreRequest = Extract<QuickRequest, { target: 'score' }>;
 /* Score actions: log a part, a repeat or a page, set an item up from a
    template, or put a block back (undo). Every one works from the file's
    current block, never from what the page last showed. */
-function applyScore(req: ScoreRequest, path: string, raw: string, today: string): QuickResult {
+function applyScore(req: ScoreRequest, path: string, raw: string, today: string, ctx: QuickContext = {}): QuickResult {
   const fm = matter(raw).data as Record<string, unknown>;
   const title = String(fm.title ?? req.slug);
   const own = readBlock(fm);
@@ -369,6 +374,12 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string)
       nextBlock = addActivity(block, { unit, kind, ...rate });
       const each = rate.per ? (rate.per >= 1 ? `1 point per ${Math.round(rate.per * 10) / 10} ${plural(unit)}` : `${Math.round((1 / rate.per) * 10) / 10} points each`) : `${rate.points} points each`;
       verb = `added ${kind === 'other' ? unit : spec.label.toLowerCase()} (${each})`;
+    } else if (req.action === 'reestimate') {
+      const unit = req.unit ?? block.parts[0]?.unit;
+      if (!unit) throw new Error('nothing to re-estimate');
+      const r = reestimate(block, unit, Number(ctx.timedMinutes));
+      nextBlock = r.block;
+      verb = `re-estimated from your timing: ${r.perPart} minutes a ${unit}, ${r.before} points in all is now ${r.after}`;
     } else if (req.action === 'remove-activity') {
       const g = block.repeat[req.group];
       if (!g) throw new Error('no such activity');

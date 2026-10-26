@@ -36,6 +36,7 @@ export interface ItemGroupView {
   points: number;
   prior: number;                // finished before tracking (no points)
   logged: number;               // entries logged since tracking (count is frozen once > 0)
+  reestimated: boolean;         // points already re-estimated from timing (once only)
   current: boolean;             // the first unfinished group of its unit
 }
 
@@ -58,6 +59,7 @@ export interface ItemView {
   summary: string;              // "16 of 120 chapters"
   weekPoints: number;
   weeklyHours: number | null;
+  paced: boolean;
   deadline: string | null;
   outcome: { points: number; achieved: string | null } | null;
   parts: ItemGroupView[];
@@ -82,7 +84,7 @@ export interface ScoreState {
   load: { hours: number; capacity: number };
   recent: ScoreEvent[];         // newest first
   /** Timed hours (a log; never points). */
-  time: { weekMinutes: number; byKey: Record<string, number>; recent: Session[] };
+  time: { weekMinutes: number; byKey: Record<string, number>; totalByKey: Record<string, number>; recent: Session[] };
 }
 
 const SURFACES: Surface[] = ['tasks', 'library', 'courses', 'exams', 'projects', 'atlas', 'list', 'notebook', 'writeups', 'timer'];
@@ -119,7 +121,7 @@ function itemView(item: ScoreItem, weekPoints: number, weekMinutes = 0): ItemVie
     if (current) seen.add(g.unit);
     return {
       index, unit: g.unit, name: g.name ?? null, done, count: g.count, points: g.points,
-      prior: g.prior, logged: g.done.length, current,
+      prior: g.prior, logged: g.done.length, current, reestimated: g.reestimated === true,
     };
   });
   /* Summarise the item by its first unit, across every group of that unit
@@ -140,7 +142,7 @@ function itemView(item: ScoreItem, weekPoints: number, weekMinutes = 0): ItemVie
     parked: item.parked, weekMinutes,
     hasBlock: item.hasBlock, needsSetup: item.needsSetup,
     earned, total, pct: total ? Math.round((earned / total) * 100) : 0, summary,
-    weekPoints, weeklyHours: item.weeklyHours, deadline: item.deadline, outcome: item.outcome,
+    weekPoints, weeklyHours: item.weeklyHours, paced: item.paced, deadline: item.deadline, outcome: item.outcome,
     parts,
     repeat: item.repeat.map((g, index) => ({
       index, unit: g.unit, points: g.points, per: g.per ?? null, kind: g.kind ?? null, count: repeatCount(g),
@@ -211,6 +213,10 @@ export function computeScore(extracted: Extracted, today: string = authorDay()):
   const byKey: Record<string, number> = {};
   for (const x of weekSessions) if (x.key) byKey[x.key] = (byKey[x.key] ?? 0) + x.minutes;
   const weekMinutes = weekSessions.reduce((n, x) => n + x.minutes, 0);
+  /* All-time minutes per item on record-only sessions (time spent on the
+     work the item's own buttons score), for re-estimating from real pace. */
+  const totalByKey: Record<string, number> = {};
+  for (const x of sessions) if (x.key && !x.scores) totalByKey[x.key] = (totalByKey[x.key] ?? 0) + x.minutes;
   const recentSessions = [...sessions]
     .sort((a, b) => `${b.date} ${b.to}`.localeCompare(`${a.date} ${a.to}`))
     .slice(0, 12);
@@ -247,8 +253,8 @@ export function computeScore(extracted: Extracted, today: string = authorDay()):
     items: views,
     surfaces,
     tallies,
-    load: { hours: load, capacity: WEEKLY_HOURS },
+    load: { hours: Math.round(load * 10) / 10, capacity: WEEKLY_HOURS },
     recent: events.slice(0, 15),
-    time: { weekMinutes, byKey, recent: recentSessions },
+    time: { weekMinutes, byKey, totalByKey, recent: recentSessions },
   };
 }

@@ -38,6 +38,8 @@ export interface PartGroup {
   points: number;
   prior: number;
   done: string[];
+  /** Points were re-estimated from timed pace (allowed once). */
+  reestimated?: boolean;
 }
 
 export interface RepeatGroup {
@@ -124,6 +126,7 @@ export function readBlock(fm: Record<string, unknown>): ScoreBlock | null {
       points: Math.round(points),
       prior: Math.max(0, Math.min(Math.round(num(o.prior) ?? 0), Math.round(count))),
       done: doneList(o.done),
+      ...(o.reestimated === true ? { reestimated: true } : {}),
     });
   }
 
@@ -187,6 +190,7 @@ export function serializeBlock(b: ScoreBlock): string[] {
       out.push(`      count: ${g.count}`);
       out.push(`      points: ${g.points}`);
       out.push(`      prior: ${g.prior}`);
+      if (g.reestimated) out.push('      reestimated: true');
       out.push(`      done: ${list(g.done)}`);
     }
   }
@@ -362,6 +366,45 @@ export function removeGroup(b: ScoreBlock, index: number): ScoreBlock {
 
 function plural0(unit: string): string {
   return /(s|x|ch|sh)$/.test(unit) ? `${unit}es` : `${unit}s`;
+}
+
+/* -- Re-estimating from real pace --------------------------------------
+ * Once the first parts of something are done and timed, the timing beats
+ * any guess. This rescales every group of one unit (all the chapters of
+ * all the books, keeping their relative sizes) so a part is worth what it
+ * actually took: timed minutes per logged part, rounded up to the next
+ * whole point. Allowed once, and only while no more than a quarter of the
+ * parts are logged, so it cannot be used to pay slow work more later on.
+ * The outcome, if it was the parts' estimate, follows.
+ */
+
+export function reestimate(b: ScoreBlock, unit: string, timedMinutes: number): { block: ScoreBlock; perPart: number; before: number; after: number } {
+  const next = cloneBlock(b);
+  const groups = next.parts.filter((g) => g.unit === unit);
+  if (!groups.length) throw new Error(`no parts called ${unit}`);
+  if (groups.some((g) => g.reestimated)) throw new Error('this has already been re-estimated once; its points are frozen');
+  const logged = groups.reduce((n, g) => n + g.done.reduce((q, e) => q + (parseDone(e)?.qty ?? 0), 0), 0);
+  const total = groups.reduce((n, g) => n + g.count, 0);
+  if (logged < 1) throw new Error(`finish and log at least one ${unit} first`);
+  if (logged > Math.ceil(total / 4)) throw new Error(`more than a quarter of the ${unit}s are already logged; too late to re-estimate`);
+  if (!Number.isFinite(timedMinutes) || timedMinutes <= 0) throw new Error(`no timed sessions on this yet; time a ${unit} with the timer first`);
+
+  /* The estimate's minutes for the parts that were logged, group by group. */
+  let estimatedMin = 0;
+  for (const g of groups) {
+    const q = g.done.reduce((n, e) => n + (parseDone(e)?.qty ?? 0), 0);
+    estimatedMin += (g.points / g.count) * q * 15;
+  }
+  const perPart = Math.ceil(timedMinutes / logged / 15) * 15;      // up to a whole point
+  const factor = (perPart * logged) / estimatedMin;
+  const before = next.parts.reduce((n, g) => n + g.points, 0);
+  for (const g of groups) {
+    g.points = Math.max(1, Math.round(g.points * factor));
+    g.reestimated = true;
+  }
+  const after = next.parts.reduce((n, g) => n + g.points, 0);
+  if (next.outcome !== undefined && next.outcome === before) next.outcome = after;
+  return { block: next, perPart, before, after };
 }
 
 /* -- Templates -------------------------------------------------------- */

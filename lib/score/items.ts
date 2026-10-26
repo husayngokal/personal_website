@@ -18,11 +18,12 @@ import matter from 'gray-matter';
 import { parseFile } from '../vault/parse';
 import { listDoneItems } from '../vault/done-items';
 import {
-  DEFAULT_LANE, RECURRING_GUT_HOURS, SCOPE_WEEKS, SCORE_EPOCH, TASK_GUT_HOURS, atlasPoints, countGain, estimate,
+  DEFAULT_LANE, MINUTES_PER_POINT, RECURRING_GUT_HOURS, SCOPE_WEEKS, SCORE_EPOCH, TASK_GUT_HOURS, atlasPoints, countGain, estimate,
   type Lane, type TemplateId,
 } from './rules';
 import { parseDone, readBlock, type PartGroup, type RepeatGroup, type ScoreBlock } from './block';
 import { parseSessions, type Session } from './time';
+import { authorDay } from '../content/streak';
 
 export type Surface =
   | 'tasks' | 'library' | 'courses' | 'exams' | 'projects'
@@ -55,6 +56,9 @@ export interface ScoreItem {
   repeat: RepeatGroup[];
   outcome: { points: number; achieved: string | null } | null;
   weeklyHours: number | null;
+  /** Set when weeklyHours is the pace a deadline needs (hours left over
+   *  weeks left), rather than a figure chosen by hand. */
+  paced: boolean;
   deadline: string | null;
   events: ScoreEvent[];
 }
@@ -154,7 +158,7 @@ export function plural(unit: string): string {
 
 export { atlasPoints } from './rules';
 
-function fromFile(src: VaultSource): ScoreItem | null {
+function fromFile(src: VaultSource, today: string = authorDay()): ScoreItem | null {
   const surface = surfaceOf(src.path);
   if (!surface) return null;
   let parsed;
@@ -187,6 +191,7 @@ function fromFile(src: VaultSource): ScoreItem | null {
     repeat: block?.repeat ?? [],
     outcome: block?.outcome ? { points: block.outcome, achieved: null } : null,
     weeklyHours: block?.weeklyHours ?? null,
+    paced: false,
     deadline: null,
   };
 
@@ -265,6 +270,19 @@ function fromFile(src: VaultSource): ScoreItem | null {
      (its status is someone else's fact). Anything else that has since been
      made current again by hand (status edited back) counts as active; the
      stale flag is ignored. */
+  /* Pace. Anything with a deadline and finite parts needs a certain number
+     of hours a week to be ready in time: the hours its unfinished parts are
+     worth, over the weeks left. That replaces a figure chosen by hand, and
+     moves on its own as work gets done (or does not). Open-ended activities
+     (flashcards, papers) have no finish line, so they are not in it. */
+  if (base.deadline && base.parts.length) {
+    const left = base.parts.reduce((n, g) => n + g.points - Math.round((g.points * Math.min(g.count, g.prior + g.done.reduce((q, e) => q + (parseDone(e)?.qty ?? 0), 0))) / g.count), 0);
+    const days = Math.round((Date.parse(`${base.deadline}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
+    const weeks = Math.max(1, days) / 7;
+    base.weeklyHours = Math.round(((left * MINUTES_PER_POINT) / 60 / weeks) * 10) / 10;
+    base.paced = true;
+  }
+
   if (base.parked) {
     if (surface === 'exams' || !base.active) { base.active = false; base.needsSetup = null; }
     else base.parked = false;
@@ -311,7 +329,7 @@ function atlasItem(src: VaultSource, tallies: Extracted['tallies']): ScoreItem |
     key: src.path, table: 'living_entries', surface: 'atlas', slug: 'field-atlas',
     title: 'The Field Atlas', href: '/field-atlas', lane: DEFAULT_LANE.atlas,
     active: false, parked: false, private: false, hasBlock: false, needsSetup: null,
-    parts: [], repeat: [], outcome: null, weeklyHours: null, deadline: null, events,
+    parts: [], repeat: [], outcome: null, weeklyHours: null, paced: false, deadline: null, events,
   };
 }
 
@@ -347,7 +365,7 @@ export function effectiveBlock(item: ScoreItem): ScoreBlock {
   };
 }
 
-export function extractAll(files: VaultSource[]): Extracted {
+export function extractAll(files: VaultSource[], today: string = authorDay()): Extracted {
   const tallies: Extracted['tallies'] = {
     tasks: { done: 0, total: 0 }, atlas: { done: 0, total: 0 }, list: { done: 0, total: 0 },
   };
@@ -368,7 +386,7 @@ export function extractAll(files: VaultSource[]): Extracted {
       tallies.list = listTally(f);
       continue;
     }
-    const item = fromFile(f);
+    const item = fromFile(f, today);
     if (item) items.push(item);
   }
 
