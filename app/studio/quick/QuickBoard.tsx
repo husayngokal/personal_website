@@ -527,7 +527,9 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
                   <span className={styles.rowTitle}>{i.title}</span>
                   <span className={styles.rowMeta}>{liveSummary(i)}{i.weeklyHours ? ` · ${i.weeklyHours} h a week` : ''}</span>
                 </div>
-                <Btn busy={busy === `${i.key}:unpark`} disabled={!!busy} onClick={() => send({ target: 'score', table: i.table, slug: i.slug, action: 'unpark' }, `${i.key}:unpark`)}>Back on the plate</Btn>
+                {i.paced || i.weeklyHours
+                  ? <Btn busy={busy === `${i.key}:unpark`} disabled={!!busy} onClick={() => send({ target: 'score', table: i.table, slug: i.slug, action: 'unpark' }, `${i.key}:unpark`)}>Back on the plate</Btn>
+                  : <BackOn busy={busy === `${i.key}:unpark`} disabled={!!busy} onBack={(weeklyHours) => send({ target: 'score', table: i.table, slug: i.slug, action: 'unpark', weeklyHours }, `${i.key}:unpark`)} />}
               </li>
             ))}
           </ul>
@@ -1150,6 +1152,21 @@ function PartsEditor({ item, busy, send }: {
         <Btn primary busy={busy === `${item.key}:add`} disabled={!!busy} onClick={() => undefined} submit>Add group</Btn>
       </form>
     </details>
+  );
+}
+
+/* Back on the plate for something with no deadline and no hours a week of
+   its own: it must say what it will get. */
+function BackOn({ busy, disabled, onBack }: { busy: boolean; disabled: boolean; onBack: (hours: number) => void }) {
+  const [v, setV] = useState('');
+  return (
+    <form className={styles.pageLog} onSubmit={(e) => { e.preventDefault(); const n = Number(v); if (n > 0) onBack(n); }}>
+      <label>
+        <span className={styles.srOnly}>Hours a week it will get</span>
+        <input required type="number" min={0.5} step="any" inputMode="decimal" placeholder="hours a week" value={v} onChange={(e) => setV(e.target.value)} />
+      </label>
+      <Btn busy={busy} disabled={disabled || !(Number(v) > 0)} onClick={() => undefined} submit>Back on the plate</Btn>
+    </form>
   );
 }
 

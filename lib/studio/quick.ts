@@ -73,7 +73,7 @@ export type QuickRequest =
   | { target: 'score'; table: string; slug: string; action: 'edit-group'; group: number; name?: string; count?: number; prior?: number }
   | { target: 'score'; table: string; slug: string; action: 'remove-group'; group: number }
   | { target: 'score'; table: string; slug: string; action: 'park' }
-  | { target: 'score'; table: string; slug: string; action: 'unpark' }
+  | { target: 'score'; table: string; slug: string; action: 'unpark'; weeklyHours?: number }
   | { target: 'score'; table: string; slug: string; action: 'restore-block'; block: ScoreBlock | null; fields?: Record<string, ScalarChange> };
 
 interface TargetSpec {
@@ -335,6 +335,15 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string,
     for (const k of Object.keys(restore)) prevFields[k] = scalar(fm[k]);
     let next = setScoreBlock(raw, { ...cloneBlock(own), parked: undefined, parkedFrom: undefined });
     if (Object.keys(restore).length) next = patchFrontmatter(next, restore);
+    /* Nothing goes on the plate without hours a week: a deadline gives its
+       own pace; anything else must say what it will get. */
+    const back = itemFromFile({ path, content: next });
+    if (back?.active && !back.paced && back.weeklyHours == null) {
+      const wh = Math.round(Number(req.weeklyHours) * 10) / 10;
+      if (!(Number.isFinite(wh) && wh > 0)) throw new QuickError('bad-request', 'say how many hours a week it will get first');
+      const nb = readBlock(matter(next).data) ?? { parts: [], repeat: [] };
+      next = setScoreBlock(next, { ...cloneBlock(nb), weeklyHours: wh });
+    }
     return {
       raw: next, changed: next !== raw, row: {}, summary: `${title}: back on the plate`,
       undo: { target: 'score', table: req.table, slug: req.slug, action: 'restore-block', block: own, ...(Object.keys(prevFields).length ? { fields: prevFields } : {}) },
