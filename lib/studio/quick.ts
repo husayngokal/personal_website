@@ -65,6 +65,7 @@ export type QuickRequest =
   | { target: 'score'; table: string; slug: string; action: 'remove-activity'; group: number }
   | { target: 'score'; table: string; slug: string; action: 'reestimate'; unit?: string }
   | { target: 'score'; table: string; slug: string; action: 'delete' }
+  | { target: 'score'; table: string; slug: string; action: 'set-weekly'; hours: number }
   | { target: 'score'; table: string; slug: string; action: 'page'; page: number }
   | { target: 'score'; table: string; slug: string; action: 'setup'; template: TemplateId; inputs: TemplateInputs }
   | { target: 'score'; table: string; slug: string; action: 'add-group'; unit: string; name?: string; count: number; hours: number; basis: 'gut' | 'measured' }
@@ -379,6 +380,13 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string,
       nextBlock = addActivity(block, { unit, kind, ...rate });
       const each = rate.per ? (rate.per >= 1 ? `1 point per ${Math.round(rate.per * 10) / 10} ${plural(unit)}` : `${Math.round((1 / rate.per) * 10) / 10} points each`) : `${rate.points} points each`;
       verb = `added ${kind === 'other' ? unit : spec.label.toLowerCase()} (${each})`;
+    } else if (req.action === 'set-weekly') {
+      /* Hours a week for something with no deadline: your call, and what
+         counts toward the weekly limit. Dated items work theirs out. */
+      const h = Math.round(Number(req.hours) * 10) / 10;
+      if (!Number.isFinite(h) || h < 0 || h > 80) throw new Error('hours a week must be between 0 and 80');
+      nextBlock = { ...cloneBlock(block), weeklyHours: h };
+      verb = `${h} hours a week`;
     } else if (req.action === 'reestimate') {
       const unit = req.unit ?? block.parts[0]?.unit;
       if (!unit) throw new Error('nothing to re-estimate');

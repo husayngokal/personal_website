@@ -396,6 +396,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
                 {[
                   liveSummary(i), i.lane, i.weekPoints ? `+${i.weekPoints} this week` : null,
                   i.weekMinutes || i.weeklyHours ? `${hoursLabel(i.weekMinutes ?? 0)} timed this week${i.weeklyHours ? ` of ${i.weeklyHours} h` : ''}` : null,
+                  !i.paced && !i.weeklyHours && !i.needsSetup ? 'no hours a week set (see More)' : null,
                   i.paced && i.deadline ? `the pace to be ready by ${shortDay(i.deadline)}` : null,
                 ].filter(Boolean).join(' · ')}
               </span>
@@ -469,6 +470,14 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
             <details className={styles.parts}>
               <summary className={styles.partsHead}>More</summary>
               <div className={styles.moreBody}>
+                {!i.paced && !i.needsSetup && (
+                  <WeeklyHours
+                    value={i.weeklyHours}
+                    busy={busy === `${i.key}:wk`}
+                    disabled={!!busy}
+                    onSave={(hours) => send({ target: 'score', table: i.table, slug: i.slug, action: 'set-weekly', hours }, `${i.key}:wk`)}
+                  />
+                )}
                 <p className={styles.setupHead}>
                   Takes it off the plate and frees its {i.weeklyHours ?? 0} hours a week. Nothing logged is lost.
                   {i.table === 'study_credentials' ? ' The exam keeps its date; it just stops counting toward the week.' : ''}
@@ -876,9 +885,9 @@ function TimerCard({ initial, plate, weekMinutes, onLogged, onError }: {
    week are not asked: they are the pace its due date needs. */
 function AddToWeek({ busy, onAdd }: {
   busy: string | null;
-  onAdd: (form: { title: string; lane: string; hours: number; milestones: string[]; due?: string }) => Promise<boolean>;
+  onAdd: (form: { title: string; lane: string; hours: number; milestones: string[]; due?: string; weeklyHours?: number }) => Promise<boolean>;
 }) {
-  const [f, setF] = useState({ title: '', lane: 'quest', hours: '', milestones: '', due: '' });
+  const [f, setF] = useState({ title: '', lane: 'quest', hours: '', milestones: '', due: '', weekly: '' });
   return (
     <details className={styles.fold}>
       <summary className={styles.foldHead}>Add to this week</summary>
@@ -890,12 +899,13 @@ function AddToWeek({ busy, onAdd }: {
             title: f.title, lane: f.lane, hours: Number(f.hours),
             milestones: f.milestones.split(/\r?\n/).map((x) => x.trim()).filter(Boolean),
             due: f.due || undefined,
+            weeklyHours: f.due ? undefined : Number(f.weekly),
           });
-          if (ok) setF({ title: '', lane: f.lane, hours: '', milestones: '', due: '' });
+          if (ok) setF({ title: '', lane: f.lane, hours: '', milestones: '', due: '', weekly: '' });
         }}
       >
         <p className={styles.setupHead}>
-          A new task on this week&apos;s plate. Points come from your gut hours, doubled and frozen. Its hours a week are worked out from the due date.
+          A new task on the plate. Points come from your gut hours for the whole thing, doubled and frozen. With a due date, its hours a week are the pace that date needs; with none, you say how many hours a week you will give it.
         </p>
         <div className={styles.partsGrid}>
           <label className={styles.setupField}><span>What is it?</span><input required value={f.title} placeholder="AI Collusion Research Sprint" onChange={(e) => setF({ ...f, title: e.target.value })} /></label>
@@ -907,7 +917,10 @@ function AddToWeek({ busy, onAdd }: {
             </select>
           </label>
           <label className={styles.setupField}><span>Your gut hours for all of it</span><input required type="number" min={0} step="any" inputMode="decimal" value={f.hours} onChange={(e) => setF({ ...f, hours: e.target.value })} /></label>
-          <label className={styles.setupField}><span>Due (blank: this Sunday)</span><input type="date" value={f.due} onChange={(e) => setF({ ...f, due: e.target.value })} /></label>
+          <label className={styles.setupField}><span>Due date (optional)</span><input type="date" value={f.due} onChange={(e) => setF({ ...f, due: e.target.value })} /></label>
+          {!f.due && (
+            <label className={styles.setupField}><span>No due date: hours a week you will give it</span><input required type="number" min={0.5} step="any" inputMode="decimal" value={f.weekly} placeholder="5" onChange={(e) => setF({ ...f, weekly: e.target.value })} /></label>
+          )}
         </div>
         <label className={styles.setupField}>
           <span>Milestones, one per line, in order (blank if it is one piece)</span>
@@ -1112,6 +1125,23 @@ function PartsEditor({ item, busy, send }: {
         <Btn primary busy={busy === `${item.key}:add`} disabled={!!busy} onClick={() => undefined} submit>Add group</Btn>
       </form>
     </details>
+  );
+}
+
+/* Hours a week for something with no deadline: what you plan to give it,
+   and what counts toward the weekly limit. */
+function WeeklyHours({ value, busy, disabled, onSave }: {
+  value: number | null; busy: boolean; disabled: boolean; onSave: (hours: number) => void;
+}) {
+  const [v, setV] = useState(value == null ? '' : String(value));
+  return (
+    <form className={styles.pageLog} onSubmit={(e) => { e.preventDefault(); const n = Number(v); if (Number.isFinite(n) && n >= 0) onSave(n); }}>
+      <label className={styles.setupField}>
+        <span>Hours a week you give it (no due date)</span>
+        <input type="number" min={0} step="any" inputMode="decimal" value={v} onChange={(e) => setV(e.target.value)} />
+      </label>
+      <Btn busy={busy} disabled={disabled || v === ''} onClick={() => undefined} submit>Save</Btn>
+    </form>
   );
 }
 

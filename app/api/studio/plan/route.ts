@@ -1,14 +1,14 @@
 /*
  * Add something to this week's plate: a quest or a curiosity, in one form.
  *
- *   POST { title, lane, hours, milestones?: string[], due?: 'YYYY-MM-DD' }
+ *   POST { title, lane, hours, milestones?: string[], due?: 'YYYY-MM-DD', weeklyHours? }
  *
  * Creates tasks/<slug>.md scoped to this week with its points frozen in
  * its score block: gut hours doubled, split across the named milestones
  * (one button each, in order) or one piece if none. Its hours a week are
- * not asked for: they are the pace its due date needs (this Sunday if no
- * date is given). Goes through the same weekly-hours check as every other
- * way onto the plate. Studio-only: the session's GitHub token commits.
+ * the pace its due date needs, or, with no due date, the hours a week you
+ * say you will give it. Goes through the same weekly-hours check as every
+ * other way onto the plate. Studio-only: the session's GitHub token commits.
  */
 
 import { NextRequest, NextResponse, after } from 'next/server';
@@ -24,7 +24,7 @@ import { parseFile } from '@/lib/vault/parse';
 import { getServerAdminClient, isSupabaseConfigured } from '@/lib/supabase';
 import { markActiveToday } from '@/lib/content/vault-state';
 import { deriveAndWriteLiveState } from '@/lib/content/derive';
-import { authorDay, weekStart } from '@/lib/content/streak';
+import { authorDay } from '@/lib/content/streak';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   if (!isSupabaseConfigured()) return NextResponse.json({ error: 'no-database' }, { status: 503 });
 
-  let body: { title?: string; lane?: string; hours?: number; milestones?: string[]; due?: string };
+  let body: { title?: string; lane?: string; hours?: number; milestones?: string[]; due?: string; weeklyHours?: number };
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'malformed-body' }, { status: 400 }); }
 
   const title = String(body.title ?? '').replace(/[\r\n]+/g, ' ').trim();
@@ -43,10 +43,16 @@ export async function POST(req: NextRequest) {
   if (!slug) return NextResponse.json({ error: 'bad-request', detail: 'That name has no letters or numbers.' }, { status: 400 });
   const path = `tasks/${slug}.md`;
 
-  /* Due: the date given, or this Sunday (Dubai). */
+  /* With a due date, its hours a week are the pace that date needs. With
+     none, it has no deadline to work back from, so its hours a week are
+     what you say you will give it. Either way that is what counts toward
+     the weekly limit. */
   const today = authorDay();
-  const sunday = (() => { const d = new Date(`${weekStart(today)}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + 6); return d.toISOString().slice(0, 10); })();
-  const due = /^\d{4}-\d{2}-\d{2}$/.test(String(body.due ?? '')) && String(body.due) >= today ? String(body.due) : sunday;
+  const due = /^\d{4}-\d{2}-\d{2}$/.test(String(body.due ?? '')) && String(body.due) >= today ? String(body.due) : null;
+  const weekly = Number(body.weeklyHours);
+  if (!due && !(Number.isFinite(weekly) && weekly > 0)) {
+    return NextResponse.json({ error: 'bad-request', detail: 'Give it a due date, or the hours a week you will give it.' }, { status: 400 });
+  }
   const names = (Array.isArray(body.milestones) ? body.milestones : [])
     .map((m) => String(m).replace(/[\r\n]+/g, ' ').trim().slice(0, 120))
     .filter(Boolean)
@@ -66,7 +72,8 @@ export async function POST(req: NextRequest) {
     } else if (names.length === 1) {
       base.parts[0] = { ...base.parts[0], unit: 'milestone', name: names[0] };
     }
-    const head = `---\ntitle: ${JSON.stringify(title)}\nstatus: open\nscope: this-week\ndue: ${due}\n---\n\nAdded to the plate from Studio.\n`;
+    if (!due) base.weeklyHours = Math.round(weekly * 10) / 10;
+    const head = `---\ntitle: ${JSON.stringify(title)}\nstatus: open\nscope: this-week\n${due ? `due: ${due}\n` : ''}---\n\nAdded to the plate from Studio.\n`;
     raw = setScoreBlock(head, base);
     parseFile(path, raw);
   } catch (err) {

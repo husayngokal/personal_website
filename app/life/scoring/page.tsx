@@ -126,7 +126,9 @@ export default function ScoringPage() {
         Only what is active counts. Every active thing says how many hours a week it takes, and
         together they cannot pass {WEEKLY_HOURS}. Anything with a deadline works its figure out on its
         own: the hours its unfinished parts are worth, over the weeks left. Fall behind and the pace
-        rises; get ahead and it drops. Anything that would push the plate over is refused
+        rises; get ahead and it drops. Anything without one carries the hours a week I choose to give it.
+        The limit is the same for quests and curiosity; the curiosity cap is a different thing, and only
+        limits how much of the weekly bar curiosity can fill. Anything that would push the plate over is refused
         until something comes off: a swap, so the load stays level. A task with no figure of its own
         takes its estimate spread over its scope (all of it in a this-week task, a thirteenth in a
         this-quarter one). Backlog counts for nothing until it is swapped in.
