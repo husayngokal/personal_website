@@ -55,6 +55,9 @@ export interface ScoreBlock {
   /** Taken off the plate without changing the item's own status (how an
    *  exam comes off: its date and pending state stay true). */
   parked?: boolean;
+  /** What taking it off the plate changed (e.g. { status: 'studying' }),
+   *  so bringing it back restores exactly that. */
+  parkedFrom?: Record<string, string>;
   parts: PartGroup[];
   repeat: RepeatGroup[];
 }
@@ -135,6 +138,16 @@ export function readBlock(fm: Record<string, unknown>): ScoreBlock | null {
     weeklyHours: num(r['weekly-hours']),
     outcome: num(r.outcome),
     parked: r.parked === true ? true : undefined,
+    parkedFrom: (() => {
+      const v = r['parked-from'];
+      if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
+      const out: Record<string, string> = {};
+      for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
+        if (/^[a-z][a-z-]*$/.test(k) && (typeof x === 'string' || typeof x === 'number')) out[k] = String(x);
+        else if (/^[a-z][a-z-]*$/.test(k) && x instanceof Date) out[k] = x.toISOString().slice(0, 10);
+      }
+      return Object.keys(out).length ? out : undefined;
+    })(),
     parts,
     repeat,
   };
@@ -153,6 +166,7 @@ export function serializeBlock(b: ScoreBlock): string[] {
   if (b.weeklyHours !== undefined) out.push(`  weekly-hours: ${b.weeklyHours}`);
   if (b.outcome !== undefined) out.push(`  outcome: ${b.outcome}`);
   if (b.parked) out.push('  parked: true');
+  if (b.parked && b.parkedFrom) out.push(`  parked-from: ${JSON.stringify(b.parkedFrom)}`);
   if (b.parts.length) {
     out.push('  parts:');
     for (const g of b.parts) {

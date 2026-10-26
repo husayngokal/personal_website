@@ -272,24 +272,40 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string)
   }
 
   if (req.action === 'park' || req.action === 'unpark') {
-    /* An exam's date and pending state are someone else's facts, so it
-       comes off the plate by a flag in its score block, not a status. */
-    if (req.table === 'study_credentials') {
-      const base: ScoreBlock = own ?? { parts: [], repeat: [] };
-      const next = setScoreBlock(raw, { ...cloneBlock(base), parked: req.action === 'park' ? true : undefined });
+    /* Taking something off the plate changes its own status where it has
+       one (a course back to planned, a task to later, a book to planned, a
+       project paused) and records what it changed in the score block, so
+       it shows in the Off the plate list and "Back on the plate" restores
+       exactly that. An exam's status is someone else's fact: only the flag. */
+    const item = itemFromFile({ path, content: raw });
+    const base: ScoreBlock = own ?? (item ? effectiveBlock(item) : { parts: [], repeat: [] });
+    if (req.action === 'park') {
+      const park = req.table === 'study_credentials' ? {} : PARK[req.table];
+      if (!park) throw new QuickError('bad-request', 'this cannot be taken off the plate here');
+      const prevFields: Record<string, ScalarChange> = {};
+      const from: Record<string, string> = {};
+      for (const k of Object.keys(park)) {
+        const v = scalar(fm[k]);
+        prevFields[k] = v;
+        if (v !== null) from[k] = String(v);
+      }
+      let next = setScoreBlock(raw, { ...cloneBlock(base), parked: true, parkedFrom: Object.keys(from).length ? from : undefined });
+      if (Object.keys(park).length) next = patchFrontmatter(next, park);
       return {
-        raw: next, changed: next !== raw, row: {},
-        summary: `${title}: ${req.action === 'park' ? 'off the plate' : 'back on the plate'}`,
-        undo: { target: 'score', table: req.table, slug: req.slug, action: 'restore-block', block: own },
+        raw: next, changed: next !== raw, row: {}, summary: `${title}: off the plate`,
+        undo: { target: 'score', table: req.table, slug: req.slug, action: 'restore-block', block: own, ...(Object.keys(prevFields).length ? { fields: prevFields } : {}) },
       };
     }
-    if (req.action === 'unpark') throw new QuickError('bad-request', 'bring this back by marking it current');
-    const park = PARK[req.table];
-    if (!park) throw new QuickError('bad-request', 'this cannot be taken off the plate here');
-    const prev: Record<string, ScalarChange> = {};
-    for (const k of Object.keys(park)) prev[k] = scalar(fm[k]);
-    const next = patchFrontmatter(raw, park);
-    return { raw: next, changed: next !== raw, row: {}, summary: `${title}: off the plate`, undo: undo(prev) };
+    if (!own?.parked) throw new QuickError('bad-request', 'this is not off the plate');
+    const restore: Record<string, ScalarChange> = { ...(own.parkedFrom ?? {}) };
+    const prevFields: Record<string, ScalarChange> = {};
+    for (const k of Object.keys(restore)) prevFields[k] = scalar(fm[k]);
+    let next = setScoreBlock(raw, { ...cloneBlock(own), parked: undefined, parkedFrom: undefined });
+    if (Object.keys(restore).length) next = patchFrontmatter(next, restore);
+    return {
+      raw: next, changed: next !== raw, row: {}, summary: `${title}: back on the plate`,
+      undo: { target: 'score', table: req.table, slug: req.slug, action: 'restore-block', block: own, ...(Object.keys(prevFields).length ? { fields: prevFields } : {}) },
+    };
   }
 
   /* Logging. An item scored by defaults (a plain or recurring task) gets

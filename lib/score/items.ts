@@ -250,7 +250,14 @@ function fromFile(src: VaultSource): ScoreItem | null {
     }
   }
 
-  if (base.parked) { base.active = false; base.needsSetup = null; }
+  /* Parked: off the plate. An exam stays parked whatever its status says
+     (its status is someone else's fact). Anything else that has since been
+     made current again by hand (status edited back) counts as active; the
+     stale flag is ignored. */
+  if (base.parked) {
+    if (surface === 'exams' || !base.active) { base.active = false; base.needsSetup = null; }
+    else base.parked = false;
+  }
 
   const events: ScoreEvent[] = [];
   for (const g of base.parts) events.push(...partEvents(base, g));
