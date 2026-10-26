@@ -517,8 +517,9 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
         </details>
       )}
 
-      {/* -- Building ------------------------------------------------- */}
-      <Section title="Building" count={projects.length} empty="No projects yet.">
+      {/* -- Building: only when there are projects --------------- */}
+      {projects.length > 0 && (
+      <Section title="Building" count={projects.length}>
         {projects.map((p) => {
           const on = p.status === 'active';
           const key = `${p.slug}:active`;
@@ -544,6 +545,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
           );
         })}
       </Section>
+      )}
 
       {/* -- Tasks ---------------------------------------------------- */}
       <Section title="This week" count={week.length} empty="Nothing scoped to this week. Pull a task in from below.">
