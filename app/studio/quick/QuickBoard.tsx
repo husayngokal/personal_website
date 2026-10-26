@@ -51,12 +51,10 @@ type Note = { kind: 'ok'; text: string; undo: QuickRequest | null } | { kind: 'e
 const THIS_WEEK = new Set(['today', 'this-week']);
 const SOON = new Set(['this-month', 'this-quarter', 'this-year']);
 
-/* What the plate shows: everything scored and active, except plain tasks
-   (their Done button below scores them) and whole-surface items. */
+/* What the plate shows: everything active, plain tasks included (their
+   one part is their Done button), except whole-surface items. */
 function onPlate(i: ItemView): boolean {
-  if (!i.active || i.surface === 'atlas') return false;
-  if (i.surface === 'tasks') return i.repeat.length > 0 || i.parts.some((g) => g.unit !== 'task');
-  return true;
+  return i.active && i.surface !== 'atlas';
 }
 
 export function QuickBoard({ initial }: { initial: QuickData }) {
@@ -254,7 +252,6 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
 
   const plate = (score?.items ?? []).filter(onPlate);
   const open = tasks.filter((t) => t.status !== 'done' && !t.recurrence);
-  const week = open.filter((t) => THIS_WEEK.has(t.scope));
   const soon = open.filter((t) => SOON.has(t.scope));
   const backlog = open.filter((t) => t.scope === 'lifetime' && t.category === 'backlog');
   const later = open.filter((t) => !THIS_WEEK.has(t.scope) && !SOON.has(t.scope) && !(t.scope === 'lifetime' && t.category === 'backlog'));
@@ -438,7 +435,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
                     disabled={!!busy}
                     onClick={() => send({ target: 'score', table: i.table, slug: i.slug, action: 'part', group: g.index }, `${i.key}:p${g.index}`)}
                   >
-                    {g.name ? `${g.name}: ` : ''}{g.unit} done
+                    {g.unit === 'task' && !g.name ? 'Done' : `${g.name ? `${g.name}: ` : ''}${g.unit} done`}
                   </Btn>
                 ))}
                 {finishedUnits(i).map((u) => (
@@ -567,9 +564,6 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
       )}
 
       {/* -- Tasks ---------------------------------------------------- */}
-      <Section title="This week" count={week.length} empty="Nothing scoped to this week. Pull a task in from below.">
-        {week.map(taskRow)}
-      </Section>
       {soon.length > 0 && (
         <Section title="This month, quarter or year" count={soon.length}>
           {soon.map(taskRow)}
