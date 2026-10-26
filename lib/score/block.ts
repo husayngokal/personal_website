@@ -429,6 +429,9 @@ function laneOf(inputs: TemplateInputs, surface: string): Lane {
 export function buildFromTemplate(id: TemplateId, inputs: TemplateInputs, surface: string): ScoreBlock {
   const block = buildParts(id, inputs, surface);
   const wh = Number(inputs.weeklyHours);
+  /* A task can leave it blank: its pace then comes from its due date, or
+     its estimate spread over its scope. Everything else must say. */
+  if (id === 'task' && (inputs.weeklyHours === undefined || inputs.weeklyHours === '')) return block;
   if (!Number.isFinite(wh) || wh <= 0) throw new Error('Hours a week must be a positive number');
   block.weeklyHours = Math.round(wh * 10) / 10;
   return block;

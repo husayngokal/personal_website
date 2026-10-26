@@ -1,13 +1,14 @@
 /*
  * Add something to this week's plate: a quest or a curiosity, in one form.
  *
- *   POST { title, lane, hours, count, weeklyHours }
+ *   POST { title, lane, hours, milestones?: string[], due?: 'YYYY-MM-DD' }
  *
  * Creates tasks/<slug>.md scoped to this week with its points frozen in
- * its score block (the task template: gut hours doubled, spread across
- * `count` milestones), after the same weekly-hours check every other way
- * onto the plate goes through. Studio-only: the session's GitHub token
- * makes the commit.
+ * its score block: gut hours doubled, split across the named milestones
+ * (one button each, in order) or one piece if none. Its hours a week are
+ * not asked for: they are the pace its due date needs (this Sunday if no
+ * date is given). Goes through the same weekly-hours check as every other
+ * way onto the plate. Studio-only: the session's GitHub token commits.
  */
 
 import { NextRequest, NextResponse, after } from 'next/server';
@@ -23,6 +24,7 @@ import { parseFile } from '@/lib/vault/parse';
 import { getServerAdminClient, isSupabaseConfigured } from '@/lib/supabase';
 import { markActiveToday } from '@/lib/content/vault-state';
 import { deriveAndWriteLiveState } from '@/lib/content/derive';
+import { authorDay, weekStart } from '@/lib/content/streak';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -32,7 +34,7 @@ export async function POST(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   if (!isSupabaseConfigured()) return NextResponse.json({ error: 'no-database' }, { status: 503 });
 
-  let body: { title?: string; lane?: string; hours?: number; count?: number; weeklyHours?: number };
+  let body: { title?: string; lane?: string; hours?: number; milestones?: string[]; due?: string };
   try { body = await req.json(); } catch { return NextResponse.json({ error: 'malformed-body' }, { status: 400 }); }
 
   const title = String(body.title ?? '').replace(/[\r\n]+/g, ' ').trim();
@@ -41,13 +43,31 @@ export async function POST(req: NextRequest) {
   if (!slug) return NextResponse.json({ error: 'bad-request', detail: 'That name has no letters or numbers.' }, { status: 400 });
   const path = `tasks/${slug}.md`;
 
+  /* Due: the date given, or this Sunday (Dubai). */
+  const today = authorDay();
+  const sunday = (() => { const d = new Date(`${weekStart(today)}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + 6); return d.toISOString().slice(0, 10); })();
+  const due = /^\d{4}-\d{2}-\d{2}$/.test(String(body.due ?? '')) && String(body.due) >= today ? String(body.due) : sunday;
+  const names = (Array.isArray(body.milestones) ? body.milestones : [])
+    .map((m) => String(m).replace(/[\r\n]+/g, ' ').trim().slice(0, 120))
+    .filter(Boolean)
+    .slice(0, 30);
+
   let raw: string;
   try {
-    const block = buildFromTemplate('task', {
-      hours: body.hours, count: body.count, lane: body.lane, weeklyHours: body.weeklyHours,
-    }, 'tasks');
-    const head = `---\ntitle: ${JSON.stringify(title)}\nstatus: open\nscope: this-week\n---\n\nAdded to the plate from Studio.\n`;
-    raw = setScoreBlock(head, block);
+    const base = buildFromTemplate('task', { hours: body.hours, count: 1, lane: body.lane }, 'tasks');
+    const total = base.parts[0].points;
+    /* Named milestones: one group each, the points split so they add up
+       to exactly the total. */
+    if (names.length > 1) {
+      base.parts = names.map((name, i) => ({
+        unit: 'milestone', name, count: 1, prior: 0, done: [],
+        points: Math.round((total * (i + 1)) / names.length) - Math.round((total * i) / names.length),
+      }));
+    } else if (names.length === 1) {
+      base.parts[0] = { ...base.parts[0], unit: 'milestone', name: names[0] };
+    }
+    const head = `---\ntitle: ${JSON.stringify(title)}\nstatus: open\nscope: this-week\ndue: ${due}\n---\n\nAdded to the plate from Studio.\n`;
+    raw = setScoreBlock(head, base);
     parseFile(path, raw);
   } catch (err) {
     return NextResponse.json({ error: 'bad-request', detail: (err as Error).message }, { status: 400 });

@@ -280,7 +280,7 @@ export const TEMPLATES: Record<TemplateId, { label: string; fields: TemplateFiel
       { key: 'hours', label: 'Your gut hours for the whole thing', kind: 'number' },
       { key: 'count', label: 'How many milestones?', kind: 'number', hint: '1 if it is one piece' },
       { key: 'lane', label: 'Lane', kind: 'lane' },
-      WEEKLY,
+      { ...WEEKLY, optional: true, hint: 'blank: worked out from its due date or scope' },
     ],
   },
 };

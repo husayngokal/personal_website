@@ -413,3 +413,13 @@
 .timerLabel { color: var(--text-strong); font-size: var(--type-body-m); font-family: var(--font-serif); }
 .timerStart { display: flex; flex-direction: column; gap: var(--space-s); }
 @media (prefers-reduced-motion: reduce) { .timerDot { animation: none; } }
+.setupField textarea {
+  padding: var(--space-s);
+  background: var(--bg-page);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: var(--font-sans);
+  font-size: var(--type-ui);
+  color: var(--text-strong);
+  resize: vertical;
+}

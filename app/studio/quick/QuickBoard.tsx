@@ -329,6 +329,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
         busy={busy}
         onAdd={async (form) => {
           if (busy) return false;
+          /* fields: title, lane, hours, milestones, due */
           setBusy('plan');
           try {
             const res = await fetch('/api/studio/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
@@ -478,6 +479,21 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
                 >
                   Hold to take off the plate
                 </HoldButton>
+                {i.table === 'tasks' && (
+                  <>
+                    <p className={styles.setupHead}>Or delete it outright, if it should never have been added. This removes the task and anything logged on it.</p>
+                    <HoldButton
+                      ms={2500}
+                      disabled={!!busy}
+                      onDone={() => {
+                        void send({ target: 'score', table: i.table, slug: i.slug, action: 'delete' }, `${i.key}:delete`)
+                          .then(() => setScore((sc) => sc && { ...sc, items: sc.items.filter((x) => x.key !== i.key) }));
+                      }}
+                    >
+                      Hold to delete this task
+                    </HoldButton>
+                  </>
+                )}
               </div>
             </details>
           </li>
@@ -854,12 +870,13 @@ function TimerCard({ initial, plate, weekMinutes, onLogged, onError }: {
   );
 }
 
-/* Put something new on this week's plate: a quest or a curiosity. */
+/* Put something new on this week's plate: a quest or a curiosity. Hours a
+   week are not asked: they are the pace its due date needs. */
 function AddToWeek({ busy, onAdd }: {
   busy: string | null;
-  onAdd: (form: { title: string; lane: string; hours: number; count: number; weeklyHours: number }) => Promise<boolean>;
+  onAdd: (form: { title: string; lane: string; hours: number; milestones: string[]; due?: string }) => Promise<boolean>;
 }) {
-  const [f, setF] = useState({ title: '', lane: 'quest', hours: '', count: '1', weeklyHours: '' });
+  const [f, setF] = useState({ title: '', lane: 'quest', hours: '', milestones: '', due: '' });
   return (
     <details className={styles.fold}>
       <summary className={styles.foldHead}>Add to this week</summary>
@@ -867,11 +884,17 @@ function AddToWeek({ busy, onAdd }: {
         className={styles.partsAdd}
         onSubmit={async (e) => {
           e.preventDefault();
-          const ok = await onAdd({ title: f.title, lane: f.lane, hours: Number(f.hours), count: Number(f.count) || 1, weeklyHours: Number(f.weeklyHours) });
-          if (ok) setF({ title: '', lane: f.lane, hours: '', count: '1', weeklyHours: '' });
+          const ok = await onAdd({
+            title: f.title, lane: f.lane, hours: Number(f.hours),
+            milestones: f.milestones.split(/\r?\n/).map((x) => x.trim()).filter(Boolean),
+            due: f.due || undefined,
+          });
+          if (ok) setF({ title: '', lane: f.lane, hours: '', milestones: '', due: '' });
         }}
       >
-        <p className={styles.setupHead}>A new task on the plate for this week. Its points are worked out from your gut hours (doubled) and frozen.</p>
+        <p className={styles.setupHead}>
+          A new task on this week&apos;s plate. Points come from your gut hours, doubled and frozen. Its hours a week are worked out from the due date.
+        </p>
         <div className={styles.partsGrid}>
           <label className={styles.setupField}><span>What is it?</span><input required value={f.title} placeholder="AI Collusion Research Sprint" onChange={(e) => setF({ ...f, title: e.target.value })} /></label>
           <label className={styles.setupField}>
@@ -881,10 +904,13 @@ function AddToWeek({ busy, onAdd }: {
               <option value="curiosity">Curiosity</option>
             </select>
           </label>
-          <label className={styles.setupField}><span>Your gut hours, all in</span><input required type="number" min={0} step="any" inputMode="decimal" value={f.hours} onChange={(e) => setF({ ...f, hours: e.target.value })} /></label>
-          <label className={styles.setupField}><span>Milestones</span><input required type="number" min={1} inputMode="numeric" value={f.count} onChange={(e) => setF({ ...f, count: e.target.value })} /></label>
-          <label className={styles.setupField}><span>Hours a week</span><input required type="number" min={0} step="any" inputMode="decimal" value={f.weeklyHours} onChange={(e) => setF({ ...f, weeklyHours: e.target.value })} /></label>
+          <label className={styles.setupField}><span>Your gut hours for all of it</span><input required type="number" min={0} step="any" inputMode="decimal" value={f.hours} onChange={(e) => setF({ ...f, hours: e.target.value })} /></label>
+          <label className={styles.setupField}><span>Due (blank: this Sunday)</span><input type="date" value={f.due} onChange={(e) => setF({ ...f, due: e.target.value })} /></label>
         </div>
+        <label className={styles.setupField}>
+          <span>Milestones, one per line, in order (blank if it is one piece)</span>
+          <textarea rows={3} value={f.milestones} placeholder={'Spec the API\nBuild the importer\nShip it'} onChange={(e) => setF({ ...f, milestones: e.target.value })} />
+        </label>
         <Btn primary busy={busy === 'plan'} disabled={!!busy} onClick={() => undefined} submit>Add to the plate</Btn>
       </form>
     </details>

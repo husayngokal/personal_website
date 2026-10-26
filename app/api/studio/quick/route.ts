@@ -21,7 +21,7 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { getStudioSession } from '@/lib/studio/session';
-import { getFile, putFile } from '@/lib/studio/github';
+import { deleteFile, getFile, putFile } from '@/lib/studio/github';
 import { applyQuick, QuickError, specFor, type QuickRequest, type QuickResult } from '@/lib/studio/quick';
 import { fetchVaultMarkdown } from '@/lib/vault/tarball';
 import { readScore, recomputeScore } from '@/lib/score/store';
@@ -65,6 +65,32 @@ export async function POST(req: NextRequest) {
     (await getVaultPath(db, spec.table, body.slug)) ??
     (spec.folder ? `${spec.folder}/${body.slug}.md` : null);
   if (!path) return NextResponse.json({ error: 'path-unknown', detail: 'No vault path on record for this entry yet. It appears after the next sync.' }, { status: 404 });
+
+  /* Deleting a task outright (a mistake, or something that should never
+     have been added): tasks only, removes the vault file. Everything else
+     comes off the plate instead and keeps its history. */
+  if (body.target === 'score' && body.action === 'delete') {
+    if (spec.table !== 'tasks') return NextResponse.json({ error: 'bad-request', detail: 'Only a task can be deleted here.' }, { status: 400 });
+    const file = await getFile(session.token, path);
+    if (!file) return NextResponse.json({ error: 'not-found', path }, { status: 404 });
+    try {
+      await deleteFile(session.token, { path, sha: file.sha, message: `studio: delete ${path}` });
+    } catch (err) {
+      return NextResponse.json({ error: 'commit-failed', detail: (err as Error).message }, { status: 502 });
+    }
+    after(async () => {
+      try {
+        await db.from('tasks').delete().eq('slug', body.slug);
+        await deriveAndWriteLiveState(db);
+        const files = (await fetchVaultMarkdown()).filter((f) => f.path !== path);
+        await recomputeScore(db, files, { asOf: new Date().toISOString() });
+      } catch (err) {
+        console.error(`[studio/quick] delete follow-up failed: ${(err as Error).message}`);
+      }
+      for (const p of ['/', '/life/tasks']) { try { revalidatePath(p); } catch { /* best effort */ } }
+    });
+    return NextResponse.json({ ok: true, path, row: {}, summary: 'Deleted.', undo: null, deleted: true });
+  }
 
   const today = authorDay();
   const cached = await readScore(db);

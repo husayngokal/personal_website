@@ -64,6 +64,7 @@ export type QuickRequest =
   | { target: 'score'; table: string; slug: string; action: 'add-activity'; kind: string; paperHours?: number; unit?: string; minutesPerUnit?: number }
   | { target: 'score'; table: string; slug: string; action: 'remove-activity'; group: number }
   | { target: 'score'; table: string; slug: string; action: 'reestimate'; unit?: string }
+  | { target: 'score'; table: string; slug: string; action: 'delete' }
   | { target: 'score'; table: string; slug: string; action: 'page'; page: number }
   | { target: 'score'; table: string; slug: string; action: 'setup'; template: TemplateId; inputs: TemplateInputs }
   | { target: 'score'; table: string; slug: string; action: 'add-group'; unit: string; name?: string; count: number; hours: number; basis: 'gut' | 'measured' }
@@ -278,6 +279,8 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string,
     return { raw: next, changed: true, row: {}, summary: `${title}: set up, ${total} points in all`, undo: undo() };
   }
 
+  if (req.action === 'delete') throw new QuickError('bad-request', 'deleting is handled by the route');
+
   if (req.action === 'park' || req.action === 'unpark') {
     /* Taking something off the plate changes its own status where it has
        one (a course back to planned, a task to later, a book to planned, a
@@ -356,7 +359,9 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string,
       if (!g) throw new Error('no such part');
       nextBlock = logParts(block, req.group, req.qty ?? 1, today);
       const n = partsDone(nextBlock.parts[req.group]) - partsDone(g);
-      verb = `${n > 1 ? `${n} ${plural(g.unit)}` : g.unit} done (${partsDone(nextBlock.parts[req.group])} of ${g.count})`;
+      verb = g.name && g.count === 1
+        ? `${g.name} done`
+        : `${n > 1 ? `${n} ${plural(g.unit)}` : g.unit} done (${partsDone(nextBlock.parts[req.group])} of ${g.count})`;
     } else if (req.action === 'repeat') {
       const g = block.repeat[req.group];
       if (!g) throw new Error('no such repeatable');

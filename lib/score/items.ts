@@ -278,7 +278,7 @@ function fromFile(src: VaultSource, today: string = authorDay()): ScoreItem | nu
   if (base.deadline && base.parts.length) {
     const left = base.parts.reduce((n, g) => n + g.points - Math.round((g.points * Math.min(g.count, g.prior + g.done.reduce((q, e) => q + (parseDone(e)?.qty ?? 0), 0))) / g.count), 0);
     const days = Math.round((Date.parse(`${base.deadline}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
-    const weeks = Math.max(1, days) / 7;
+    const weeks = Math.max(7, days) / 7;           // due within a week: all of it this week
     base.weeklyHours = Math.round(((left * MINUTES_PER_POINT) / 60 / weeks) * 10) / 10;
     base.paced = true;
   }
