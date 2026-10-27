@@ -11,7 +11,7 @@
 
 import { authorDay, weekStart } from '../content/streak';
 import {
-  CURIOSITY_CAP, LEVEL_SIZE, SCORE_EPOCH, WEEKLY_BAR, WEEKLY_HOURS, type Lane,
+  CALIBRATION, CURIOSITY_CAP, LEVEL_SIZE, MINUTES_PER_POINT, SCORE_EPOCH, WEEKLY_BAR, WEEKLY_HOURS, type Lane,
 } from './rules';
 import { partsDone, repeatCount } from './block';
 import { plural, type Extracted, type ScoreEvent, type ScoreItem, type Surface, type Tally } from './items';
@@ -83,6 +83,9 @@ export interface ScoreState {
   tallies: { tasks: Tally; atlas: Tally; list: Tally };
   load: { hours: number; capacity: number };
   recent: ScoreEvent[];         // newest first
+  /** How new estimates are corrected: timed work on finished parts over
+   *  priced minutes, across everything, recent weeks only. */
+  calibration: { factor: number; parts: number; timedMinutes: number; pricedMinutes: number; enough: boolean };
   /** Timed hours (a log; never points). */
   time: { weekMinutes: number; byKey: Record<string, number>; totalByKey: Record<string, number>; recent: Session[] };
 }
@@ -221,6 +224,28 @@ export function computeScore(extracted: Extracted, today: string = authorDay()):
     .sort((a, b) => `${b.date} ${b.to}`.localeCompare(`${a.date} ${a.to}`))
     .slice(0, 12);
 
+  /* Calibration. For every item with parts finished in the window and
+     record-only time logged against it in the same window, set the time
+     against what those parts were priced at. One ratio across everything:
+     a single section running long or short barely moves it. */
+  const winStart = addDays(today, -CALIBRATION.windowDays);
+  let calTimed = 0, calPriced = 0, calParts = 0;
+  for (const item of items) {
+    const ev = item.events.filter((e) => e.kind === 'part' && e.date >= winStart && e.date >= SCORE_EPOCH && e.date <= today);
+    if (!ev.length) continue;
+    const mins = sessions
+      .filter((x) => x.key === item.key && !x.scores && x.date >= winStart && x.date <= today)
+      .reduce((n, x) => n + x.minutes, 0);
+    if (!mins) continue;
+    calTimed += mins;
+    calPriced += ev.reduce((n, e) => n + e.points, 0) * MINUTES_PER_POINT;
+    calParts += ev.length;
+  }
+  const calEnough = calParts >= CALIBRATION.minParts && calPriced >= CALIBRATION.minPricedMinutes;
+  const calFactor = calEnough
+    ? Math.min(CALIBRATION.max, Math.max(CALIBRATION.min, Math.round((calTimed / calPriced) * 20) / 20))
+    : 1;
+
   const views = items
     .filter((i) => i.active || i.parked || weekByItem.has(i.key))
     .map((i) => itemView(i, weekByItem.get(i.key) ?? 0, byKey[i.key] ?? 0))
@@ -256,5 +281,6 @@ export function computeScore(extracted: Extracted, today: string = authorDay()):
     load: { hours: Math.round(load * 10) / 10, capacity: WEEKLY_HOURS },
     recent: events.slice(0, 15),
     time: { weekMinutes, byKey, totalByKey, recent: recentSessions },
+    calibration: { factor: calFactor, parts: calParts, timedMinutes: calTimed, pricedMinutes: calPriced, enough: calEnough },
   };
 }

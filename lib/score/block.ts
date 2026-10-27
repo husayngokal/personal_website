@@ -426,8 +426,8 @@ function laneOf(inputs: TemplateInputs, surface: string): Lane {
 /** Turn a template's rough answers into a frozen score block. Every
  *  template also records the hours a week the item takes while active,
  *  which is what the weekly limit adds up. */
-export function buildFromTemplate(id: TemplateId, inputs: TemplateInputs, surface: string): ScoreBlock {
-  const block = buildParts(id, inputs, surface);
+export function buildFromTemplate(id: TemplateId, inputs: TemplateInputs, surface: string, calib = 1): ScoreBlock {
+  const block = buildParts(id, inputs, surface, calib);
   const wh = Number(inputs.weeklyHours);
   /* A task can leave it blank: its pace then comes from its due date, or
      its estimate spread over its scope. Everything else must say. */
@@ -437,12 +437,12 @@ export function buildFromTemplate(id: TemplateId, inputs: TemplateInputs, surfac
   return block;
 }
 
-function buildParts(id: TemplateId, inputs: TemplateInputs, surface: string): ScoreBlock {
+function buildParts(id: TemplateId, inputs: TemplateInputs, surface: string, calib = 1): ScoreBlock {
   switch (id) {
     case 'exam-prep': {
       const count = Math.round(needNum(inputs, 'count', 'Number of parts'));
       const each = needNum(inputs, 'hoursEach', 'Hours per part');
-      const points = estimate.gut(count * each);
+      const points = estimate.gut(count * each, calib);
       const block: ScoreBlock = {
         lane: 'quest', template: id, outcome: points,
         parts: [{ unit: String(inputs.unit || 'module').trim(), count, points, prior: 0, done: [] }],
@@ -460,7 +460,7 @@ function buildParts(id: TemplateId, inputs: TemplateInputs, surface: string): Sc
       const tier = (typeof inputs.tier === 'string' && inputs.tier in READING_TIERS ? inputs.tier : 'normal') as Tier;
       return {
         lane: laneOf(inputs, surface), template: id, tier,
-        parts: [{ unit: 'page', count: pages, points: estimate.pages(pages, tier), prior: 0, done: [] }],
+        parts: [{ unit: 'page', count: pages, points: estimate.pages(pages, tier, calib), prior: 0, done: [] }],
         repeat: [],
       };
     }
@@ -469,7 +469,7 @@ function buildParts(id: TemplateId, inputs: TemplateInputs, surface: string): Sc
       const count = Math.round(needNum(inputs, 'count', 'Number of parts'));
       return {
         lane: laneOf(inputs, surface), template: id,
-        parts: [{ unit: String(inputs.unit || 'module').trim(), count, points: estimate.formula(hours), prior: 0, done: [] }],
+        parts: [{ unit: String(inputs.unit || 'module').trim(), count, points: estimate.formula(hours, calib), prior: 0, done: [] }],
         repeat: [],
       };
     }
@@ -477,7 +477,7 @@ function buildParts(id: TemplateId, inputs: TemplateInputs, surface: string): Sc
       const hours = needNum(inputs, 'hours', 'Hours');
       const count = Math.max(1, Math.round(Number(inputs.count) || 1));
       const lane = laneOf(inputs, surface);
-      const points = estimate.gut(hours);
+      const points = estimate.gut(hours, calib);
       return {
         lane, template: id,
         parts: [{ unit: count > 1 ? 'milestone' : 'task', count, points, prior: 0, done: [] }],

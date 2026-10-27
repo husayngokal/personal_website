@@ -43,6 +43,14 @@ export const LEVEL_SIZE = 1000;
  *  10 hours against an expected 5). The low end corrects them. */
 export const GUT_FACTOR = 2;
 
+/** Calibration: prices are set once and never re-priced, but the way new
+ *  estimates are made learns from the record. Over the last WINDOW_DAYS,
+ *  all timed work on finished parts is set against the minutes those parts
+ *  were priced at; the ratio (once there are enough parts to trust it,
+ *  and kept within bounds) multiplies every new gut or formula estimate.
+ *  Existing prices never change, so slow work never pays itself more. */
+export const CALIBRATION = { windowDays: 56, minParts: 5, minPricedMinutes: 120, min: 0.5, max: 2 };
+
 /** Formula estimates (pages at a reading speed, published course hours,
  *  hiking time from distance and climb) leave out breaks and setup. */
 export const FORMULA_FACTOR = 1.25;
@@ -100,13 +108,13 @@ export function hoursToPoints(hours: number): number {
 
 export const estimate = {
   /** Your own guess, corrected for the measured underestimate. */
-  gut: (hours: number) => hoursToPoints(hours * GUT_FACTOR),
+  gut: (hours: number, calib = 1) => hoursToPoints(hours * GUT_FACTOR * calib),
   /** A formula or published figure, with breaks and setup added. */
-  formula: (hours: number) => hoursToPoints(hours * FORMULA_FACTOR),
+  formula: (hours: number, calib = 1) => hoursToPoints(hours * FORMULA_FACTOR * calib),
   /** Something already timed (a past paper's sitting plus review). */
   measured: (hours: number) => hoursToPoints(hours),
-  pages: (pages: number, tier: Tier) =>
-    hoursToPoints(((pages * READING_TIERS[tier].minutesPerPage) / 60) * FORMULA_FACTOR),
+  pages: (pages: number, tier: Tier, calib = 1) =>
+    hoursToPoints(((pages * READING_TIERS[tier].minutesPerPage) / 60) * FORMULA_FACTOR * calib),
   words: (words: number) => hoursToPoints(words / WORDS_PER_HOUR),
 };
 
@@ -189,14 +197,14 @@ export const PAPER_MARKING_FACTOR = 1.5;
 
 /** Frozen numbers for a new activity: either units per point (counts) or
  *  points per unit (a past paper). */
-export function activityRate(kind: ActivityKind, opts: { paperHours?: number; minutesPerUnit?: number } = {}): { per?: number; points?: number } {
+export function activityRate(kind: ActivityKind, opts: { paperHours?: number; minutesPerUnit?: number; calib?: number } = {}): { per?: number; points?: number } {
   const a = ACTIVITIES[kind];
   if (kind === 'past-paper') {
     const h = Number(opts.paperHours);
     if (!Number.isFinite(h) || h <= 0) throw new Error("a past paper needs its official length in hours");
     return { points: hoursToPoints(h * PAPER_MARKING_FACTOR * RETRIEVAL_FACTOR) };
   }
-  const m = kind === 'other' ? Number(opts.minutesPerUnit) * GUT_FACTOR : (a.minutesPerUnit ?? 0) * (a.retrieval ? RETRIEVAL_FACTOR : 1);
+  const m = kind === 'other' ? Number(opts.minutesPerUnit) * GUT_FACTOR * (opts.calib ?? 1) : (a.minutesPerUnit ?? 0) * (a.retrieval ? RETRIEVAL_FACTOR : 1);
   if (!Number.isFinite(m) || m <= 0) throw new Error('minutes per unit must be a positive number');
   return { per: Math.round((MINUTES_PER_POINT / m) * 1000) / 1000 };
 }

@@ -34,7 +34,9 @@ export interface QuickData {
   timer: TimerNow;
 }
 
-type ScoreSlice = Pick<ScoreState, 'week' | 'lifetime' | 'streak' | 'items'> & { load?: ScoreState['load']; time?: ScoreState['time'] };
+type ScoreSlice = Pick<ScoreState, 'week' | 'lifetime' | 'streak' | 'items'> & {
+  load?: ScoreState['load']; time?: ScoreState['time']; calibration?: ScoreState['calibration'];
+};
 
 interface ApiOk {
   ok: true;
@@ -88,7 +90,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
         const h = hold.current;
         if (h && Date.now() < h.until && v.lifetime.points < h.points) return;
         if (h && v.lifetime.points >= h.points) hold.current = null;
-        setScore({ week: v.week, lifetime: v.lifetime, streak: v.streak, items: v.items, load: v.load, time: v.time });
+        setScore({ week: v.week, lifetime: v.lifetime, streak: v.streak, items: v.items, load: v.load, time: v.time, calibration: v.calibration });
       })
       .subscribe();
     return () => { void supabase.removeChannel(channel); };
@@ -975,6 +977,13 @@ function WeekCard({ score, load }: { score: ScoreSlice; load: ScoreState['load']
         >
           Sound {sound ? 'on' : 'off'}
         </button>
+        {score.calibration && (
+          <p className={styles.load}>
+            {score.calibration.enough
+              ? `Your estimates run ${score.calibration.factor}\u00d7 (from ${score.calibration.parts} timed parts, last 8 weeks). New estimates use it; old prices never change.`
+              : `Estimate calibration: 1\u00d7 until 5 parts are finished and timed (${score.calibration.parts} so far).`}
+          </p>
+        )}
         {load && (
           <p className={styles.load}>
             <span className={styles.loadTrack} aria-hidden="true">
@@ -1095,7 +1104,6 @@ function pluralUnit(u: string): string {
 type GroupAction =
   | { action: 'add-activity'; kind: string; paperHours?: number; unit?: string; minutesPerUnit?: number }
   | { action: 'remove-activity'; group: number }
-  | { action: 'reestimate'; unit: string }
   | { action: 'part'; group: number }
   | { action: 'edit-group'; group: number; name?: string; count?: number; prior?: number }
   | { action: 'remove-group'; group: number }
@@ -1111,7 +1119,6 @@ function PartsEditor({ item, busy, send }: {
   return (
     <details className={styles.parts}>
       <summary className={styles.partsHead}>Edit parts · {item.parts.length} {item.parts.length === 1 ? 'group' : 'groups'}</summary>
-      <Reestimate item={item} busy={busy} send={send} />
       <ul className={styles.partsList}>
         {item.parts.map((g) => (
           <GroupRow key={`${item.key}-${g.index}-${g.count}-${g.prior}-${g.name ?? ''}`} itemKey={item.key} g={g} busy={busy} send={send} />
@@ -1204,29 +1211,6 @@ function WeeklyHours({ value, busy, disabled, onSave }: {
       </label>
       <Btn busy={busy} disabled={disabled || v === ''} onClick={() => undefined} submit>Save</Btn>
     </form>
-  );
-}
-
-/* Re-estimate from timing: once, early, from timed minutes per part.
-   Shown while it is still allowed; the server checks the same rules. */
-function Reestimate({ item, busy, send }: {
-  item: ItemView; busy: string | null; send: (req: GroupAction, key: string) => void;
-}) {
-  const unit = item.parts[0]?.unit;
-  if (!unit) return null;
-  const groups = item.parts.filter((g) => g.unit === unit);
-  const logged = groups.reduce((n, g) => n + g.logged, 0);
-  const total = groups.reduce((n, g) => n + g.count, 0);
-  if (groups.some((g) => g.reestimated) || logged < 1 || logged > Math.ceil(total / 4)) return null;
-  return (
-    <div className={styles.moreBody}>
-      <p className={styles.setupHead}>
-        Points for each {unit} are an estimate until you have timed some. Re-estimating sets them from your timed minutes per {unit}, rounded up to a whole point. Once only, and only in the first quarter.
-      </p>
-      <HoldButton disabled={!!busy} onDone={() => send({ action: 'reestimate', unit }, `${item.key}:re`)}>
-        Hold to re-estimate from my timing
-      </HoldButton>
-    </div>
   );
 }
 

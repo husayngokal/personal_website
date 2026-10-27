@@ -4,7 +4,7 @@ import {
   ATLAS, CURIOSITY_CAP, FORMULA_FACTOR, GUT_FACTOR, LEVEL_SIZE, MINUTES_PER_POINT,
   READING_TIERS, RECURRING_GUT_HOURS, SCORE_EPOCH, TASK_GUT_HOURS, WEEKLY_BAR, WEEKLY_HOURS,
   WORDS_PER_HOUR, estimate, pagesPerPoint, type Tier,
-  ACTIVITIES, RETRIEVAL_FACTOR, TIMED_FACTOR, TIMED_SESSION_CAP_MIN, activityRate, type ActivityKind,
+  ACTIVITIES, CALIBRATION, RETRIEVAL_FACTOR, TIMED_FACTOR, TIMED_SESSION_CAP_MIN, activityRate, type ActivityKind,
 } from '@/lib/score/rules';
 import { shortDay } from '@/lib/score/format';
 import styles from './scoring.module.css';
@@ -81,7 +81,8 @@ export default function ScoringPage() {
         <li><strong>Gut estimates are multiplied by {GUT_FACTOR}.</strong> I measured my own estimates running two to three times short. The low end corrects them.</li>
         <li><strong>Formula estimates are multiplied by {FORMULA_FACTOR}</strong>, for breaks and setup: pages at a reading speed, published course hours, walking time from distance and climb.</li>
         <li><strong>Measured time is used as it is</strong>: how long a past paper actually takes to sit and mark.</li>
-        <li><strong>Timing beats guessing.</strong> Once the first parts of something are done and timed, its points can be re-estimated from the real minutes per part, rounded up to a whole point. Once only, and only in the first quarter, so slow work later on is never paid more.</li>
+<li><strong>Prices are set once and never changed.</strong> A part that took twice as long as expected earns its price, and so does one that took half. Over a month the swings cancel; judging one part at a time would only measure the noise.</li>
+        <li><strong>The estimating learns, not the prices.</strong> Over the last {CALIBRATION.windowDays / 7} weeks, all timed work on finished parts is set against what those parts were priced at, across everything. Once at least {CALIBRATION.minParts} parts are in, that one ratio (kept between {CALIBRATION.min}&times; and {CALIBRATION.max}&times;) multiplies every new gut or formula estimate. Old prices stay as they were, so slow work never pays itself more.</li>
         <li><strong>Points are frozen when something is set up.</strong> If a rule here ever changes, it applies to new things only, and the change goes in the <Link href="/life/changed-my-mind">changed-my-mind log</Link>. Points already earned are never rewritten.</li>
       </ul>
 

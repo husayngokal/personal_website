@@ -170,7 +170,7 @@ function changesFor(req: QuickRequest, fm: Record<string, unknown>, today: strin
 
 /** Facts the server supplies that a single file cannot: all-time timed
  *  minutes on this item, for re-estimating. */
-export interface QuickContext { timedMinutes?: number }
+export interface QuickContext { timedMinutes?: number; calibration?: number }
 
 export function applyQuick(req: QuickRequest, path: string, raw: string, today: string, ctx: QuickContext = {}): QuickResult {
   const spec = specFor(req as { target: QuickTarget; table?: string });
@@ -272,7 +272,7 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string,
     if (!item) throw new QuickError('bad-request', 'this file cannot be scored');
     let block: ScoreBlock;
     try {
-      block = buildFromTemplate(req.template, req.inputs ?? {}, item.surface);
+      block = buildFromTemplate(req.template, req.inputs ?? {}, item.surface, ctx.calibration ?? 1);
     } catch (err) {
       throw new QuickError('bad-request', (err as Error).message);
     }
@@ -406,7 +406,7 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string,
       if (!(req.kind in ACTIVITIES)) throw new Error('unknown activity');
       const kind = req.kind as ActivityKind;
       const spec = ACTIVITIES[kind];
-      const rate = activityRate(kind, { paperHours: req.paperHours, minutesPerUnit: req.minutesPerUnit });
+      const rate = activityRate(kind, { paperHours: req.paperHours, minutesPerUnit: req.minutesPerUnit, calib: ctx.calibration ?? 1 });
       const unit = kind === 'other' ? String(req.unit ?? '').trim() : spec.unit;
       nextBlock = addActivity(block, { unit, kind, ...rate });
       const each = rate.per ? (rate.per >= 1 ? `1 point per ${Math.round(rate.per * 10) / 10} ${plural(unit)}` : `${Math.round((1 / rate.per) * 10) / 10} points each`) : `${rate.points} points each`;

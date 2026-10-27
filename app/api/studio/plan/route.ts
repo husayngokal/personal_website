@@ -59,9 +59,12 @@ export async function POST(req: NextRequest) {
     .filter(Boolean)
     .slice(0, 30);
 
+  const db = getServerAdminClient();
+  const cached = await readScore(db);
+
   let raw: string;
   try {
-    const base = buildFromTemplate('task', { hours: body.hours, count: 1, lane: body.lane }, 'tasks');
+    const base = buildFromTemplate('task', { hours: body.hours, count: 1, lane: body.lane }, 'tasks', cached?.calibration?.factor ?? 1);
     const total = base.parts[0].points;
     /* Named milestones: one group each, the points split so they add up
        to exactly the total. */
@@ -85,8 +88,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'bad-request', detail: (err as Error).message }, { status: 400 });
   }
 
-  const db = getServerAdminClient();
-  const over = overCapacity(await readScore(db), path, raw);
+  const over = overCapacity(cached, path, raw);
   if (over) return NextResponse.json({ error: 'over-capacity', ...over }, { status: 409 });
 
   if (await getFile(session.token, path)) {
