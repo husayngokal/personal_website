@@ -122,6 +122,10 @@ function finishesOf(item: ScoreItem): Finish[] {
   const out: Finish[] = [];
   for (const g of item.parts) {
     const entries = g.done.map(parseDone).filter((e): e is DoneEntry => !!e).sort(doneOrder);
+    /* Judged by the price committed before the work, even where the points
+       paid were re-scored afterwards; a part priced only afterwards (0)
+       says nothing about estimating, so it never calibrates. */
+    const price = g.priced ?? g.points;
     let n = g.prior;
     for (const e of entries) {
       if (n >= g.count) break;
@@ -131,9 +135,9 @@ function finishesOf(item: ScoreItem): Finish[] {
       out.push({
         at: stamp(e),
         date: e.date,
-        points: Math.round((g.points * n) / g.count) - Math.round((g.points * before) / g.count),
+        points: Math.round((price * n) / g.count) - Math.round((price * before) / g.count),
         counted: e.date >= SCORE_EPOCH,
-        basis: g.basis ?? null,
+        basis: g.priced === 0 ? null : g.basis ?? null,
         factor: g.factor ?? (learned ? STARTING_FACTORS[g.basis as Learning] : 1),
         group: g,
         qty: n - before,

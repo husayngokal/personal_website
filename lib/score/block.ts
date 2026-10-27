@@ -52,6 +52,11 @@ export interface PartGroup {
   factor?: number;
   /** The basis in words: "120 pages, technical reading, x 1.25". */
   why?: string;
+  /** Set only when finished parts were re-scored by hand afterwards (a
+   *  one-time exception, 27 Oct 2026): the price committed before the work,
+   *  which calibration and the notes still judge the estimate by. 0 means
+   *  no price was committed before the work, so it never calibrates. */
+  priced?: number;
 }
 
 export interface RepeatGroup {
@@ -162,6 +167,7 @@ export function readBlock(fm: Record<string, unknown>): ScoreBlock | null {
       ...(isSource(o.basis) ? { basis: o.basis } : {}),
       ...(num(o.factor) && num(o.factor)! > 0 ? { factor: num(o.factor) } : {}),
       ...(str(o.why) ? { why: str(o.why) } : {}),
+      ...(num(o.priced) !== undefined && num(o.priced)! >= 0 ? { priced: Math.round(num(o.priced)!) } : {}),
     });
   }
 
@@ -237,6 +243,7 @@ export function serializeBlock(b: ScoreBlock): string[] {
       if (g.basis) out.push(`      basis: ${q(g.basis)}`);
       if (g.factor !== undefined) out.push(`      factor: ${g.factor}`);
       if (g.why) out.push(`      why: ${q(g.why)}`);
+      if (g.priced !== undefined) out.push(`      priced: ${g.priced}`);
       out.push(`      done: ${list(g.done)}`);
     }
   }
