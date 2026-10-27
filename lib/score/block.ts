@@ -419,6 +419,8 @@ export function editGroup(
   if (change.count !== undefined) {
     const c = Math.round(change.count);
     if (!Number.isFinite(c) || c < 1) throw new Error('count must be at least 1');
+    /* Fewer parts means bigger ones: the cap holds here too. */
+    if (g.basis && c < g.count) capCheck(g.points, c, g.basis, g.unit);
     g.count = c;
   }
   if (change.prior !== undefined) {
