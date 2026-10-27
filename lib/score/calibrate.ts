@@ -351,9 +351,9 @@ export function varianceNotes(items: ScoreItem[], sessions: Session[], today: st
       const same = batch.every((f) => f.group === g);
       notes.push({
         date: batch[0].date, key: item.key, title: item.title, href: item.href,
-        label: same
-          ? `${g.name ? `${g.name} · ` : ''}${qty > 1 ? `${qty} ${plural(g.unit)}` : g.unit}`
-          : `${qty} parts`,
+        label: !same ? `${qty} parts`
+          : g.name ? (qty > 1 ? `${g.name} · ${qty} ${plural(g.unit)}` : g.name)
+          : qty > 1 ? `${qty} ${plural(g.unit)}` : g.unit,
         timed, priced, ratio: Math.round(ratio * 100) / 100,
         basis: same ? g.basis ?? null : null, why: same ? g.why ?? null : null,
       });
