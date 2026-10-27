@@ -4,18 +4,32 @@ import {
   ATLAS, CURIOSITY_CAP, FORMULA_FACTOR, GUT_FACTOR, LEVEL_SIZE, MINUTES_PER_POINT,
   READING_TIERS, RECURRING_GUT_HOURS, SCORE_EPOCH, TASK_GUT_HOURS, WEEKLY_BAR, WEEKLY_HOURS,
   WORDS_PER_HOUR, estimate, pagesPerPoint, type Tier,
-  ACTIVITIES, CALIBRATION, RETRIEVAL_FACTOR, TIMED_FACTOR, TIMED_SESSION_CAP_MIN, activityRate, type ActivityKind,
+  ACTIVITIES, CALIBRATION, RETRIEVAL_FACTOR, SOURCES, STARTING_FACTORS, TIMED_FACTOR, TIMED_SESSION_CAP_MIN, UNIT_CAP, VARIANCE,
+  activityRate, factorLabel, type ActivityKind, type Learning,
 } from '@/lib/score/rules';
 import { shortDay } from '@/lib/score/format';
+import { getScoreState } from '@/lib/content/score';
 import styles from './scoring.module.css';
 
 /*
  * How scoring works: the public rules.
  *
- * Every number on this page is read from lib/score/rules.ts, the same
- * module that does the maths, so the explanation cannot drift from the
- * scoring. Static: it changes only when the rules do.
+ * Every rule on this page is read from lib/score/rules.ts, the same module
+ * that does the maths, so the explanation cannot drift from the scoring.
+ * The factors in force and the notes come from the stored score, which is
+ * recomputed from the vault on every change.
  */
+
+export const revalidate = 300;
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const longDay = (iso: string) => `${Number(iso.slice(8, 10))} ${MONTHS[Number(iso.slice(5, 7)) - 1]} ${iso.slice(0, 4)}`;
+const dur = (m: number) => (m < 60 ? `${m} min` : m % 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m / 60} h`);
+const KINDS: { key: Learning; label: string }[] = [
+  { key: 'gut', label: 'My guess' },
+  { key: 'stated', label: 'Published hours' },
+  { key: 'formula', label: 'Counted content' },
+];
 
 export const metadata = {
   title: 'How scoring works',
@@ -25,7 +39,10 @@ export const metadata = {
 
 const fmt = (n: number) => (Number.isInteger(n) ? String(n) : String(Number(n.toFixed(2))));
 
-export default function ScoringPage() {
+export default async function ScoringPage() {
+  const score = await getScoreState();
+  const cal = score?.calibration?.factors ? score.calibration : null;
+  const notes = score?.variance ?? [];
   const tiers = Object.entries(READING_TIERS) as [Tier, (typeof READING_TIERS)[Tier]][];
   const wordsPerPoint = (WORDS_PER_HOUR * MINUTES_PER_POINT) / 60;
   const capHours = (CURIOSITY_CAP * MINUTES_PER_POINT) / 60;
@@ -77,14 +94,72 @@ export default function ScoringPage() {
       </ul>
 
       <h2 className={styles.h2}>Estimates</h2>
+      <p>Every price is set before the work starts, from the first of these that exists:</p>
+      <ol className={styles.list}>
+        <li><strong>An official timing.</strong> A past paper&apos;s set length. Used as it is, and never corrected.</li>
+        <li><strong>The content, counted.</strong> Pages or words at a reading speed (below), video at its running time, a walk from its distance and climb. Times {factorLabel(STARTING_FACTORS.formula)} to start with, for breaks and setup.</li>
+        <li><strong>Published hours.</strong> A course&apos;s own figure. Times {factorLabel(STARTING_FACTORS.stated)} to start with: published hours tend to run long, not short.</li>
+        <li><strong>My guess</strong>, for the whole thing, written down raw. Times {factorLabel(STARTING_FACTORS.gut)} to start with. The factor does the correcting, so a guess is never padded by hand.</li>
+      </ol>
       <ul className={styles.list}>
-        <li><strong>Gut estimates are multiplied by {GUT_FACTOR}.</strong> I measured my own estimates running two to three times short. The low end corrects them.</li>
-        <li><strong>Formula estimates are multiplied by {FORMULA_FACTOR}</strong>, for breaks and setup: pages at a reading speed, published course hours, walking time from distance and climb.</li>
-        <li><strong>Measured time is used as it is</strong>: how long a past paper actually takes to sit and mark.</li>
-<li><strong>Prices are set once and never changed.</strong> A part that took twice as long as expected earns its price, and so does one that took half. Over a month the swings cancel; judging one part at a time would only measure the noise.</li>
-        <li><strong>The estimating learns, not the prices.</strong> Over the last {CALIBRATION.windowDays / 7} weeks, all timed work on finished parts is set against what those parts were priced at, across everything. Once at least {CALIBRATION.minParts} parts are in, that one ratio (kept between {CALIBRATION.min}&times; and {CALIBRATION.max}&times;) multiplies every new gut or formula estimate. Old prices stay as they were, so slow work never pays itself more.</li>
-        <li><strong>Points are frozen when something is set up.</strong> If a rule here ever changes, it applies to new things only, and the change goes in the <Link href="/life/changed-my-mind">changed-my-mind log</Link>. Points already earned are never rewritten.</li>
+        <li><strong>Prices are set once and never changed.</strong> A part that took twice as long as expected earns its price, and so does one that took half. Over a month the swings cancel; judging one part at a time would only measure the noise.</li>
+        <li><strong>No part is worth more than {UNIT_CAP.default} points</strong>, or {UNIT_CAP.gut} for a guess. Bigger work is split into parts, so one bad estimate can only be so wrong. An official timing is one unit, and exempt.</li>
+        <li><strong>One re-measure, never a re-price.</strong> Once the first part of something priced from published hours or a guess is done, what is left is priced again from what it holds: pages, words and video, counted. Up or down, once only, and whatever that first part took, so going slowly buys nothing. Otherwise a price reopens only if the work itself changes or a clerical error is found, never for speed or skill.</li>
+        <li><strong>Anything worked on before it is priced is set up at half rate</strong>, because a price set after a look at the work leans on it.</li>
+        <li><strong>Points are frozen when something is set up.</strong> Points already earned are never rewritten.</li>
       </ul>
+
+      <h2 className={styles.h2}>Calibration</h2>
+      <p>
+        My timing never changes a price. It corrects the factors, slowly, so the next estimate of the
+        same kind is better. A rule that let my own speed set my future prices would pay slow work, so
+        none is allowed.
+      </p>
+      <ul className={styles.list}>
+        <li><strong>One factor per kind of estimate.</strong> Guesses, published hours and counted content each learn from their own record, never from each other. Official timings and the activity rates never learn: getting faster at them is the point.</li>
+        <li><strong>Once a month.</strong> A review on the first Monday of each month reads the last {CALIBRATION.windowWeeks} weeks. A new factor applies only to things priced after it.</li>
+        <li><strong>Items, not minutes.</strong> Each item counts once, however many parts it has; none carries more than a quarter of the weight, and each is held between a third and three times its price. Trust in the record grows with the number of items: halfway at five, two thirds at ten, four fifths at twenty.</li>
+        <li><strong>Small steps.</strong> A review moves a factor at most a tenth, to the nearest 0.05. One that would end up under half or over double where it started is held, and the whole kind is checked by hand.</li>
+        <li><strong>Clean time only.</strong> Only time run on the timer counts, never time typed in afterwards. Overlapping sessions count once. Only time up to an item&apos;s latest finished part counts, and an item with any finished part untimed is left out, so timing only the slow parts cannot steer a factor. An item needs at least {CALIBRATION.minItemMinutes} timed minutes.</li>
+      </ul>
+      <table className={styles.table}>
+        <thead>
+          <tr><th>Estimate</th><th>Starts at</th><th>In force</th><th>{cal ? `On ${shortDay(cal.next)}, so far` : 'Next review'}</th></tr>
+        </thead>
+        <tbody>
+          {KINDS.map(({ key, label }) => (
+            <tr key={key}>
+              <td>{label}</td>
+              <td>&times;{factorLabel(STARTING_FACTORS[key])}</td>
+              <td>&times;{factorLabel(cal ? cal.factors[key] : STARTING_FACTORS[key])}</td>
+              <td>{cal?.preview?.classes?.[key] ? `\u00d7${factorLabel(cal.preview.classes[key].next)}${cal.preview.classes[key].items ? `, from ${cal.preview.classes[key].items} ${cal.preview.classes[key].items === 1 ? 'item' : 'items'}` : ''}` : 'not yet'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p>
+        {cal?.since
+          ? `The factors in force were set by the review of ${longDay(cal.since)}. The next is on ${longDay(cal.next)}.`
+          : `These rules began on 27 October 2026. The first review is on ${longDay(cal?.next ?? CALIBRATION.firstReview)}; until then the starting factors stand.`}
+      </p>
+
+      <h2 className={styles.h2}>Notes</h2>
+      <p>
+        Any finished part that took under {VARIANCE.low === 0.5 ? 'half' : VARIANCE.low} or over {VARIANCE.high === 2 ? 'double' : VARIANCE.high} its
+        price gets a line here, with how it was priced. Points never change.
+      </p>
+      {notes.length ? (
+        <ul className={styles.list}>
+          {notes.map((n) => (
+            <li key={`${n.key}-${n.date}-${n.label}`}>
+              {shortDay(n.date)} · {n.href ? <Link href={n.href}>{n.title}</Link> : n.title}, {n.label}: {dur(n.timed)} against {dur(n.priced)} priced ({factorLabel(n.ratio)}&times;).
+              {n.basis ? ` Priced from ${SOURCES[n.basis].label}${n.why ? `: ${n.why}` : ''}.` : ''}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p>None yet.</p>
+      )}
 
       <h2 className={styles.h2}>Rates</h2>
       <table className={styles.table}>
@@ -115,6 +190,11 @@ export default function ScoringPage() {
           <tr><td>A normal 300-page book</td><td>{estimate.pages(300, 'normal')} points.</td></tr>
         </tbody>
       </table>
+
+      <p>
+        Text counted in words, like an article, becomes pages at {READING_TIERS.normal.wordsPerPage} words a
+        page for light and normal reading and {READING_TIERS.technical.wordsPerPage} for technical and dense.
+      </p>
 
       <h2 className={styles.h2}>Levels</h2>
       <p>
@@ -171,7 +251,8 @@ export default function ScoringPage() {
         supplementary reading or a one-off, scores at <strong>half rate</strong>: {fmt(60 / MINUTES_PER_POINT * TIMED_FACTOR)} points
         an hour. Hours are input, not output, and a timer cannot tell focus from drift. At the end of a
         session the focused minutes are confirmed, never more than the timer ran, and one session counts
-        for at most {TIMED_SESSION_CAP_MIN / 60} hours. Its points are frozen into the log.
+        for at most {TIMED_SESSION_CAP_MIN / 60} hours. Its points are frozen into the log. Time typed in
+        afterwards is marked as such: it stays in the record, but never calibrates an estimate.
       </p>
 
       <h2 className={styles.h2}>Finishing</h2>
@@ -181,6 +262,14 @@ export default function ScoringPage() {
         sat; the result pays its outcome. A new week starts at midnight on Monday, Dubai time, on its
         own; past weeks are never stored separately, they are read back from the dated log in each
         item, so they cannot drift.
+      </p>
+
+      <h2 className={styles.h2}>Changing the rules</h2>
+      <p>
+        A change to these rules goes in the <Link href="/life/changed-my-mind">changed-my-mind log</Link> before
+        it applies, takes effect the Monday after at the earliest, and never touches points already
+        earned. Every proposal has to pass one test: an extra minute on the clock must never buy a
+        minute or more of future price.
       </p>
     </div>
   );

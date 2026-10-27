@@ -21,7 +21,7 @@ import {
   DEFAULT_LANE, MINUTES_PER_POINT, RECURRING_GUT_HOURS, SCOPE_WEEKS, SCORE_EPOCH, TASK_GUT_HOURS, atlasPoints, countGain, estimate,
   type Lane, type TemplateId,
 } from './rules';
-import { parseDone, readBlock, type PartGroup, type RepeatGroup, type ScoreBlock } from './block';
+import { doneOrder, parseDone, readBlock, remeasureDue, type PartGroup, type RepeatGroup, type ScoreBlock } from './block';
 import { parseSessions, type Session } from './time';
 import { authorDay } from '../content/streak';
 
@@ -60,6 +60,9 @@ export interface ScoreItem {
    *  weeks left), rather than a figure chosen by hand. */
   paced: boolean;
   deadline: string | null;
+  /** Due its one content re-measure (block.ts): priced from published
+   *  hours or a guess, first part done, not yet re-measured. */
+  remeasure: boolean;
   events: ScoreEvent[];
 }
 
@@ -113,7 +116,7 @@ function partEvents(item: Omit<ScoreItem, 'events'>, g: PartGroup): ScoreEvent[]
   const entries = g.done
     .map(parseDone)
     .filter((e): e is NonNullable<typeof e> => !!e)
-    .sort((a, b) => a.date.localeCompare(b.date));
+    .sort(doneOrder);
   const out: ScoreEvent[] = [];
   let n = g.prior;
   for (const e of entries) {
@@ -193,6 +196,7 @@ function fromFile(src: VaultSource, today: string = authorDay()): ScoreItem | nu
     weeklyHours: block?.weeklyHours ?? null,
     paced: false,
     deadline: null,
+    remeasure: remeasureDue(block),
   };
 
   switch (surface) {
@@ -329,7 +333,7 @@ function atlasItem(src: VaultSource, tallies: Extracted['tallies']): ScoreItem |
     key: src.path, table: 'living_entries', surface: 'atlas', slug: 'field-atlas',
     title: 'The Field Atlas', href: '/field-atlas', lane: DEFAULT_LANE.atlas,
     active: false, parked: false, private: false, hasBlock: false, needsSetup: null,
-    parts: [], repeat: [], outcome: null, weeklyHours: null, paced: false, deadline: null, events,
+    parts: [], repeat: [], outcome: null, weeklyHours: null, paced: false, deadline: null, remeasure: false, events,
   };
 }
 

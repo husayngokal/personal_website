@@ -25,6 +25,8 @@ import { deleteFile, getFile, putFile } from '@/lib/studio/github';
 import { applyQuick, QuickError, specFor, type QuickRequest, type QuickResult } from '@/lib/studio/quick';
 import { fetchVaultMarkdown } from '@/lib/vault/tarball';
 import { readScore, recomputeScore } from '@/lib/score/store';
+import { factorsInForce } from '@/lib/score/calibrate';
+import { dubaiParts } from '@/lib/score/time';
 import { overCapacity } from '@/lib/score/capacity';
 import { getServerAdminClient, isSupabaseConfigured } from '@/lib/supabase';
 import { getVaultPath, markActiveToday } from '@/lib/content/vault-state';
@@ -105,7 +107,8 @@ export async function POST(req: NextRequest) {
       if (!file) return NextResponse.json({ error: 'not-found', path }, { status: 404 });
       const computed = applyQuick(body, path, file.content, today, {
         timedMinutes: cached?.time?.totalByKey?.[path],
-        calibration: cached?.calibration?.factor,
+        factors: factorsInForce(cached),
+        now: dubaiParts(Date.now()).hm,
       });
 
       /* The weekly limit. Anything that would push the active load past

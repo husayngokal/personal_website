@@ -14,7 +14,10 @@
  *
  * A session that scores carries its points frozen at the end of the line
  * (work with no button of its own, at half rate; see rules.ts). The rest
- * are a record only.
+ * are a record only. Time added by hand afterwards, rather than run on
+ * the timer, is marked "by hand" and never used to calibrate estimates:
+ *
+ *   - 2026-10-28 · 19:30 to 20:00 · 30 min · - · Reading · by hand
  *
  * Day and times are Dubai time. The fourth field is the vault path of the
  * item the time went to, or "-" for anything else; the last is a label.
@@ -32,9 +35,11 @@ export interface Session {
   label: string;
   /** Present when the session scores: points frozen at stop, and lane. */
   scores?: { points: number; lane: 'quest' | 'curiosity' };
+  /** Typed in afterwards, not run on the timer. */
+  manual?: boolean;
 }
 
-const LINE = /^- (\d{4}-\d{2}-\d{2}) · (\d{2}:\d{2}) to (\d{2}:\d{2}) · (\d+) min · (\S+) · (.*?)(?: · scores (\d+) \((quest|curiosity)\))?$/;
+const LINE = /^- (\d{4}-\d{2}-\d{2}) · (\d{2}:\d{2}) to (\d{2}:\d{2}) · (\d+) min · (\S+) · (.*?)( · by hand)?(?: · scores (\d+) \((quest|curiosity)\))?$/;
 
 export function parseSessions(body: string): Session[] {
   const out: Session[] = [];
@@ -44,7 +49,8 @@ export function parseSessions(body: string): Session[] {
     out.push({
       date: m[1], from: m[2], to: m[3], minutes: Number(m[4]),
       key: m[5] === '-' ? null : m[5], label: m[6].trim(),
-      ...(m[7] ? { scores: { points: Number(m[7]), lane: m[8] as 'quest' | 'curiosity' } } : {}),
+      ...(m[7] ? { manual: true } : {}),
+      ...(m[8] ? { scores: { points: Number(m[8]), lane: m[9] as 'quest' | 'curiosity' } } : {}),
     });
   }
   return out;
@@ -53,7 +59,7 @@ export function parseSessions(body: string): Session[] {
 const clean = (s: string) => s.replace(/[\r\n·]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140);
 
 export function formatSession(s: Session): string {
-  const tail = s.scores ? ` · scores ${Math.max(0, Math.round(s.scores.points))} (${s.scores.lane})` : '';
+  const tail = (s.manual ? ' · by hand' : '') + (s.scores ? ` · scores ${Math.max(0, Math.round(s.scores.points))} (${s.scores.lane})` : '');
   return `- ${s.date} · ${s.from} to ${s.to} · ${Math.max(1, Math.round(s.minutes))} min · ${s.key ?? '-'} · ${clean(s.label) || 'Untitled'}${tail}`;
 }
 
@@ -65,7 +71,7 @@ export function sessionFile(date: string): string {
 export function appendSession(existing: string | null, s: Session): string {
   const line = formatSession(s);
   if (!existing || !existing.trim()) {
-    return `# Time, ${s.date.slice(0, 7)}\n\nTimed sessions, Dubai time. A session scores only when the line ends with its points.\n\n${line}\n`;
+    return `# Time, ${s.date.slice(0, 7)}\n\nTimed sessions, Dubai time. A session scores only when the line ends with its points; one marked "by hand" was typed in afterwards.\n\n${line}\n`;
   }
   return existing.replace(/\s*$/, '\n') + line + '\n';
 }

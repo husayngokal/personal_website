@@ -39,27 +39,102 @@ export const CURIOSITY_CAP = 80;
 /** A level per this many lifetime points (about five full weeks). */
 export const LEVEL_SIZE = 1000;
 
-/** Gut estimates run 2 to 3x short (measured: BlueDot section one took
- *  10 hours against an expected 5). The low end corrects them. */
-export const GUT_FACTOR = 2;
+/* -- Where an estimate comes from --------------------------------------
+ * Every price records its source, picked by precedence before any of the
+ * work is timed: an official timing if there is one; else a content
+ * measure (pages or words at a reading tier, video minutes, route time);
+ * else the provider's stated hours; else my own guess, entered raw for the
+ * whole thing and never corrected by hand, because the source's factor
+ * does the correcting.
+ *
+ * A factor turns a source's raw number into the focused minutes the work
+ * is expected to take. Formula, stated and gut factors learn from the
+ * record once a month (calibrate.ts). Official timings never do: re-rating
+ * a fixed timing from my own speed would only pay slow work more.
+ *
+ * `pace` marks parts priced from my own measured speed before these rules
+ * began. Nothing new is priced that way, and those parts never learn.
+ */
 
-/** Calibration: prices are set once and never re-priced, but the way new
- *  estimates are made learns from the record. Over the last WINDOW_DAYS,
- *  all timed work on finished parts is set against the minutes those parts
- *  were priced at; the ratio (once there are enough parts to trust it,
- *  and kept within bounds) multiplies every new gut or formula estimate.
- *  Existing prices never change, so slow work never pays itself more. */
-export const CALIBRATION = { windowDays: 56, minParts: 5, minPricedMinutes: 120, min: 0.5, max: 2 };
+export type Source = 'measured' | 'formula' | 'stated' | 'gut' | 'pace';
+export type Learning = 'formula' | 'stated' | 'gut';
+export type Factors = Record<Learning, number>;
+export const LEARNING: Learning[] = ['formula', 'stated', 'gut'];
 
-/** Formula estimates (pages at a reading speed, published course hours,
- *  hiking time from distance and climb) leave out breaks and setup. */
-export const FORMULA_FACTOR = 1.25;
+/** Where each learning factor starts. Formula: 1.25 for breaks and setup
+ *  (about 120 words a minute on a 600-word technical page). Stated: 1,
+ *  since published hours tend to run long, not short. Gut: 2, from one
+ *  recalled section, so only a starting point. */
+export const STARTING_FACTORS: Factors = { formula: 1.25, stated: 1, gut: 2 };
 
-export const READING_TIERS: Record<Tier, { label: string; minutesPerPage: number; example: string }> = {
-  light:     { label: 'Light',     minutesPerPage: 0.5, example: 'self-help, popular non-fiction' },
-  normal:    { label: 'Normal',    minutesPerPage: 1,   example: 'most books' },
-  technical: { label: 'Technical', minutesPerPage: 4,   example: 'textbooks with mathematics' },
-  dense:     { label: 'Dense',     minutesPerPage: 10,  example: 'research papers' },
+export const SOURCES: Record<Source, { label: string; learns: boolean }> = {
+  measured: { label: 'an official timing', learns: false },
+  formula: { label: 'a content measure', learns: true },
+  stated: { label: 'published hours', learns: true },
+  gut: { label: 'a guess', learns: true },
+  pace: { label: 'my own measured pace (priced before these rules)', learns: false },
+};
+
+export function isSource(v: unknown): v is Source {
+  return typeof v === 'string' && v in SOURCES;
+}
+
+/** The starting factors under their older names. Plain tasks, routines
+ *  and Field Atlas outings always use these: their defaults are rough by
+ *  design, and a learned factor would move their points every month. */
+export const GUT_FACTOR = STARTING_FACTORS.gut;
+export const FORMULA_FACTOR = STARTING_FACTORS.formula;
+
+/** The pricing rules below apply to anything priced from this day. */
+export const RULES_FROM = '2026-10-27';
+
+/** Calibration (calibrate.ts). Prices never change; each learning source's
+ *  factor is reviewed on the first Monday of each month and applies to
+ *  things priced after it. */
+export const CALIBRATION = {
+  firstReview: '2026-11-02',
+  windowWeeks: 26,          // items whose latest finished part is this recent
+  minItemMinutes: 20,       // an item needs at least this much timed work
+  clamp: 3,                 // each item's time is held within a third and three times its price
+  itemShare: 0.25,          // no item carries more than a quarter of the weight
+  trustK: 5,                // trust in the record: items / (items + 5)
+  step: 0.1,                // a review moves a factor at most a tenth
+  guard: 2,                 // past half or double its start, a factor is held for review by hand
+};
+
+/** The most one part can be worth. Bigger work is split into parts, so a
+ *  misprice is bounded both ways; a guessed part is held tighter. An
+ *  official timing (a past paper) is one indivisible unit, and exempt. */
+export const UNIT_CAP = { default: 16, gut: 8 };
+
+export function unitCap(source: Source): number {
+  return source === 'gut' ? UNIT_CAP.gut : UNIT_CAP.default;
+}
+
+/** Does a group of `count` parts worth `points` in all keep every part
+ *  under the cap? (Spread by cumulative rounding, no part exceeds the cap
+ *  when the average does not.) */
+export function fitsCap(points: number, count: number, source: Source): boolean {
+  return source === 'measured' || points <= unitCap(source) * Math.max(1, count);
+}
+
+/** The fewest parts `points` can be split into under its cap. */
+export function minParts(points: number, source: Source): number {
+  return source === 'measured' ? 1 : Math.max(1, Math.ceil(points / unitCap(source)));
+}
+
+/** A finished part that took under half or over double its price gets a
+ *  one-line public note on how it was priced. No effect on points. */
+export const VARIANCE = { low: 0.5, high: 2 };
+
+/** Reading speeds. Text counted in words (an article, a web page) is
+ *  turned into pages at the tier's own page size: a book page for light
+ *  and normal reading, a 600-word page for technical and dense. */
+export const READING_TIERS: Record<Tier, { label: string; minutesPerPage: number; wordsPerPage: number; example: string }> = {
+  light:     { label: 'Light',     minutesPerPage: 0.5, wordsPerPage: 300, example: 'self-help, popular non-fiction' },
+  normal:    { label: 'Normal',    minutesPerPage: 1,   wordsPerPage: 300, example: 'most books, essays and articles' },
+  technical: { label: 'Technical', minutesPerPage: 4,   wordsPerPage: 600, example: 'textbooks with mathematics, policy and legal reports' },
+  dense:     { label: 'Dense',     minutesPerPage: 10,  wordsPerPage: 600, example: 'research papers' },
 };
 
 /** Finished prose: essays and writeups score once, on publish, by length.
@@ -106,17 +181,37 @@ export function hoursToPoints(hours: number): number {
   return Math.max(1, Math.round((hours * 60) / MINUTES_PER_POINT));
 }
 
+/** Something whose size can be counted before the work starts: pages,
+ *  words, and video or audio at its running time. */
+export interface Content { pages?: number; words?: number; tier?: Tier; videoMinutes?: number }
+
+/** Minutes a piece of content holds at the reading tiers, before its factor. */
+export function contentMinutes(c: Content): number {
+  const t = READING_TIERS[c.tier ?? 'normal'];
+  const n = (x: number | undefined) => (Number.isFinite(x) && (x as number) > 0 ? (x as number) : 0);
+  return (n(c.pages) + n(c.words) / t.wordsPerPage) * t.minutesPerPage + n(c.videoMinutes);
+}
+
+/** Raw hours times the factor in force for their source. */
 export const estimate = {
-  /** Your own guess, corrected for the measured underestimate. */
-  gut: (hours: number, calib = 1) => hoursToPoints(hours * GUT_FACTOR * calib),
-  /** A formula or published figure, with breaks and setup added. */
-  formula: (hours: number, calib = 1) => hoursToPoints(hours * FORMULA_FACTOR * calib),
-  /** Something already timed (a past paper's sitting plus review). */
+  /** My own guess. */
+  gut: (hours: number, factor = STARTING_FACTORS.gut) => hoursToPoints(hours * factor),
+  /** A formula: pages at a reading speed, walking time from distance and climb. */
+  formula: (hours: number, factor = STARTING_FACTORS.formula) => hoursToPoints(hours * factor),
+  /** A provider's published hours. */
+  stated: (hours: number, factor = STARTING_FACTORS.stated) => hoursToPoints(hours * factor),
+  /** An official timing (a past paper's set length). Never corrected. */
   measured: (hours: number) => hoursToPoints(hours),
-  pages: (pages: number, tier: Tier, calib = 1) =>
-    hoursToPoints(((pages * READING_TIERS[tier].minutesPerPage) / 60) * FORMULA_FACTOR * calib),
+  pages: (pages: number, tier: Tier, factor = STARTING_FACTORS.formula) =>
+    hoursToPoints(((pages * READING_TIERS[tier].minutesPerPage) / 60) * factor),
+  content: (c: Content, factor = STARTING_FACTORS.formula) => hoursToPoints((contentMinutes(c) / 60) * factor),
   words: (words: number) => hoursToPoints(words / WORDS_PER_HOUR),
 };
+
+/** Factors print as 2, 1.25, 1.8. */
+export function factorLabel(f: number): string {
+  return String(Math.round(f * 100) / 100);
+}
 
 /** Gate-to-gate points for a Field Atlas line: Naismith's rule from its
  *  distance and climb, plus the drive, or a typical day for the discipline. */
@@ -189,7 +284,7 @@ export const ACTIVITIES: Record<ActivityKind, ActivitySpec> = {
   'past-paper': { label: 'Past paper', unit: 'past paper', retrieval: true, asks: 'paperHours', basis: 'its official length, and half again to mark it' },
   statute: { label: 'Learning statutes', unit: 'statute', minutesPerUnit: 10, retrieval: false, basis: '10 minutes to read, understand and note one' },
   case: { label: 'Learning cases', unit: 'case', minutesPerUnit: 8, retrieval: false, basis: '8 minutes for the facts, the ratio and the principle' },
-  other: { label: 'Something else (your estimate, doubled)', unit: '', retrieval: false, asks: 'custom', basis: 'your gut minutes per unit, doubled like every gut estimate' },
+  other: { label: 'Something else (your guess per unit)', unit: '', retrieval: false, asks: 'custom', basis: 'your gut minutes per unit, times the guess factor in force, at most 8 points a unit' },
 };
 
 /** A past paper is marked as well as sat. */
@@ -197,15 +292,18 @@ export const PAPER_MARKING_FACTOR = 1.5;
 
 /** Frozen numbers for a new activity: either units per point (counts) or
  *  points per unit (a past paper). */
-export function activityRate(kind: ActivityKind, opts: { paperHours?: number; minutesPerUnit?: number; calib?: number } = {}): { per?: number; points?: number } {
+export function activityRate(kind: ActivityKind, opts: { paperHours?: number; minutesPerUnit?: number; gut?: number } = {}): { per?: number; points?: number } {
   const a = ACTIVITIES[kind];
   if (kind === 'past-paper') {
     const h = Number(opts.paperHours);
     if (!Number.isFinite(h) || h <= 0) throw new Error("a past paper needs its official length in hours");
     return { points: hoursToPoints(h * PAPER_MARKING_FACTOR * RETRIEVAL_FACTOR) };
   }
-  const m = kind === 'other' ? Number(opts.minutesPerUnit) * GUT_FACTOR * (opts.calib ?? 1) : (a.minutesPerUnit ?? 0) * (a.retrieval ? RETRIEVAL_FACTOR : 1);
+  const m = kind === 'other' ? Number(opts.minutesPerUnit) * (opts.gut ?? STARTING_FACTORS.gut) : (a.minutesPerUnit ?? 0) * (a.retrieval ? RETRIEVAL_FACTOR : 1);
   if (!Number.isFinite(m) || m <= 0) throw new Error('minutes per unit must be a positive number');
+  if (kind === 'other' && m / MINUTES_PER_POINT > UNIT_CAP.gut) {
+    throw new Error(`one unit would be worth ${Math.round(m / MINUTES_PER_POINT)} points; a guessed unit can be worth at most ${UNIT_CAP.gut}, so use a smaller unit`);
+  }
   return { per: Math.round((MINUTES_PER_POINT / m) * 1000) / 1000 };
 }
 
@@ -241,7 +339,7 @@ export type TemplateId = 'exam-prep' | 'book' | 'course' | 'task';
 export interface TemplateField {
   key: string;
   label: string;
-  kind: 'number' | 'text' | 'tier' | 'lane';
+  kind: 'number' | 'text' | 'tier' | 'lane' | 'basis';
   optional?: boolean;
   hint?: string;
 }
@@ -258,7 +356,7 @@ export const TEMPLATES: Record<TemplateId, { label: string; fields: TemplateFiel
     fields: [
       { key: 'unit', label: 'What is one part called?', kind: 'text', hint: 'module, chapter, unit' },
       { key: 'count', label: 'How many parts?', kind: 'number' },
-      { key: 'hoursEach', label: 'Your gut hours for one part', kind: 'number' },
+      { key: 'hoursEach', label: 'Your gut hours for one part', kind: 'number', hint: 'a guessed part can be worth at most 8 points' },
       { key: 'repeatUnit', label: 'Something you can repeat', kind: 'text', optional: true, hint: 'past paper' },
       { key: 'repeatHours', label: 'Hours one takes, all in', kind: 'number', optional: true },
       WEEKLY,
@@ -275,7 +373,8 @@ export const TEMPLATES: Record<TemplateId, { label: string; fields: TemplateFiel
   course: {
     label: 'Course',
     fields: [
-      { key: 'hours', label: 'Total hours (published, or your measured pace)', kind: 'number' },
+      { key: 'hours', label: 'Total hours', kind: 'number', hint: 'the course\'s published figure, or your guess' },
+      { key: 'basis', label: 'Those hours are', kind: 'basis' },
       { key: 'unit', label: 'What is one part called?', kind: 'text', hint: 'module, week, section' },
       { key: 'count', label: 'How many parts?', kind: 'number' },
       { key: 'lane', label: 'Lane', kind: 'lane' },
@@ -286,7 +385,7 @@ export const TEMPLATES: Record<TemplateId, { label: string; fields: TemplateFiel
     label: 'Task or project',
     fields: [
       { key: 'hours', label: 'Your gut hours for the whole thing', kind: 'number' },
-      { key: 'count', label: 'How many milestones?', kind: 'number', hint: '1 if it is one piece' },
+      { key: 'count', label: 'How many milestones?', kind: 'number', hint: 'a guessed part can be worth at most 8 points' },
       { key: 'lane', label: 'Lane', kind: 'lane' },
       { ...WEEKLY, optional: true, hint: 'blank: worked out from its due date or scope' },
     ],

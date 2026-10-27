@@ -11,9 +11,10 @@
 
 import { authorDay, weekStart } from '../content/streak';
 import {
-  CALIBRATION, CURIOSITY_CAP, LEVEL_SIZE, MINUTES_PER_POINT, SCORE_EPOCH, WEEKLY_BAR, WEEKLY_HOURS, type Lane,
+  CURIOSITY_CAP, LEVEL_SIZE, SCORE_EPOCH, WEEKLY_BAR, WEEKLY_HOURS, type Lane, type Source,
 } from './rules';
 import { partsDone, repeatCount } from './block';
+import { calibrate, varianceNotes, type Calibration, type VarianceNote } from './calibrate';
 import { plural, type Extracted, type ScoreEvent, type ScoreItem, type Surface, type Tally } from './items';
 import type { Session } from './time';
 
@@ -36,7 +37,7 @@ export interface ItemGroupView {
   points: number;
   prior: number;                // finished before tracking (no points)
   logged: number;               // entries logged since tracking (count is frozen once > 0)
-  reestimated: boolean;         // points already re-estimated from timing (once only)
+  basis: Source | null;         // where its price came from
   current: boolean;             // the first unfinished group of its unit
 }
 
@@ -62,6 +63,8 @@ export interface ItemView {
   paced: boolean;
   deadline: string | null;
   outcome: { points: number; achieved: string | null } | null;
+  /** Due its one content re-measure (block.ts). */
+  remeasure: boolean;
   parts: ItemGroupView[];
   repeat: { index: number; unit: string; points: number; per: number | null; kind: string | null; count: number }[];
 }
@@ -83,9 +86,11 @@ export interface ScoreState {
   tallies: { tasks: Tally; atlas: Tally; list: Tally };
   load: { hours: number; capacity: number };
   recent: ScoreEvent[];         // newest first
-  /** How new estimates are corrected: timed work on finished parts over
-   *  priced minutes, across everything, recent weeks only. */
-  calibration: { factor: number; parts: number; timedMinutes: number; pricedMinutes: number; enough: boolean };
+  /** The factor each source of estimate is priced at now, the reviews
+   *  that set them, and the next one (calibrate.ts). */
+  calibration: Calibration;
+  /** Finished parts that took under half or over double their price. */
+  variance: VarianceNote[];
   /** Timed hours (a log; never points). */
   time: { weekMinutes: number; byKey: Record<string, number>; totalByKey: Record<string, number>; recent: Session[] };
 }
@@ -124,7 +129,7 @@ function itemView(item: ScoreItem, weekPoints: number, weekMinutes = 0): ItemVie
     if (current) seen.add(g.unit);
     return {
       index, unit: g.unit, name: g.name ?? null, done, count: g.count, points: g.points,
-      prior: g.prior, logged: g.done.length, current, reestimated: g.reestimated === true,
+      prior: g.prior, logged: g.done.length, current, basis: g.basis ?? null,
     };
   });
   /* Summarise the item by its first unit, across every group of that unit
@@ -146,6 +151,7 @@ function itemView(item: ScoreItem, weekPoints: number, weekMinutes = 0): ItemVie
     hasBlock: item.hasBlock, needsSetup: item.needsSetup,
     earned, total, pct: total ? Math.round((earned / total) * 100) : 0, summary,
     weekPoints, weeklyHours: item.weeklyHours, paced: item.paced, deadline: item.deadline, outcome: item.outcome,
+    remeasure: item.remeasure,
     parts,
     repeat: item.repeat.map((g, index) => ({
       index, unit: g.unit, points: g.points, per: g.per ?? null, kind: g.kind ?? null, count: repeatCount(g),
@@ -217,34 +223,13 @@ export function computeScore(extracted: Extracted, today: string = authorDay()):
   for (const x of weekSessions) if (x.key) byKey[x.key] = (byKey[x.key] ?? 0) + x.minutes;
   const weekMinutes = weekSessions.reduce((n, x) => n + x.minutes, 0);
   /* All-time minutes per item on record-only sessions (time spent on the
-     work the item's own buttons score), for re-estimating from real pace. */
+     work the item's own buttons score): work timed before something is
+     priced sets it up at half rate. */
   const totalByKey: Record<string, number> = {};
   for (const x of sessions) if (x.key && !x.scores) totalByKey[x.key] = (totalByKey[x.key] ?? 0) + x.minutes;
   const recentSessions = [...sessions]
     .sort((a, b) => `${b.date} ${b.to}`.localeCompare(`${a.date} ${a.to}`))
     .slice(0, 12);
-
-  /* Calibration. For every item with parts finished in the window and
-     record-only time logged against it in the same window, set the time
-     against what those parts were priced at. One ratio across everything:
-     a single section running long or short barely moves it. */
-  const winStart = addDays(today, -CALIBRATION.windowDays);
-  let calTimed = 0, calPriced = 0, calParts = 0;
-  for (const item of items) {
-    const ev = item.events.filter((e) => e.kind === 'part' && e.date >= winStart && e.date >= SCORE_EPOCH && e.date <= today);
-    if (!ev.length) continue;
-    const mins = sessions
-      .filter((x) => x.key === item.key && !x.scores && x.date >= winStart && x.date <= today)
-      .reduce((n, x) => n + x.minutes, 0);
-    if (!mins) continue;
-    calTimed += mins;
-    calPriced += ev.reduce((n, e) => n + e.points, 0) * MINUTES_PER_POINT;
-    calParts += ev.length;
-  }
-  const calEnough = calParts >= CALIBRATION.minParts && calPriced >= CALIBRATION.minPricedMinutes;
-  const calFactor = calEnough
-    ? Math.min(CALIBRATION.max, Math.max(CALIBRATION.min, Math.round((calTimed / calPriced) * 20) / 20))
-    : 1;
 
   const views = items
     .filter((i) => i.active || i.parked || weekByItem.has(i.key))
@@ -281,6 +266,7 @@ export function computeScore(extracted: Extracted, today: string = authorDay()):
     load: { hours: Math.round(load * 10) / 10, capacity: WEEKLY_HOURS },
     recent: events.slice(0, 15),
     time: { weekMinutes, byKey, totalByKey, recent: recentSessions },
-    calibration: { factor: calFactor, parts: calParts, timedMinutes: calTimed, pricedMinutes: calPriced, enough: calEnough },
+    calibration: calibrate(items, sessions, today),
+    variance: varianceNotes(items, sessions, today),
   };
 }

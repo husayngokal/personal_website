@@ -24,14 +24,20 @@ import matter from 'gray-matter';
 import { patchFrontmatter, type ScalarChange } from '../vault/frontmatter-patch';
 import { itemLabel, listDoneItems, setItemDone } from '../vault/done-items';
 import { parseFile } from '../vault/parse';
-import { ACTIVITIES, TEMPLATES, activityRate, countGain, estimate, type ActivityKind, type TemplateId } from '../score/rules';
 import {
-  addActivity, addGroup, buildFromTemplate, cloneBlock, editGroup, logParts, logRepeat, partsDone, readBlock, reestimate, removeActivity, removeGroup, repeatCount, setScoreBlock,
+  ACTIVITIES, READING_TIERS, STARTING_FACTORS, TEMPLATES, activityRate, countGain, estimate, factorLabel,
+  type ActivityKind, type Content, type Factors, type TemplateId, type Tier,
+} from '../score/rules';
+import {
+  addActivity, addGroup, buildFromTemplate, cloneBlock, contentWhy, editGroup, logParts, logRepeat, partsDone, readBlock, remeasure, removeActivity, removeGroup, repeatCount, setScoreBlock,
   type ScoreBlock, type TemplateInputs,
 } from '../score/block';
 import { atlasPoints, effectiveBlock, itemFromFile, plural } from '../score/items';
 
 export type FrontmatterTarget = 'book' | 'task' | 'project';
+/** How a new part group is priced (rules.ts precedence): counted from its
+ *  content, an official timing, published hours, or a guess. */
+export type GroupBasis = 'formula' | 'measured' | 'stated' | 'gut';
 export type QuickTarget = FrontmatterTarget | 'atlas' | 'score';
 
 /* Tables whose items carry a score block, and where their files live. */
@@ -63,13 +69,13 @@ export type QuickRequest =
   | { target: 'score'; table: string; slug: string; action: 'repeat'; group: number; qty?: number }
   | { target: 'score'; table: string; slug: string; action: 'add-activity'; kind: string; paperHours?: number; unit?: string; minutesPerUnit?: number }
   | { target: 'score'; table: string; slug: string; action: 'remove-activity'; group: number }
-  | { target: 'score'; table: string; slug: string; action: 'reestimate'; unit?: string }
+  | { target: 'score'; table: string; slug: string; action: 'remeasure'; content?: Content; none?: boolean }
   | { target: 'score'; table: string; slug: string; action: 'delete' }
   | { target: 'score'; table: string; slug: string; action: 'set-weekly'; hours: number }
   | { target: 'score'; table: string; slug: string; action: 'activate'; due?: string; weeklyHours?: number }
   | { target: 'score'; table: string; slug: string; action: 'page'; page: number }
   | { target: 'score'; table: string; slug: string; action: 'setup'; template: TemplateId; inputs: TemplateInputs }
-  | { target: 'score'; table: string; slug: string; action: 'add-group'; unit: string; name?: string; count: number; hours: number; basis: 'gut' | 'measured' }
+  | { target: 'score'; table: string; slug: string; action: 'add-group'; unit: string; name?: string; count: number; basis: GroupBasis; hours?: number; content?: Content }
   | { target: 'score'; table: string; slug: string; action: 'edit-group'; group: number; name?: string; count?: number; prior?: number }
   | { target: 'score'; table: string; slug: string; action: 'remove-group'; group: number }
   | { target: 'score'; table: string; slug: string; action: 'park' }
@@ -169,8 +175,21 @@ function changesFor(req: QuickRequest, fm: Record<string, unknown>, today: strin
 }
 
 /** Facts the server supplies that a single file cannot: all-time timed
- *  minutes on this item, for re-estimating. */
-export interface QuickContext { timedMinutes?: number; calibration?: number }
+ *  minutes on this item, the factors in force (calibrate.ts), and the time
+ *  of day (Dubai, HH:MM) a part is logged at. */
+export interface QuickContext { timedMinutes?: number; factors?: Factors; now?: string }
+
+/** Content from a request, checked: pages and words at one reading tier,
+ *  video minutes. Null when nothing was counted. */
+function cleanContent(c: Content | undefined): Content | null {
+  if (!c || typeof c !== 'object') return null;
+  const n = (x: unknown) => { const v = Number(x); return Number.isFinite(v) && v > 0 ? v : 0; };
+  const out: Content = {
+    pages: n(c.pages), words: n(c.words), videoMinutes: n(c.videoMinutes),
+    tier: (typeof c.tier === 'string' && c.tier in READING_TIERS ? c.tier : 'normal') as Tier,
+  };
+  return out.pages || out.words || out.videoMinutes ? out : null;
+}
 
 export function applyQuick(req: QuickRequest, path: string, raw: string, today: string, ctx: QuickContext = {}): QuickResult {
   const spec = specFor(req as { target: QuickTarget; table?: string });
@@ -272,13 +291,24 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string,
     if (!item) throw new QuickError('bad-request', 'this file cannot be scored');
     let block: ScoreBlock;
     try {
-      block = buildFromTemplate(req.template, req.inputs ?? {}, item.surface, ctx.calibration ?? 1);
+      block = buildFromTemplate(req.template, req.inputs ?? {}, item.surface, ctx.factors ?? STARTING_FACTORS);
     } catch (err) {
       throw new QuickError('bad-request', (err as Error).message);
     }
+    /* Worked on before it was priced: the price could lean on what the work
+       already looked like, so it is set at half rate. */
+    const early = Number(ctx.timedMinutes) > 0;
+    if (early) {
+      const full = block.parts.reduce((n, g) => n + g.points, 0);
+      for (const g of block.parts) {
+        g.points = Math.max(1, Math.round(g.points / 2));
+        g.why = `${g.why ?? ''}, half rate: timed before it was priced`.replace(/^, /, '');
+      }
+      if (block.outcome !== undefined && block.outcome === full) block.outcome = block.parts.reduce((n, g) => n + g.points, 0);
+    }
     const next = setScoreBlock(raw, block);
     const total = block.parts.reduce((s, g) => s + g.points, 0);
-    return { raw: next, changed: true, row: {}, summary: `${title}: set up, ${total} points in all`, undo: undo() };
+    return { raw: next, changed: true, row: {}, summary: `${title}: set up, ${total} points in all${early ? ' (half rate, it was timed before it was priced)' : ''}`, undo: undo() };
   }
 
   if (req.action === 'delete') throw new QuickError('bad-request', 'deleting is handled by the route');
@@ -366,10 +396,23 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string,
   const fields: Record<string, ScalarChange> = {};
   try {
     if (req.action === 'add-group') {
-      const hours = Number(req.hours);
-      if (!Number.isFinite(hours) || hours <= 0) throw new Error('hours must be a positive number');
-      const points = req.basis === 'measured' ? estimate.measured(hours) : estimate.gut(hours);
-      nextBlock = addGroup(block, { unit: String(req.unit ?? ''), name: req.name, count: Number(req.count), points });
+      const f = ctx.factors ?? STARTING_FACTORS;
+      const basis: GroupBasis = req.basis === 'formula' || req.basis === 'measured' || req.basis === 'stated' ? req.basis : 'gut';
+      let points: number, factor: number, why: string;
+      if (basis === 'formula') {
+        const c = cleanContent(req.content);
+        if (!c) throw new Error('give the pages, words or video minutes it holds');
+        factor = f.formula;
+        points = estimate.content(c, factor);
+        why = contentWhy(c, factor);
+      } else {
+        const hours = Number(req.hours);
+        if (!Number.isFinite(hours) || hours <= 0) throw new Error('hours must be a positive number');
+        factor = basis === 'measured' ? 1 : f[basis];
+        points = basis === 'measured' ? estimate.measured(hours) : basis === 'stated' ? estimate.stated(hours, factor) : estimate.gut(hours, factor);
+        why = `${Math.round(hours * 100) / 100} hours, ${basis === 'measured' ? 'an official timing' : basis === 'stated' ? 'published' : 'guessed'}${basis === 'measured' ? '' : `, x ${factorLabel(factor)}`}`;
+      }
+      nextBlock = addGroup(block, { unit: String(req.unit ?? ''), name: req.name, count: Number(req.count), points, basis, factor, why });
       verb = `added ${req.name?.trim() || req.unit} (${Math.round(Number(req.count))} ${plural(String(req.unit).trim())}, ${points} points)`;
     } else if (req.action === 'edit-group') {
       const g = block.parts[req.group];
@@ -389,7 +432,7 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string,
     } else if (req.action === 'part') {
       const g = block.parts[req.group];
       if (!g) throw new Error('no such part');
-      nextBlock = logParts(block, req.group, req.qty ?? 1, today);
+      nextBlock = logParts(block, req.group, req.qty ?? 1, today, ctx.now);
       const n = partsDone(nextBlock.parts[req.group]) - partsDone(g);
       verb = g.name && g.count === 1
         ? `${g.name} done`
@@ -406,7 +449,7 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string,
       if (!(req.kind in ACTIVITIES)) throw new Error('unknown activity');
       const kind = req.kind as ActivityKind;
       const spec = ACTIVITIES[kind];
-      const rate = activityRate(kind, { paperHours: req.paperHours, minutesPerUnit: req.minutesPerUnit, calib: ctx.calibration ?? 1 });
+      const rate = activityRate(kind, { paperHours: req.paperHours, minutesPerUnit: req.minutesPerUnit, gut: (ctx.factors ?? STARTING_FACTORS).gut });
       const unit = kind === 'other' ? String(req.unit ?? '').trim() : spec.unit;
       nextBlock = addActivity(block, { unit, kind, ...rate });
       const each = rate.per ? (rate.per >= 1 ? `1 point per ${Math.round(rate.per * 10) / 10} ${plural(unit)}` : `${Math.round((1 / rate.per) * 10) / 10} points each`) : `${rate.points} points each`;
@@ -418,12 +461,14 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string,
       if (!Number.isFinite(h) || h < 0 || h > 80) throw new Error('hours a week must be between 0 and 80');
       nextBlock = { ...cloneBlock(block), weeklyHours: h };
       verb = `${h} hours a week`;
-    } else if (req.action === 'reestimate') {
-      const unit = req.unit ?? block.parts[0]?.unit;
-      if (!unit) throw new Error('nothing to re-estimate');
-      const r = reestimate(block, unit, Number(ctx.timedMinutes));
+    } else if (req.action === 'remeasure') {
+      const c = req.none ? null : cleanContent(req.content);
+      if (!req.none && !c) throw new Error('give the pages, words or video minutes what is left holds, or say nothing can be counted');
+      const r = remeasure(block, c, (ctx.factors ?? STARTING_FACTORS).formula, today);
       nextBlock = r.block;
-      verb = `re-estimated from your timing: ${r.perPart} minutes a ${unit}, ${r.before} points in all is now ${r.after}`;
+      verb = c
+        ? `what was left re-measured from its content: ${r.before} points is now ${r.after}`
+        : 'nothing left can be counted; prices stay';
     } else if (req.action === 'remove-activity') {
       const g = block.repeat[req.group];
       if (!g) throw new Error('no such activity');
@@ -436,7 +481,7 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string,
       const page = Math.round(Number(req.page));
       const at = partsDone(g);
       if (!Number.isFinite(page) || page <= at) throw new Error(`you are already on page ${at}`);
-      nextBlock = logParts(block, gi, page - at, today);
+      nextBlock = logParts(block, gi, page - at, today, ctx.now);
       const reached = partsDone(nextBlock.parts[gi]);
       prevFields['progress-pct'] = fm['progress-pct'] === undefined ? null : Number(fm['progress-pct']);
       fields['progress-pct'] = Math.round((reached / g.count) * 100);

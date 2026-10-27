@@ -15,7 +15,7 @@ import { ACTIVITIES, TASK_GUT_HOURS, atlasPoints, countGain, estimate, partGain,
 import type { QuickRequest } from '@/lib/studio/quick';
 import type { DoneGroup } from '@/lib/vault/done-items';
 import type { ItemView, ScoreState } from '@/lib/score/compute';
-import { READING_TIERS, TEMPLATES, type TemplateId } from '@/lib/score/rules';
+import { READING_TIERS, TEMPLATES, UNIT_CAP, factorLabel, type Learning, type TemplateId, type Tier } from '@/lib/score/rules';
 import { IDLE, TIMER_KEY, elapsedMs, hms, hoursLabel, type TimerNow } from '@/lib/score/time';
 import { shortDay } from '@/lib/score/format';
 
@@ -466,6 +466,13 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
                   </Btn>
                 ))}
               </div>
+            )}
+            {i.remeasure && (
+              <Remeasure
+                item={i}
+                busy={busy}
+                send={(req, key) => send({ target: 'score', table: i.table, slug: i.slug, ...req } as QuickRequest, key)}
+              />
             )}
             {!i.needsSetup && i.parts.length > 0 && !i.parts.some((g) => g.unit === 'page') && (
               <PartsEditor
@@ -919,7 +926,7 @@ function AddToWeek({ busy, onAdd }: {
         }}
       >
         <p className={styles.setupHead}>
-          A new task on the plate. Points come from your gut hours for the whole thing, doubled and frozen. With a due date, its hours a week are the pace that date needs; with none, you say how many hours a week you will give it.
+          A new task on the plate. Points come from your gut hours for the whole thing, times the guess factor in force, frozen. A guessed part can be worth at most {UNIT_CAP.gut} points, so bigger milestones are cut into pieces. With a due date, its hours a week are the pace that date needs; with none, you say how many hours a week you will give it.
         </p>
         <div className={styles.partsGrid}>
           <label className={styles.setupField}>
@@ -977,13 +984,7 @@ function WeekCard({ score, load }: { score: ScoreSlice; load: ScoreState['load']
         >
           Sound {sound ? 'on' : 'off'}
         </button>
-        {score.calibration && (
-          <p className={styles.load}>
-            {score.calibration.enough
-              ? `Your estimates run ${score.calibration.factor}\u00d7 (from ${score.calibration.parts} timed parts, last 8 weeks). New estimates use it; old prices never change.`
-              : `Estimate calibration: 1\u00d7 until 5 parts are finished and timed (${score.calibration.parts} so far).`}
-          </p>
-        )}
+        {score.calibration?.factors && <FactorsLine c={score.calibration} />}
         {load && (
           <p className={styles.load}>
             <span className={styles.loadTrack} aria-hidden="true">
@@ -1011,20 +1012,25 @@ function SetupForm({ template, busy, disabled, onSubmit }: {
         e.preventDefault();
         const inputs: Record<string, string | number> = {};
         for (const f of spec.fields) {
-          const v = vals[f.key];
+          const v = vals[f.key] ?? (f.kind === 'basis' ? 'stated' : undefined);
           if (v === undefined || v === '') continue;
           inputs[f.key] = f.kind === 'number' ? Number(v) : v;
         }
         onSubmit(inputs);
       }}
     >
-      <p className={styles.setupHead}>Set up scoring · {spec.label}. Points are frozen once saved.</p>
+      <p className={styles.setupHead}>Set up scoring · {spec.label}. Points are frozen once saved. Work timed before this is saved sets it up at half rate.</p>
       {spec.fields.map((f) => (
         <label key={f.key} className={styles.setupField}>
           <span>{f.label}{f.optional ? ' (optional)' : ''}</span>
           {f.kind === 'tier' ? (
             <select value={vals[f.key] ?? 'normal'} onChange={(e) => set(f.key, e.target.value)}>
               {Object.entries(READING_TIERS).map(([k, t]) => <option key={k} value={k}>{t.label} · {t.example}</option>)}
+            </select>
+          ) : f.kind === 'basis' ? (
+            <select value={vals[f.key] ?? 'stated'} onChange={(e) => set(f.key, e.target.value)}>
+              <option value="stated">Published by the course</option>
+              <option value="gut">My own guess</option>
             </select>
           ) : f.kind === 'lane' ? (
             <select value={vals[f.key] ?? ''} onChange={(e) => set(f.key, e.target.value)}>
@@ -1107,7 +1113,77 @@ type GroupAction =
   | { action: 'part'; group: number }
   | { action: 'edit-group'; group: number; name?: string; count?: number; prior?: number }
   | { action: 'remove-group'; group: number }
-  | { action: 'add-group'; unit: string; name?: string; count: number; hours: number; basis: 'gut' | 'measured' };
+  | { action: 'add-group'; unit: string; name?: string; count: number; basis: 'formula' | 'measured' | 'stated' | 'gut'; hours?: number; content?: ContentInput }
+  | { action: 'remeasure'; content?: ContentInput; none?: boolean };
+
+interface ContentInput { pages?: number; words?: number; tier?: Tier; videoMinutes?: number }
+
+/* The estimate factors in force, and what the next monthly review would
+   do on the record so far. */
+const SOURCE_NAME: Record<Learning, string> = { gut: 'guesses', stated: 'published hours', formula: 'counted content' };
+function FactorsLine({ c }: { c: ScoreState['calibration'] }) {
+  const order: Learning[] = ['gut', 'stated', 'formula'];
+  const moves = order
+    .filter((k) => c.preview?.classes?.[k] && c.preview.classes[k].next !== c.factors[k])
+    .map((k) => `${SOURCE_NAME[k]} to \u00d7${factorLabel(c.preview.classes[k].next)}`);
+  return (
+    <p className={styles.load}>
+      Estimates now: {order.map((k) => `${SOURCE_NAME[k]} \u00d7${factorLabel(c.factors[k])}`).join(', ')}.
+      {' '}Next review {shortDay(c.next)}{moves.length ? `; on the record so far, ${moves.join(', ')}` : ''}. Old prices never change.
+    </p>
+  );
+}
+
+/* Pages, words and video minutes, at one reading tier: what something
+   holds, counted before the work. */
+function ContentFields({ v, set }: {
+  v: { pages: string; words: string; tier: string; video: string };
+  set: (v: { pages: string; words: string; tier: string; video: string }) => void;
+}) {
+  return (
+    <>
+      <label className={styles.setupField}><span>Pages</span><input type="number" min={0} inputMode="numeric" value={v.pages} onChange={(e) => set({ ...v, pages: e.target.value })} /></label>
+      <label className={styles.setupField}><span>Words (articles, web pages)</span><input type="number" min={0} inputMode="numeric" value={v.words} onChange={(e) => set({ ...v, words: e.target.value })} /></label>
+      <label className={styles.setupField}>
+        <span>Reading</span>
+        <select value={v.tier} onChange={(e) => set({ ...v, tier: e.target.value })}>
+          {Object.entries(READING_TIERS).map(([k, t]) => <option key={k} value={k}>{t.label} · {t.example}</option>)}
+        </select>
+      </label>
+      <label className={styles.setupField}><span>Video or audio minutes</span><input type="number" min={0} inputMode="numeric" value={v.video} onChange={(e) => set({ ...v, video: e.target.value })} /></label>
+    </>
+  );
+}
+
+const toContent = (v: { pages: string; words: string; tier: string; video: string }): ContentInput => ({
+  pages: Number(v.pages) || 0, words: Number(v.words) || 0, tier: v.tier as Tier, videoMinutes: Number(v.video) || 0,
+});
+
+/* The one content re-measure (lib/score/block.ts). The first part of
+   something priced from published hours or a guess is done: what is left
+   is priced again from what it holds, up or down, whatever that part took.
+   No preview, so the choice cannot follow the answer. */
+function Remeasure({ item, busy, send }: {
+  item: ItemView; busy: string | null; send: (req: GroupAction, key: string) => void;
+}) {
+  const [v, setV] = useState({ pages: '', words: '', tier: 'technical', video: '' });
+  const key = `${item.key}:rm`;
+  return (
+    <form
+      className={styles.partsAdd}
+      onSubmit={(e) => { e.preventDefault(); send({ action: 'remeasure', content: toContent(v) }, key); }}
+    >
+      <p className={styles.setupHead}>
+        First part done. Count everything still to do and it is priced again from what it holds, once: up or down, whatever this part took. If none of it can be counted, say so and the prices stay.
+      </p>
+      <div className={styles.partsGrid}><ContentFields v={v} set={setV} /></div>
+      <div className={styles.rowActions}>
+        <Btn primary busy={busy === key} disabled={!!busy} onClick={() => undefined} submit>Re-measure what is left</Btn>
+        <Btn disabled={!!busy} onClick={() => send({ action: 'remeasure', none: true }, key)}>Nothing here can be counted</Btn>
+      </div>
+    </form>
+  );
+}
 
 /* Every part group of an item, editable: name, how many parts, how many
    were done before scoring. Counts lock once something is logged in that
@@ -1115,7 +1191,9 @@ type GroupAction =
 function PartsEditor({ item, busy, send }: {
   item: ItemView; busy: string | null; send: (req: GroupAction, key: string) => void;
 }) {
-  const [adding, setAdding] = useState({ name: '', unit: item.parts[0]?.unit ?? 'chapter', count: '', hours: '', basis: 'gut' });
+  const [adding, setAdding] = useState({ name: '', unit: item.parts[0]?.unit ?? 'chapter', count: '', hours: '', basis: 'formula' });
+  const [content, setContent] = useState({ pages: '', words: '', tier: 'technical', video: '' });
+  const counted = adding.basis === 'formula';
   return (
     <details className={styles.parts}>
       <summary className={styles.partsHead}>Edit parts · {item.parts.length} {item.parts.length === 1 ? 'group' : 'groups'}</summary>
@@ -1130,25 +1208,31 @@ function PartsEditor({ item, busy, send }: {
         onSubmit={(e) => {
           e.preventDefault();
           send({
-            action: 'add-group', unit: adding.unit, name: adding.name || undefined,
-            count: Number(adding.count), hours: Number(adding.hours), basis: adding.basis as 'gut' | 'measured',
+            action: 'add-group', unit: adding.unit, name: adding.name || undefined, count: Number(adding.count),
+            basis: adding.basis as 'formula' | 'measured' | 'stated' | 'gut',
+            ...(counted ? { content: toContent(content) } : { hours: Number(adding.hours) }),
           }, `${item.key}:add`);
           setAdding((a) => ({ ...a, name: '', count: '', hours: '' }));
+          setContent((c) => ({ ...c, pages: '', words: '', video: '' }));
         }}
       >
-        <p className={styles.setupHead}>Add a group (a book, a module set). Its points are worked out from the hours and frozen.</p>
+        <p className={styles.setupHead}>Add a group (a book, a module set). Price it from the first of these that exists: its content counted, an official timing, published hours, your guess. Frozen once added; a part can be worth at most {UNIT_CAP.default} points ({UNIT_CAP.gut} for a guess).</p>
         <div className={styles.partsGrid}>
           <label className={styles.setupField}><span>Name</span><input value={adding.name} placeholder="Tort Law (Book 3)" onChange={(e) => setAdding({ ...adding, name: e.target.value })} /></label>
           <label className={styles.setupField}><span>Unit</span><input required value={adding.unit} onChange={(e) => setAdding({ ...adding, unit: e.target.value })} /></label>
           <label className={styles.setupField}><span>How many</span><input required type="number" min={1} inputMode="numeric" value={adding.count} onChange={(e) => setAdding({ ...adding, count: e.target.value })} /></label>
-          <label className={styles.setupField}><span>Hours, all in</span><input required type="number" min={0} step="any" inputMode="decimal" value={adding.hours} onChange={(e) => setAdding({ ...adding, hours: e.target.value })} /></label>
           <label className={styles.setupField}>
-            <span>Those hours are</span>
+            <span>Priced from</span>
             <select value={adding.basis} onChange={(e) => setAdding({ ...adding, basis: e.target.value })}>
-              <option value="gut">a guess (doubled)</option>
-              <option value="measured">measured (used as is)</option>
+              <option value="formula">its content, counted</option>
+              <option value="measured">an official timing (used as is)</option>
+              <option value="stated">published hours</option>
+              <option value="gut">my guess</option>
             </select>
           </label>
+          {counted
+            ? <ContentFields v={content} set={setContent} />
+            : <label className={styles.setupField}><span>Hours, all in</span><input required type="number" min={0} step="any" inputMode="decimal" value={adding.hours} onChange={(e) => setAdding({ ...adding, hours: e.target.value })} /></label>}
         </div>
         <Btn primary busy={busy === `${item.key}:add`} disabled={!!busy} onClick={() => undefined} submit>Add group</Btn>
       </form>

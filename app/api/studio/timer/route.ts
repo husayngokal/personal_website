@@ -10,7 +10,8 @@
  *
  * The running state is one current_state row (lib/score/time.ts), so every
  * open page sees it over Realtime. Elapsed time is derived from
- * timestamps, never counted. Logged time is a record, never points.
+ * timestamps, never counted. Time added by hand is marked as such and
+ * never calibrates estimates (lib/score/calibrate.ts).
  */
 
 import { NextRequest, NextResponse, after } from 'next/server';
@@ -100,7 +101,7 @@ export async function POST(req: NextRequest) {
           const date = /^\d{4}-\d{2}-\d{2}$/.test(String(body.date)) ? String(body.date) : today.date;
           const endMs = date === today.date ? now : Date.parse(`${date}T20:00:00+04:00`);
           const startMs = Math.max(Date.parse(`${date}T00:00:00+04:00`), endMs - minutes * 60000);
-          s = { date, from: dubaiParts(startMs).hm, to: dubaiParts(endMs).hm, minutes, key, label: label || 'Untitled' };
+          s = { date, from: dubaiParts(startMs).hm, to: dubaiParts(endMs).hm, minutes, key, label: label || 'Untitled', manual: true };
           if (lane) s.scores = { points: timedPoints(minutes), lane };
         }
 

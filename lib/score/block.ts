@@ -21,15 +21,21 @@
  *         done: ["2026-11-02"]
  *
  *   parts   finite work. `points` is the total for all `count` parts;
- *           each done entry finishes one part, or N with "+N". `prior`
- *           parts were finished before tracking and earn nothing.
+ *           each done entry finishes one part, or N with "+N", stamped
+ *           with the day and (since 27 Oct 2026) the time it was logged,
+ *           "2026-10-27 16:36". `prior` parts were finished before
+ *           tracking and earn nothing. `basis` and `factor` record where
+ *           the price came from (rules.ts), `why` the same in words.
  *   repeat  open-ended work. Every done entry earns `points`, no limit.
  *   outcome the reward for the result (an exam passed), paid once.
  *
  * Pure module, no I/O.
  */
 
-import { estimate, DEFAULT_LANE, type Lane, type Tier, type TemplateId, READING_TIERS } from './rules';
+import {
+  estimate, factorLabel, fitsCap, isSource, minParts, unitCap, DEFAULT_LANE, READING_TIERS, STARTING_FACTORS,
+  type Content, type Factors, type Lane, type Source, type Tier, type TemplateId,
+} from './rules';
 
 export interface PartGroup {
   unit: string;
@@ -38,8 +44,14 @@ export interface PartGroup {
   points: number;
   prior: number;
   done: string[];
-  /** Points were re-estimated from timed pace (allowed once). */
+  /** Older: points were re-estimated once from timed pace. No longer
+   *  allowed (re-pricing from my own speed pays slow work); kept as a record. */
   reestimated?: boolean;
+  /** Where the price came from, and the factor it was priced at. */
+  basis?: Source;
+  factor?: number;
+  /** The basis in words: "120 pages, technical reading, x 1.25". */
+  why?: string;
 }
 
 export interface RepeatGroup {
@@ -65,21 +77,41 @@ export interface ScoreBlock {
   /** What taking it off the plate changed (e.g. { status: 'studying' }),
    *  so bringing it back restores exactly that. */
   parkedFrom?: Record<string, string>;
+  /** The one content re-measure of its unstarted parts (rules.ts): when,
+   *  and whether anything could be counted. */
+  remeasured?: { on: string; counted: boolean };
   parts: PartGroup[];
   repeat: RepeatGroup[];
 }
 
-export interface DoneEntry { date: string; qty: number }
+export interface DoneEntry { date: string; time?: string; qty: number }
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+const HM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
-/** "2026-10-27" or "2026-10-27 +3"; YAML may hand over a Date. */
+/** "2026-10-27", "2026-10-27 16:36", "2026-10-27 +3" or "2026-10-27 16:36 +3";
+ *  YAML may hand over a Date. Times are Dubai time. */
 export function parseDone(v: unknown): DoneEntry | null {
   if (v instanceof Date && !Number.isNaN(v.getTime())) return { date: v.toISOString().slice(0, 10), qty: 1 };
   if (typeof v !== 'string') return null;
-  const m = v.trim().match(/^(\d{4}-\d{2}-\d{2})(?:\s*\+(\d+))?$/);
+  const m = v.trim().match(/^(\d{4}-\d{2}-\d{2})(?:[ T](\d{2}:\d{2}))?(?:\s*\+(\d+))?$/);
   if (!m) return null;
-  return { date: m[1], qty: m[2] ? Math.max(1, Number(m[2])) : 1 };
+  return {
+    date: m[1],
+    ...(m[2] && HM.test(m[2]) ? { time: m[2] } : {}),
+    qty: m[3] ? Math.max(1, Number(m[3])) : 1,
+  };
+}
+
+/** The order finished parts are counted in: by day, then by time logged
+ *  (an entry with no time sorts first on its day). Every reader of the
+ *  log uses this, so the same entry always carries the same points. */
+export function doneOrder(a: DoneEntry, b: DoneEntry): number {
+  return a.date.localeCompare(b.date) || (a.time ?? '').localeCompare(b.time ?? '');
+}
+
+export function formatDone(e: DoneEntry): string {
+  return `${e.date}${e.time ? ` ${e.time}` : ''}${e.qty > 1 ? ` +${e.qty}` : ''}`;
 }
 
 function num(v: unknown): number | undefined {
@@ -96,7 +128,7 @@ function doneList(v: unknown): string[] {
   const out: string[] = [];
   for (const x of v) {
     const d = parseDone(x);
-    if (d) out.push(d.qty > 1 ? `${d.date} +${d.qty}` : d.date);
+    if (d) out.push(formatDone(d));
   }
   return out;
 }
@@ -127,6 +159,9 @@ export function readBlock(fm: Record<string, unknown>): ScoreBlock | null {
       prior: Math.max(0, Math.min(Math.round(num(o.prior) ?? 0), Math.round(count))),
       done: doneList(o.done),
       ...(o.reestimated === true ? { reestimated: true } : {}),
+      ...(isSource(o.basis) ? { basis: o.basis } : {}),
+      ...(num(o.factor) && num(o.factor)! > 0 ? { factor: num(o.factor) } : {}),
+      ...(str(o.why) ? { why: str(o.why) } : {}),
     });
   }
 
@@ -163,6 +198,13 @@ export function readBlock(fm: Record<string, unknown>): ScoreBlock | null {
       }
       return Object.keys(out).length ? out : undefined;
     })(),
+    remeasured: (() => {
+      const v = r.remeasured;
+      if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
+      const o = v as Record<string, unknown>;
+      const on = o.on instanceof Date ? o.on.toISOString().slice(0, 10) : str(o.on);
+      return on && ISO_DAY.test(on) ? { on, counted: o.counted === true } : undefined;
+    })(),
     parts,
     repeat,
   };
@@ -182,6 +224,7 @@ export function serializeBlock(b: ScoreBlock): string[] {
   if (b.outcome !== undefined) out.push(`  outcome: ${b.outcome}`);
   if (b.parked) out.push('  parked: true');
   if (b.parked && b.parkedFrom) out.push(`  parked-from: ${JSON.stringify(b.parkedFrom)}`);
+  if (b.remeasured) out.push(`  remeasured: ${JSON.stringify(b.remeasured)}`);
   if (b.parts.length) {
     out.push('  parts:');
     for (const g of b.parts) {
@@ -191,6 +234,9 @@ export function serializeBlock(b: ScoreBlock): string[] {
       out.push(`      points: ${g.points}`);
       out.push(`      prior: ${g.prior}`);
       if (g.reestimated) out.push('      reestimated: true');
+      if (g.basis) out.push(`      basis: ${q(g.basis)}`);
+      if (g.factor !== undefined) out.push(`      factor: ${g.factor}`);
+      if (g.why) out.push(`      why: ${q(g.why)}`);
       out.push(`      done: ${list(g.done)}`);
     }
   }
@@ -246,8 +292,10 @@ export function cloneBlock(b: ScoreBlock): ScoreBlock {
   };
 }
 
-/** Log `qty` finished parts on `day`. Throws if the group is already full. */
-export function logParts(b: ScoreBlock, groupIndex: number, qty: number, day: string): ScoreBlock {
+/** Log `qty` finished parts on `day`, at `time` (Dubai, HH:MM) when known,
+ *  so timed work can be matched to the part it bought. Throws if the group
+ *  is already full. */
+export function logParts(b: ScoreBlock, groupIndex: number, qty: number, day: string, time?: string): ScoreBlock {
   const next = cloneBlock(b);
   const g = next.parts[groupIndex];
   if (!g) throw new Error('no such part group');
@@ -255,7 +303,7 @@ export function logParts(b: ScoreBlock, groupIndex: number, qty: number, day: st
   const room = g.count - partsDone(g);
   if (room <= 0) throw new Error(`every ${g.unit} is already done`);
   const n = Math.max(1, Math.min(Math.round(qty), room));
-  g.done.push(n > 1 ? `${day} +${n}` : day);
+  g.done.push(formatDone({ date: day, ...(time && HM.test(time) ? { time } : {}), qty: n }));
   return next;
 }
 
@@ -312,6 +360,9 @@ export interface GroupInput {
   count: number;
   points: number;
   prior?: number;
+  basis: Source;
+  factor: number;
+  why?: string;
 }
 
 export function addGroup(b: ScoreBlock, g: GroupInput): ScoreBlock {
@@ -320,6 +371,7 @@ export function addGroup(b: ScoreBlock, g: GroupInput): ScoreBlock {
   if (!g.unit.trim()) throw new Error('a part needs a name for its unit');
   if (!Number.isFinite(count) || count < 1) throw new Error('count must be at least 1');
   if (!Number.isFinite(g.points) || g.points < 1) throw new Error('points must be at least 1');
+  capCheck(Math.round(g.points), count, g.basis, g.unit.trim());
   next.parts.push({
     unit: g.unit.trim(),
     name: g.name?.trim() || undefined,
@@ -327,8 +379,22 @@ export function addGroup(b: ScoreBlock, g: GroupInput): ScoreBlock {
     points: Math.round(g.points),
     prior: Math.max(0, Math.min(Math.round(g.prior ?? 0), count)),
     done: [],
+    basis: g.basis,
+    factor: g.factor,
+    ...(g.why ? { why: g.why } : {}),
   });
   return next;
+}
+
+/** Refuse a group whose parts would be worth more than the cap allows. */
+export function capCheck(points: number, count: number, basis: Source, unit: string): void {
+  if (fitsCap(points, count, basis)) return;
+  const each = Math.round(points / count);
+  const need = minParts(points, basis);
+  throw new Error(
+    `each ${unit} would be worth ${each} points; ${basis === 'gut' ? 'a guessed part' : 'a part'} can be worth at most ${unitCap(basis)}, ` +
+    `so it needs at least ${need} parts. Use a smaller part.`,
+  );
 }
 
 export function editGroup(
@@ -368,43 +434,81 @@ function plural0(unit: string): string {
   return /(s|x|ch|sh)$/.test(unit) ? `${unit}es` : `${unit}s`;
 }
 
-/* -- Re-estimating from real pace --------------------------------------
- * Once the first parts of something are done and timed, the timing beats
- * any guess. This rescales every group of one unit (all the chapters of
- * all the books, keeping their relative sizes) so a part is worth what it
- * actually took: timed minutes per logged part, rounded up to the next
- * whole point. Allowed once, and only while no more than a quarter of the
- * parts are logged, so it cannot be used to pay slow work more later on.
- * The outcome, if it was the parts' estimate, follows.
+/* -- Re-measuring from content ------------------------------------------
+ * The one change a price can get after the work starts. Once the first part
+ * of something priced from published hours or a guess is finished, its
+ * unstarted parts are re-priced from what they contain (pages, words,
+ * video minutes, at the reading tiers), up or down, whatever that first
+ * part took: the first part's time is never looked at, so going slowly
+ * buys nothing. Once only. Finished parts keep their points exactly: a
+ * part-done group is cut so each logged entry keeps its own frozen points.
+ * When nothing left can be counted, the prices stay and it is not asked
+ * again.
  */
 
-export function reestimate(b: ScoreBlock, unit: string, timedMinutes: number): { block: ScoreBlock; perPart: number; before: number; after: number } {
-  const next = cloneBlock(b);
-  const groups = next.parts.filter((g) => g.unit === unit);
-  if (!groups.length) throw new Error(`no parts called ${unit}`);
-  if (groups.some((g) => g.reestimated)) throw new Error('this has already been re-estimated once; its points are frozen');
-  const logged = groups.reduce((n, g) => n + g.done.reduce((q, e) => q + (parseDone(e)?.qty ?? 0), 0), 0);
-  const total = groups.reduce((n, g) => n + g.count, 0);
-  if (logged < 1) throw new Error(`finish and log at least one ${unit} first`);
-  if (logged > Math.ceil(total / 4)) throw new Error(`more than a quarter of the ${unit}s are already logged; too late to re-estimate`);
-  if (!Number.isFinite(timedMinutes) || timedMinutes <= 0) throw new Error(`no timed sessions on this yet; time a ${unit} with the timer first`);
+export function remeasureDue(b: ScoreBlock | null): boolean {
+  if (!b || b.remeasured) return false;
+  const priced = b.parts.filter((g) => g.basis === 'stated' || g.basis === 'gut');
+  return priced.some((g) => g.done.length > 0) && priced.some((g) => partsDone(g) < g.count);
+}
 
-  /* The estimate's minutes for the parts that were logged, group by group. */
-  let estimatedMin = 0;
-  for (const g of groups) {
-    const q = g.done.reduce((n, e) => n + (parseDone(e)?.qty ?? 0), 0);
-    estimatedMin += (g.points / g.count) * q * 15;
+export function remeasure(
+  b: ScoreBlock, content: Content | null, formulaFactor: number, day: string,
+): { block: ScoreBlock; before: number; after: number } {
+  if (b.remeasured) throw new Error('this has already been re-measured once; its prices are frozen');
+  if (!remeasureDue(b)) throw new Error('only something priced from published hours or a guess, with its first part done, is re-measured');
+  const next = cloneBlock(b);
+  const open = (g: PartGroup) => (g.basis === 'stated' || g.basis === 'gut') && partsDone(g) < g.count;
+  const leftPoints = (g: PartGroup) => g.points - Math.round((g.points * partsDone(g)) / g.count);
+  const before = next.parts.filter(open).reduce((n, g) => n + leftPoints(g), 0);
+  if (!content) {
+    next.remeasured = { on: day, counted: false };
+    return { block: next, before, after: before };
   }
-  const perPart = Math.ceil(timedMinutes / logged / 15) * 15;      // up to a whole point
-  const factor = (perPart * logged) / estimatedMin;
-  const before = next.parts.reduce((n, g) => n + g.points, 0);
-  for (const g of groups) {
-    g.points = Math.max(1, Math.round(g.points * factor));
-    g.reestimated = true;
-  }
-  const after = next.parts.reduce((n, g) => n + g.points, 0);
-  if (next.outcome !== undefined && next.outcome === before) next.outcome = after;
-  return { block: next, perPart, before, after };
+  const total = estimate.content(content, formulaFactor);
+  const why = contentWhy(content, formulaFactor);
+  const groups: PartGroup[] = [];
+  const weights = next.parts.map((g) => (open(g) ? leftPoints(g) : 0));
+  const wSum = weights.reduce((a, c) => a + c, 0) || 1;
+  let given = 0, wSeen = 0;
+  next.parts.forEach((g, i) => {
+    if (!open(g)) { groups.push(g); return; }
+    const done = partsDone(g);
+    /* The finished share keeps its points entry by entry. */
+    if (g.prior > 0) {
+      groups.push({ ...g, name: g.name, count: g.prior, points: Math.round((g.points * g.prior) / g.count), prior: g.prior, done: [] });
+    }
+    let n = g.prior;
+    for (const e of g.done.map(parseDone).filter((x): x is DoneEntry => !!x).sort(doneOrder)) {
+      if (n >= g.count) break;
+      const q = Math.min(g.count - n, e.qty);
+      const pts = Math.round((g.points * (n + q)) / g.count) - Math.round((g.points * n) / g.count);
+      groups.push({ ...g, count: q, points: pts, prior: 0, done: [formatDone(e)] });
+      n += q;
+    }
+    /* The rest, re-priced: its share of the new total, by the old sizes. */
+    wSeen += weights[i];
+    const share = Math.round((total * wSeen) / wSum) - given;
+    given += share;
+    const left = g.count - done;
+    const count = Math.max(left, minParts(share, 'formula'));
+    groups.push({
+      unit: count === left ? g.unit : 'part', name: g.name, count, points: Math.max(1, share), prior: 0, done: [],
+      basis: 'formula', factor: formulaFactor, why,
+    });
+  });
+  next.parts = groups;
+  next.remeasured = { on: day, counted: true };
+  return { block: next, before, after: total };
+}
+
+export function contentWhy(c: Content, factor: number): string {
+  const bits: string[] = [];
+  if (c.pages) bits.push(`${Math.round(c.pages)} pages`);
+  if (c.words) bits.push(`${Math.round(c.words).toLocaleString('en-GB')} words`);
+  const reading = bits.length ? `${bits.join(' and ')} at ${READING_TIERS[c.tier ?? 'normal'].label.toLowerCase()} reading` : '';
+  const video = c.videoMinutes ? `${Math.round(c.videoMinutes)} min of video` : '';
+  return `${[reading, video].filter(Boolean).join(', ')}, x ${factorLabel(factor)}`;
 }
 
 /* -- Templates -------------------------------------------------------- */
@@ -423,11 +527,12 @@ function laneOf(inputs: TemplateInputs, surface: string): Lane {
   return DEFAULT_LANE[surface] ?? 'curiosity';
 }
 
-/** Turn a template's rough answers into a frozen score block. Every
- *  template also records the hours a week the item takes while active,
- *  which is what the weekly limit adds up. */
-export function buildFromTemplate(id: TemplateId, inputs: TemplateInputs, surface: string, calib = 1): ScoreBlock {
-  const block = buildParts(id, inputs, surface, calib);
+/** Turn a template's rough answers into a frozen score block, priced at
+ *  the factors in force today. Every template also records the hours a
+ *  week the item takes while active, which is what the weekly limit adds up. */
+export function buildFromTemplate(id: TemplateId, inputs: TemplateInputs, surface: string, factors: Factors = STARTING_FACTORS): ScoreBlock {
+  const block = buildParts(id, inputs, surface, factors);
+  for (const g of block.parts) capCheck(g.points, g.count, g.basis ?? 'gut', g.unit);
   const wh = Number(inputs.weeklyHours);
   /* A task can leave it blank: its pace then comes from its due date, or
      its estimate spread over its scope. Everything else must say. */
@@ -437,15 +542,21 @@ export function buildFromTemplate(id: TemplateId, inputs: TemplateInputs, surfac
   return block;
 }
 
-function buildParts(id: TemplateId, inputs: TemplateInputs, surface: string, calib = 1): ScoreBlock {
+const hrs = (h: number) => `${Math.round(h * 100) / 100} ${h === 1 ? 'hour' : 'hours'}`;
+
+function buildParts(id: TemplateId, inputs: TemplateInputs, surface: string, factors: Factors): ScoreBlock {
   switch (id) {
     case 'exam-prep': {
       const count = Math.round(needNum(inputs, 'count', 'Number of parts'));
       const each = needNum(inputs, 'hoursEach', 'Hours per part');
-      const points = estimate.gut(count * each, calib);
+      const unit = String(inputs.unit || 'module').trim();
+      const points = estimate.gut(count * each, factors.gut);
       const block: ScoreBlock = {
         lane: 'quest', template: id, outcome: points,
-        parts: [{ unit: String(inputs.unit || 'module').trim(), count, points, prior: 0, done: [] }],
+        parts: [{
+          unit, count, points, prior: 0, done: [],
+          basis: 'gut', factor: factors.gut, why: `${hrs(each)} a ${unit}, guessed, x ${factorLabel(factors.gut)}`,
+        }],
         repeat: [],
       };
       const rUnit = typeof inputs.repeatUnit === 'string' ? inputs.repeatUnit.trim() : '';
@@ -460,16 +571,26 @@ function buildParts(id: TemplateId, inputs: TemplateInputs, surface: string, cal
       const tier = (typeof inputs.tier === 'string' && inputs.tier in READING_TIERS ? inputs.tier : 'normal') as Tier;
       return {
         lane: laneOf(inputs, surface), template: id, tier,
-        parts: [{ unit: 'page', count: pages, points: estimate.pages(pages, tier, calib), prior: 0, done: [] }],
+        parts: [{
+          unit: 'page', count: pages, points: estimate.pages(pages, tier, factors.formula), prior: 0, done: [],
+          basis: 'formula', factor: factors.formula,
+          why: `${pages} pages, ${READING_TIERS[tier].label.toLowerCase()} reading, x ${factorLabel(factors.formula)}`,
+        }],
         repeat: [],
       };
     }
     case 'course': {
       const hours = needNum(inputs, 'hours', 'Hours');
       const count = Math.round(needNum(inputs, 'count', 'Number of parts'));
+      const basis: Source = inputs.basis === 'gut' ? 'gut' : 'stated';
+      const factor = factors[basis];
+      const points = basis === 'gut' ? estimate.gut(hours, factor) : estimate.stated(hours, factor);
       return {
         lane: laneOf(inputs, surface), template: id,
-        parts: [{ unit: String(inputs.unit || 'module').trim(), count, points: estimate.formula(hours, calib), prior: 0, done: [] }],
+        parts: [{
+          unit: String(inputs.unit || 'module').trim(), count, points, prior: 0, done: [],
+          basis, factor, why: `${hrs(hours)}, ${basis === 'gut' ? 'guessed' : 'published'}, x ${factorLabel(factor)}`,
+        }],
         repeat: [],
       };
     }
@@ -477,13 +598,32 @@ function buildParts(id: TemplateId, inputs: TemplateInputs, surface: string, cal
       const hours = needNum(inputs, 'hours', 'Hours');
       const count = Math.max(1, Math.round(Number(inputs.count) || 1));
       const lane = laneOf(inputs, surface);
-      const points = estimate.gut(hours, calib);
+      const points = estimate.gut(hours, factors.gut);
       return {
         lane, template: id,
-        parts: [{ unit: count > 1 ? 'milestone' : 'task', count, points, prior: 0, done: [] }],
+        parts: [{
+          unit: count > 1 ? 'milestone' : 'task', count, points, prior: 0, done: [],
+          basis: 'gut', factor: factors.gut, why: `${hrs(hours)}, guessed, x ${factorLabel(factors.gut)}`,
+        }],
         repeat: [],
       };
     }
   }
   throw new Error('unknown template');
+}
+
+/** Split a guessed total into groups no part of which passes the cap:
+ *  named milestones share it equally and each is cut into pieces if it
+ *  must be; with no names it is one group of equal pieces. */
+export function guessedParts(total: number, names: string[], factor: number, why: string): PartGroup[] {
+  const base = { prior: 0, done: [] as string[], basis: 'gut' as Source, factor, why };
+  if (!names.length) {
+    const count = minParts(total, 'gut');
+    return [{ ...base, unit: count > 1 ? 'piece' : 'task', count, points: total }];
+  }
+  return names.map((name, i) => {
+    const points = Math.round((total * (i + 1)) / names.length) - Math.round((total * i) / names.length);
+    const count = minParts(points, 'gut');
+    return { ...base, unit: count > 1 ? 'piece' : 'milestone', name, count, points };
+  });
 }

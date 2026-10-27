@@ -4,8 +4,10 @@
  *   POST { title, lane, hours, milestones?: string[], due?: 'YYYY-MM-DD', weeklyHours? }
  *
  * Creates tasks/<slug>.md scoped to this week with its points frozen in
- * its score block: gut hours doubled, split across the named milestones
- * (one button each, in order) or one piece if none. Its hours a week are
+ * its score block: gut hours times the guess factor in force, shared
+ * across the named milestones (one button each, in order), each cut into
+ * pieces if it would pass the 8-point cap for a guess, or equal pieces if
+ * none are named. Its hours a week are
  * the pace its due date needs, or, with no due date, the hours a week you
  * say you will give it. Goes through the same weekly-hours check as every
  * other way onto the plate. Studio-only: the session's GitHub token commits.
@@ -16,7 +18,9 @@ import { revalidatePath } from 'next/cache';
 import { getStudioSession } from '@/lib/studio/session';
 import { getFile, putFile } from '@/lib/studio/github';
 import { slugify } from '@/lib/studio/markdown';
-import { buildFromTemplate, setScoreBlock } from '@/lib/score/block';
+import { guessedParts, setScoreBlock, type ScoreBlock } from '@/lib/score/block';
+import { factorsInForce } from '@/lib/score/calibrate';
+import { DEFAULT_LANE, estimate, factorLabel } from '@/lib/score/rules';
 import { overCapacity } from '@/lib/score/capacity';
 import { readScore, recomputeScore } from '@/lib/score/store';
 import { fetchVaultMarkdown } from '@/lib/vault/tarball';
@@ -64,18 +68,18 @@ export async function POST(req: NextRequest) {
 
   let raw: string;
   try {
-    const base = buildFromTemplate('task', { hours: body.hours, count: 1, lane: body.lane }, 'tasks', cached?.calibration?.factor ?? 1);
-    const total = base.parts[0].points;
-    /* Named milestones: one group each, the points split so they add up
-       to exactly the total. */
-    if (names.length > 1) {
-      base.parts = names.map((name, i) => ({
-        unit: 'milestone', name, count: 1, prior: 0, done: [],
-        points: Math.round((total * (i + 1)) / names.length) - Math.round((total * i) / names.length),
-      }));
-    } else if (names.length === 1) {
-      base.parts[0] = { ...base.parts[0], unit: 'milestone', name: names[0] };
-    }
+    const hours = Number(body.hours);
+    if (!Number.isFinite(hours) || hours <= 0) throw new Error('Hours must be a positive number');
+    const gut = factorsInForce(cached).gut;
+    const total = estimate.gut(hours, gut);
+    /* Named milestones share the total so it adds up exactly; any that
+       would pass the cap for a guess is cut into equal pieces. */
+    const base: ScoreBlock = {
+      lane: body.lane === 'curiosity' || body.lane === 'quest' ? body.lane : DEFAULT_LANE.tasks,
+      template: 'task',
+      parts: guessedParts(total, names, gut, `${Math.round(hours * 100) / 100} hours, guessed, x ${factorLabel(gut)}`),
+      repeat: [],
+    };
     /* The backlog: no hours committed, nothing on the plate, points frozen
        now so they are known when it is brought on. */
     if (!backlog && !due) base.weeklyHours = Math.round(weekly * 10) / 10;
