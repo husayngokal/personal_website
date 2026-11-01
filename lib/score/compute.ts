@@ -92,7 +92,12 @@ export interface ScoreState {
   /** Finished parts that took under half or over double their price. */
   variance: VarianceNote[];
   /** Timed hours (a log; never points). */
-  time: { weekMinutes: number; byKey: Record<string, number>; totalByKey: Record<string, number>; recent: Session[] };
+  time: {
+    weekMinutes: number;
+    /** This week's minutes by lane: a scoring session's own lane, else its item's; "other" for time on nothing in particular. */
+    weekByLane?: { quest: number; curiosity: number; other: number };
+    byKey: Record<string, number>; totalByKey: Record<string, number>; recent: Session[];
+  };
 }
 
 const SURFACES: Surface[] = ['tasks', 'library', 'courses', 'exams', 'projects', 'atlas', 'list', 'notebook', 'writeups', 'timer'];
@@ -222,6 +227,8 @@ export function computeScore(extracted: Extracted, today: string = authorDay()):
   const byKey: Record<string, number> = {};
   for (const x of weekSessions) if (x.key) byKey[x.key] = (byKey[x.key] ?? 0) + x.minutes;
   const weekMinutes = weekSessions.reduce((n, x) => n + x.minutes, 0);
+  const weekByLane = { quest: 0, curiosity: 0, other: 0 };
+  for (const x of weekSessions) weekByLane[x.scores?.lane ?? (x.key ? byPath.get(x.key)?.lane : undefined) ?? 'other'] += x.minutes;
   /* All-time minutes per item on record-only sessions (time spent on the
      work the item's own buttons score): work timed before something is
      priced sets it up at half rate. */
@@ -265,7 +272,7 @@ export function computeScore(extracted: Extracted, today: string = authorDay()):
     tallies,
     load: { hours: Math.round(load * 10) / 10, capacity: WEEKLY_HOURS },
     recent: events.slice(0, 15),
-    time: { weekMinutes, byKey, totalByKey, recent: recentSessions },
+    time: { weekMinutes, weekByLane, byKey, totalByKey, recent: recentSessions },
     calibration: calibrate(items, sessions, today),
     variance: varianceNotes(items, sessions, today),
   };

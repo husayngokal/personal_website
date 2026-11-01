@@ -302,7 +302,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
       onPointerDownCapture={(e) => { press.current = { x: e.clientX, y: e.clientY }; unlockAudio(); }}
     >
       {/* -- This week ------------------------------------------------ */}
-      {score && <WeekCard score={score} load={score.load ?? initial.score?.load ?? null} />}
+      {score && <WeekCard score={score} load={score.load ?? initial.score?.load ?? null} time={score.time ?? null} />}
 
       {/* -- Timer ---------------------------------------------------- */}
       <TimerCard
@@ -313,7 +313,15 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
           const snap = score;
           let next: ScoreSlice | null = snap && {
             ...snap,
-            time: snap.time ? { ...snap.time, weekMinutes: snap.time.weekMinutes + minutes } : snap.time,
+            time: snap.time ? {
+              ...snap.time,
+              weekMinutes: snap.time.weekMinutes + minutes,
+              ...(snap.time.weekByLane ? { weekByLane: (() => {
+                const l = { ...snap.time.weekByLane };
+                l[scored?.lane ?? snap.items.find((it) => it.key === key)?.lane ?? 'other'] += minutes;
+                return l;
+              })() } : {}),
+            } : snap.time,
             items: snap.items.map((it) => it.key !== key ? it : { ...it, weekMinutes: (it.weekMinutes ?? 0) + minutes }),
           };
           if (next && snap && scored && scored.points > 0) {
@@ -984,7 +992,8 @@ function AddToWeek({ busy, onAdd }: {
   );
 }
 
-function WeekCard({ score, load }: { score: ScoreSlice; load: ScoreState['load'] | null }) {
+function WeekCard({ score, load, time }: { score: ScoreSlice; load: ScoreState['load'] | null; time: ScoreState['time'] | null }) {
+  const lanes = time?.weekByLane;
   const [sound, setSound] = useState(true);
   useEffect(() => { setSound(soundOn()); }, []);
   return (
@@ -1006,6 +1015,16 @@ function WeekCard({ score, load }: { score: ScoreSlice; load: ScoreState['load']
         >
           Sound {sound ? 'on' : 'off'}
         </button>
+        {time && time.weekMinutes > 0 && (
+          <p className={styles.load}>
+            {[
+              `${hoursLabel(time.weekMinutes)} logged this week`,
+              lanes?.quest ? `${hoursLabel(lanes.quest)} quest` : null,
+              lanes?.curiosity ? `${hoursLabel(lanes.curiosity)} curiosity` : null,
+              lanes?.other ? `${hoursLabel(lanes.other)} other` : null,
+            ].filter(Boolean).join(' · ')}
+          </p>
+        )}
         {load && (
           <p className={styles.load}>
             <span className={styles.loadTrack} aria-hidden="true">
