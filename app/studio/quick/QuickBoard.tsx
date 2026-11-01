@@ -18,7 +18,7 @@ const TIMED_RATE = timedPoints(60);
 import type { QuickRequest } from '@/lib/studio/quick';
 import type { DoneGroup } from '@/lib/vault/done-items';
 import type { ItemView, ScoreState } from '@/lib/score/compute';
-import { READING_TIERS, TEMPLATES, UNIT_CAP, factorLabel, type Learning, type TemplateId, type Tier } from '@/lib/score/rules';
+import { READING_TIERS, TEMPLATES, UNIT_CAP, type TemplateId, type Tier } from '@/lib/score/rules';
 import { IDLE, TIMER_KEY, elapsedMs, hms, hoursLabel, type TimerNow } from '@/lib/score/time';
 import { shortDay } from '@/lib/score/format';
 
@@ -1006,7 +1006,6 @@ function WeekCard({ score, load }: { score: ScoreSlice; load: ScoreState['load']
         >
           Sound {sound ? 'on' : 'off'}
         </button>
-        {score.calibration?.factors && <FactorsLine c={score.calibration} />}
         {load && (
           <p className={styles.load}>
             <span className={styles.loadTrack} aria-hidden="true">
@@ -1139,22 +1138,6 @@ type GroupAction =
   | { action: 'remeasure'; content?: ContentInput; none?: boolean };
 
 interface ContentInput { pages?: number; words?: number; tier?: Tier; videoMinutes?: number }
-
-/* The estimate factors in force, and what the next monthly review would
-   do on the record so far. */
-const SOURCE_NAME: Record<Learning, string> = { gut: 'guesses', stated: 'published hours', formula: 'counted content' };
-function FactorsLine({ c }: { c: ScoreState['calibration'] }) {
-  const order: Learning[] = ['gut', 'stated', 'formula'];
-  const moves = order
-    .filter((k) => c.preview?.classes?.[k] && c.preview.classes[k].next !== c.factors[k])
-    .map((k) => `${SOURCE_NAME[k]} to \u00d7${factorLabel(c.preview.classes[k].next)}`);
-  return (
-    <p className={styles.load}>
-      Estimates now: {order.map((k) => `${SOURCE_NAME[k]} \u00d7${factorLabel(c.factors[k])}`).join(', ')}.
-      {' '}Next review {shortDay(c.next)}{moves.length ? `; on the record so far, ${moves.join(', ')}` : ''}. Old prices never change.
-    </p>
-  );
-}
 
 /* Pages, words and video minutes, at one reading tier: what something
    holds, counted before the work. */
