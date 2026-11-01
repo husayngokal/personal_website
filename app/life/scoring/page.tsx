@@ -120,7 +120,7 @@ export default async function ScoringPage() {
         <li><strong>Once a month.</strong> A review on the first Monday of each month reads the last {CALIBRATION.windowWeeks} weeks. A new factor applies only to things priced after it.</li>
         <li><strong>Items, not minutes.</strong> Each item counts once, however many parts it has; none carries more than a quarter of the weight, and each is held between a third and three times its price. Trust in the record grows with the number of items: halfway at five, two thirds at ten, four fifths at twenty.</li>
         <li><strong>Small steps.</strong> A review moves a factor at most a tenth, to the nearest 0.05. One that would end up under half or over double where it started is held, and the whole kind is checked by hand.</li>
-        <li><strong>Clean time only.</strong> Only time run on the timer counts, never time typed in afterwards. Overlapping sessions count once. Only time up to an item&apos;s latest finished part counts, and an item with any finished part untimed is left out, so timing only the slow parts cannot steer a factor. An item needs at least {CALIBRATION.minItemMinutes} timed minutes.</li>
+        <li><strong>Clean time only.</strong> Only time run on the timer counts, never time typed in afterwards. Overlapping sessions count once. Only time up to an item&apos;s latest finished part counts, and an item with any finished part untimed, or a tenth or more of it typed in, is left out, so timing only the slow parts cannot steer a factor. An item needs at least {CALIBRATION.minItemMinutes} timed minutes.</li>
       </ul>
       <table className={styles.table}>
         <thead>
@@ -146,7 +146,8 @@ export default async function ScoringPage() {
       <h2 className={styles.h2}>Notes</h2>
       <p>
         Any finished part that took under {VARIANCE.low === 0.5 ? 'half' : VARIANCE.low} or over {VARIANCE.high === 2 ? 'double' : VARIANCE.high} its
-        price gets a line here, with how it was priced. Points never change.
+        price on the timer gets a line here, with how it was priced. A part with a tenth or more of
+        its time typed in afterwards gets none, since the timer saw only some of it. Points never change.
       </p>
       {notes.length ? (
         <ul className={styles.list}>

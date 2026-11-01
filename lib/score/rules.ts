@@ -100,6 +100,7 @@ export const CALIBRATION = {
   trustK: 5,                // trust in the record: items / (items + 5)
   step: 0.1,                // a review moves a factor at most a tenth
   guard: 2,                 // past half or double its start, a factor is held for review by hand
+  handShare: 0.1,           // a part with this share or more of its time typed in counts as untimed
 };
 
 /** The most one part can be worth. Bigger work is split into parts, so a

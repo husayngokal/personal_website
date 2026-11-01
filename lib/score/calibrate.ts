@@ -154,9 +154,9 @@ interface Slice { mid: number; minutes: number }
 /** Live-timed, record-only minutes on an item, starting before `cut`.
  *  Overlapping sessions count once: each adds only the part of its span
  *  no earlier session covered, and never more than its own minutes. */
-function liveSlices(sessions: Session[], key: string, cut: number): Slice[] {
+function liveSlices(sessions: Session[], key: string, cut: number, manual = false): Slice[] {
   const own = sessions
-    .filter((s) => s.key === key && !s.scores && !s.manual && s.date >= SCORE_EPOCH)
+    .filter((s) => s.key === key && !s.scores && !!s.manual === manual && s.date >= SCORE_EPOCH)
     .map((s) => {
       const start = dayIndex(s.date) * DAY + hm(s.from);
       let span = hm(s.to) - hm(s.from);
@@ -187,6 +187,18 @@ function merge(list: [number, number][], a: number, b: number): void {
       list.splice(i + 1, 1);
     } else i++;
   }
+}
+
+/** The moments whose work had a tenth or more of its time typed in by
+ *  hand. The timer saw only part of that work, so it counts as untimed: in
+ *  a review and in a note alike, it would otherwise read as faster than it
+ *  was. A few minutes typed in beside a long timed stretch do not. */
+function handTyped(fins: Finish[], sessions: Session[], key: string, cut: number, timed: Map<number, number>): Set<number> {
+  const out = new Set<number>();
+  for (const [at, hand] of attribute(fins, liveSlices(sessions, key, cut, true)).byMoment) {
+    if (hand >= CALIBRATION.handShare * (hand + (timed.get(at) ?? 0))) out.add(at);
+  }
+  return out;
 }
 
 /** Minutes per finished entry. Each slice goes to the first finish at or
@@ -222,13 +234,15 @@ function evidence(items: ScoreItem[], sessions: Session[], until: string): Recor
     const fins = finishesOf(item).filter((f) => f.date < until);
     if (!fins.some((f) => f.counted && f.basis && f.basis in STARTING_FACTORS)) continue;
     const { mins, byMoment } = attribute(fins, liveSlices(sessions, item.key, cut));
+    const hand = handTyped(fins, sessions, item.key, cut, byMoment);
     for (const c of LEARNING) {
       const idx = fins.map((f, i) => (f.counted && f.basis === c ? i : -1)).filter((i) => i >= 0);
       if (!idx.length) continue;
       if (fins[idx[idx.length - 1]].date < windowStart) continue;
       /* One untimed part and the item is out: timing only the slow ones
-         must not be able to steer a factor. */
-      if (idx.some((i) => !(byMoment.get(fins[i].at) ?? 0))) continue;
+         must not be able to steer a factor. Partly typed in counts as
+         untimed. */
+      if (idx.some((i) => !(byMoment.get(fins[i].at) ?? 0) || hand.has(fins[i].at))) continue;
       const T = idx.reduce((n, i) => n + mins[i], 0);
       if (T < CALIBRATION.minItemMinutes) continue;
       const B = idx.reduce((n, i) => n + ((fins[i].points * MINUTES_PER_POINT) / fins[i].factor) * STARTING_FACTORS[c], 0);
@@ -341,10 +355,11 @@ export function varianceNotes(items: ScoreItem[], sessions: Session[], today: st
     const fins = finishesOf(item).filter((f) => f.date <= today);
     if (!fins.some((f) => f.counted)) continue;
     const { byMoment } = attribute(fins, liveSlices(sessions, item.key, cut));
+    const hand = handTyped(fins, sessions, item.key, cut, byMoment);
     const moments = [...new Set(fins.map((f) => f.at))];
     for (const at of moments) {
       const batch = fins.filter((f) => f.at === at);
-      if (!batch.every((f) => f.counted)) continue;
+      if (!batch.every((f) => f.counted) || hand.has(at)) continue;
       const timed = Math.round(byMoment.get(at) ?? 0);
       const priced = batch.reduce((n, f) => n + f.points, 0) * MINUTES_PER_POINT;
       if (!timed || !priced) continue;

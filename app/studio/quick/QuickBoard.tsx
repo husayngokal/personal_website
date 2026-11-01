@@ -12,6 +12,9 @@ import { ScoreMeter } from '@/components/score/ScoreMeter';
 import { emitScoreFx, setSoundOn, soundOn, unlockAudio } from '@/lib/score/fx';
 import { getBrowserClient, isSupabaseConfigured } from '@/lib/supabase';
 import { ACTIVITIES, TASK_GUT_HOURS, atlasPoints, countGain, estimate, partGain, timedPoints, type ActivityKind } from '@/lib/score/rules';
+
+/* Points an hour for time on work with no button of its own. */
+const TIMED_RATE = timedPoints(60);
 import type { QuickRequest } from '@/lib/studio/quick';
 import type { DoneGroup } from '@/lib/vault/done-items';
 import type { ItemView, ScoreState } from '@/lib/score/compute';
@@ -757,7 +760,7 @@ function TimerCard({ initial, plate, weekMinutes, onLogged, onError }: {
 
       {running ? (
         <>
-          <p className={styles.timerLabel}>{paused ? 'Paused · ' : ''}{t.label}{t.scores ? ` · scores as ${t.scores}, half rate` : ''}</p>
+          <p className={styles.timerLabel}>{paused ? 'Paused · ' : ''}{t.label}{t.scores ? ` · ${TIMED_RATE} points an hour, as ${t.scores === 'quest' ? 'a quest' : 'curiosity'}` : ''}</p>
           <div className={styles.rowActions}>
             {paused
               ? <Btn primary disabled={busy} onClick={() => void call({ action: 'resume' })}>Resume</Btn>
@@ -837,14 +840,14 @@ function TimerCard({ initial, plate, weekMinutes, onLogged, onError }: {
             <select value={scores} onChange={(e) => setScores(e.target.value as 'none' | 'quest' | 'curiosity')}>
               {pick === '__other' ? (
                 <>
-                  <option value="curiosity">Scores as curiosity, at half rate</option>
-                  <option value="quest">Scores as a quest, at half rate</option>
-                  <option value="none">Just a record</option>
+                  <option value="curiosity">{TIMED_RATE} points an hour, as curiosity</option>
+                  <option value="quest">{TIMED_RATE} points an hour, as a quest</option>
+                  <option value="none">No points, just a record</option>
                 </>
               ) : (
                 <>
-                  <option value="none">Just a record (its buttons score this work)</option>
-                  <option value={laneOf(pick)}>Other work on it, no button: scores at half rate</option>
+                  <option value="none">No points: its buttons pay for this work</option>
+                  <option value={laneOf(pick)}>{TIMED_RATE} points an hour: work on it with no button</option>
                 </>
               )}
             </select>
@@ -887,9 +890,9 @@ function TimerCard({ initial, plate, weekMinutes, onLogged, onError }: {
             <label className={styles.setupField}>
               <span>Points</span>
               <select value={manual.scores} onChange={(e) => setManual({ ...manual, scores: e.target.value })}>
-                <option value="none">Just a record</option>
-                <option value={manual.key === '__other' ? 'curiosity' : laneOf(manual.key)}>No button for this work: half rate</option>
-                {manual.key === '__other' && <option value="quest">No button, as a quest: half rate</option>}
+                <option value="none">{manual.key === '__other' ? 'No points, just a record' : 'No points: its buttons pay for this work'}</option>
+                <option value={manual.key === '__other' ? 'curiosity' : laneOf(manual.key)}>{manual.key === '__other' ? `${TIMED_RATE} points an hour, as curiosity` : `${TIMED_RATE} points an hour: work on it with no button`}</option>
+                {manual.key === '__other' && <option value="quest">{TIMED_RATE} points an hour, as a quest</option>}
               </select>
             </label>
           </div>
