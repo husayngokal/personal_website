@@ -318,15 +318,20 @@ export function countGain(per: number, before: number, after: number): number {
  * Time scores only for work with no button of its own (supplementary
  * reading, a one-off), at half its real rate: hours are input, not output,
  * and a timer cannot tell focus from drift. At stop you confirm the
- * focused minutes (never more than the timer ran); one session counts for
- * at most three hours. Points are frozen into the log line.
+ * focused minutes (never more than the timer ran), breaks taken out by
+ * you. Points are frozen into the log line. Sessions dated before
+ * TIMED_UNCAPPED_FROM counted for at most three hours each.
  */
 
 export const TIMED_FACTOR = 0.5;
 export const TIMED_SESSION_CAP_MIN = 180;
+export const TIMED_UNCAPPED_FROM = '2026-11-02';
 
-export function timedPoints(focusedMinutes: number): number {
-  const m = Math.max(0, Math.min(TIMED_SESSION_CAP_MIN, Math.round(focusedMinutes)));
+/** Points for focused minutes on work with no button. `date` is the
+ *  session's Dubai day; before TIMED_UNCAPPED_FROM the old cap applies. */
+export function timedPoints(focusedMinutes: number, date?: string): number {
+  let m = Math.max(0, Math.round(focusedMinutes));
+  if (date && date < TIMED_UNCAPPED_FROM) m = Math.min(TIMED_SESSION_CAP_MIN, m);
   return Math.round((m / MINUTES_PER_POINT) * TIMED_FACTOR);
 }
 

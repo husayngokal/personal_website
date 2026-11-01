@@ -4,7 +4,7 @@ import {
   ATLAS, CURIOSITY_CAP, FORMULA_FACTOR, GUT_FACTOR, LEVEL_SIZE, MINUTES_PER_POINT,
   READING_TIERS, RECURRING_GUT_HOURS, SCORE_EPOCH, TASK_GUT_HOURS, WEEKLY_BAR, WEEKLY_HOURS,
   WORDS_PER_HOUR, estimate, pagesPerPoint, type Tier,
-  ACTIVITIES, CALIBRATION, RETRIEVAL_FACTOR, SOURCES, STARTING_FACTORS, TIMED_FACTOR, TIMED_SESSION_CAP_MIN, UNIT_CAP, VARIANCE,
+  ACTIVITIES, CALIBRATION, RETRIEVAL_FACTOR, SOURCES, STARTING_FACTORS, TIMED_FACTOR, TIMED_SESSION_CAP_MIN, TIMED_UNCAPPED_FROM, UNIT_CAP, VARIANCE,
   activityRate, factorLabel, type ActivityKind, type Learning,
 } from '@/lib/score/rules';
 import { shortDay } from '@/lib/score/format';
@@ -251,8 +251,9 @@ export default async function ScoringPage() {
         record only; the button scores the work. Time on work with no button of its own, like
         supplementary reading or a one-off, scores at <strong>half rate</strong>: {fmt(60 / MINUTES_PER_POINT * TIMED_FACTOR)} points
         an hour. Hours are input, not output, and a timer cannot tell focus from drift. At the end of a
-        session the focused minutes are confirmed, never more than the timer ran, and one session counts
-        for at most {TIMED_SESSION_CAP_MIN / 60} hours. Its points are frozen into the log. Time typed in
+        session the focused minutes are confirmed, never more than the timer ran, with the breaks taken
+        out by me. Its points are frozen into the log. Before {longDay(TIMED_UNCAPPED_FROM)}, one session counted for at
+        most {TIMED_SESSION_CAP_MIN / 60} hours. Time typed in
         afterwards is marked as such: it stays in the record, but never calibrates an estimate.
       </p>
 

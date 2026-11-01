@@ -793,7 +793,7 @@ function TimerCard({ initial, plate, weekMinutes, onLogged, onError }: {
               }}
             >
               <p className={styles.setupHead}>
-                It ran {Math.max(1, Math.round(elapsedMs(t) / 60000))} minutes. How many were focused? Take out the breaks; it can only go down. Up to 3 hours of one session counts, at half rate.
+                It ran {Math.max(1, Math.round(elapsedMs(t) / 60000))} minutes. How many were focused? Take out the breaks; it can only go down. Every focused minute counts, at half rate.
               </p>
               <div className={styles.partsGrid}>
                 <label className={styles.setupField}>
@@ -802,7 +802,7 @@ function TimerCard({ initial, plate, weekMinutes, onLogged, onError }: {
                 </label>
               </div>
               <div className={styles.rowActions}>
-                <Btn primary disabled={busy} onClick={() => undefined} submit>Log +{timedPoints(Number(confirm) || 0)}</Btn>
+                <Btn primary disabled={busy} onClick={() => undefined} submit>Log +{timedPoints(Number(confirm) || 0, new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dubai' }).format(new Date()))}</Btn>
                 <Btn disabled={busy} onClick={() => setConfirm(null)}>Keep timing</Btn>
               </div>
             </form>

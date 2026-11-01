@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
           if (t.scores) {
             const f = Number(body.focusedMinutes);
             const focused = Number.isFinite(f) ? Math.max(0, Math.min(minutes, Math.round(f))) : minutes;
-            s.scores = { points: timedPoints(focused), lane: t.scores };
+            s.scores = { points: timedPoints(focused, s.date), lane: t.scores };
           }
         } else {
           const minutes = Math.round(Number(body.minutes));
@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
           const endMs = date === today.date ? now : Date.parse(`${date}T20:00:00+04:00`);
           const startMs = Math.max(Date.parse(`${date}T00:00:00+04:00`), endMs - minutes * 60000);
           s = { date, from: dubaiParts(startMs).hm, to: dubaiParts(endMs).hm, minutes, key, label: label || 'Untitled', manual: true };
-          if (lane) s.scores = { points: timedPoints(minutes), lane };
+          if (lane) s.scores = { points: timedPoints(minutes, s.date), lane };
         }
 
         /* Append to the month's file; two tries if it moved underneath us. */
