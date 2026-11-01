@@ -1,5 +1,5 @@
 /*
- * The weekly hours limit, shared by every route that can put something
+ * This week's hours limit, shared by every route that can put something
  * on the plate (a Quick action, a new item added to this week).
  *
  * Compares an item's hours a week before and after an edit against the
@@ -8,7 +8,6 @@
  */
 
 import { itemFromFile } from './items';
-import { WEEKLY_HOURS } from './rules';
 import type { ScoreState } from './compute';
 
 export interface OverCapacity {
@@ -27,12 +26,14 @@ export function overCapacity(score: ScoreState | null, path: string, raw: string
   const was = prev?.active ? prev.weeklyHours ?? 0 : 0;
   const will = item.weeklyHours ?? 0;
   if (will <= was) return null;
+  /* This week's limit (the bar in hours, set at the start of the week). */
+  const limit = score.load.capacity;
   const load = Math.round((score.load.hours - was + will) * 10) / 10;
-  if (load <= WEEKLY_HOURS) return null;
+  if (load <= limit) return null;
   return {
-    detail: `That would put ${load} hours a week on the plate, over the ${WEEKLY_HOURS}. Take something off first.`,
+    detail: `That would put ${load} hours a week on the plate, over this week's ${limit}. Take something off first.`,
     load,
-    capacity: WEEKLY_HOURS,
+    capacity: limit,
     adding: Math.round((will - was) * 10) / 10,
     plate: score.items
       .filter((i) => i.active && (i.weeklyHours ?? 0) > 0 && i.key !== path)

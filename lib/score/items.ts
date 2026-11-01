@@ -60,6 +60,9 @@ export interface ScoreItem {
    *  weeks left), rather than a figure chosen by hand. */
   paced: boolean;
   deadline: string | null;
+  /** The deadline is a date someone else fixed (an exam's, or a task's
+   *  marked `due-kind: fixed`), so it sets the weekly bar's floor. */
+  fixedDate: boolean;
   /** Due its one content re-measure (block.ts): priced from published
    *  hours or a guess, first part done, not yet re-measured. */
   remeasure: boolean;
@@ -196,6 +199,7 @@ function fromFile(src: VaultSource, today: string = authorDay()): ScoreItem | nu
     weeklyHours: block?.weeklyHours ?? null,
     paced: false,
     deadline: null,
+    fixedDate: false,
     remeasure: remeasureDue(block),
   };
 
@@ -203,6 +207,7 @@ function fromFile(src: VaultSource, today: string = authorDay()): ScoreItem | nu
     case 'tasks': {
       base.active = ACTIVE_TASK.has(String(row.status)) && row.scope !== 'lifetime';
       base.deadline = day(row.due);
+      base.fixedDate = !!base.deadline && (fm['due-kind'] === 'fixed' || fm['due-fixed'] === true) && ACTIVE_TASK.has(String(row.status));
       if (block) {
         /* A sized task finished by its status (Done in Quick, the edit form,
            Obsidian): its single part counts as done on the completed day. */
@@ -246,6 +251,7 @@ function fromFile(src: VaultSource, today: string = authorDay()): ScoreItem | nu
     case 'exams': {
       const pending = row.pending === true;
       base.deadline = day(row.exam_date);
+      base.fixedDate = pending && !!base.deadline;
       base.active = pending && (!!base.deadline || !!block);
       if (base.active && !block) base.needsSetup = 'exam-prep';
       if (base.outcome) base.outcome.achieved = !pending ? day(row.earned) : null;
@@ -333,7 +339,7 @@ function atlasItem(src: VaultSource, tallies: Extracted['tallies']): ScoreItem |
     key: src.path, table: 'living_entries', surface: 'atlas', slug: 'field-atlas',
     title: 'The Field Atlas', href: '/field-atlas', lane: DEFAULT_LANE.atlas,
     active: false, parked: false, private: false, hasBlock: false, needsSetup: null,
-    parts: [], repeat: [], outcome: null, weeklyHours: null, paced: false, deadline: null, remeasure: false, events,
+    parts: [], repeat: [], outcome: null, weeklyHours: null, paced: false, deadline: null, fixedDate: false, remeasure: false, events,
   };
 }
 

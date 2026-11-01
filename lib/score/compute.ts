@@ -2,17 +2,19 @@
  * Scored items -> the score state the site shows.
  *
  * Weeks run Monday to Sunday in the author's timezone (Asia/Dubai, see
- * lib/content/streak.ts). A week's bar is its quest points plus its
- * curiosity points up to the cap. Outcomes never fill a week; they go to
- * the lifetime total and the level.
+ * lib/content/streak.ts). A week's score is its quest points plus its
+ * curiosity points up to that week's cap; its bar, cap and plate limit
+ * come from week-rule.ts. Outcomes never fill a week; they go to the
+ * lifetime total and the level.
  *
  * Pure module, no I/O.
  */
 
 import { authorDay, weekStart } from '../content/streak';
 import {
-  CURIOSITY_CAP, LEVEL_SIZE, SCORE_EPOCH, WEEKLY_BAR, WEEKLY_HOURS, type Lane, type Source,
+  LEVEL_SIZE, SCORE_EPOCH, type Lane, type Source,
 } from './rules';
+import { weekRules, type WeekRule } from './week-rule';
 import { partsDone, repeatCount } from './block';
 import { calibrate, varianceNotes, type Calibration, type VarianceNote } from './calibrate';
 import { plural, type Extracted, type ScoreEvent, type ScoreItem, type Surface, type Tally } from './items';
@@ -23,7 +25,11 @@ export interface WeekTotals {
   quest: number;
   curiosity: number;            // all curiosity earned
   curiosityCounted: number;     // the part that fills the bar
-  bar: number;
+  bar: number;                  // the week's score toward its bar
+  /** The week's own bar and curiosity cap (week-rule.ts). Absent on a
+   *  score stored before the bar moved week to week: then 200 and 80. */
+  max?: number;
+  cap?: number;
   full: boolean;
   extra: number;
 }
@@ -62,6 +68,8 @@ export interface ItemView {
   weeklyHours: number | null;
   paced: boolean;
   deadline: string | null;
+  /** The date is one someone else fixed: it counts toward the bar's floor. */
+  fixedDate?: boolean;
   outcome: { points: number; achieved: string | null } | null;
   /** Due its one content re-measure (block.ts). */
   remeasure: boolean;
@@ -75,8 +83,11 @@ export interface ScoreState {
   asOf?: string;
   today: string;
   epoch: string;
-  bar: number;
-  curiosityCap: number;
+  bar: number;                  // this week's bar
+  curiosityCap: number;         // this week's curiosity cap
+  /** This week's rule, and next week's as it stands now. */
+  rule?: WeekRule;
+  next?: WeekRule;
   week: WeekTotals;
   history: WeekTotals[];        // oldest first, current week last
   streak: number;               // full weeks in a row
@@ -108,18 +119,23 @@ function addDays(isoDay: string, n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-function totalsFor(start: string, events: ScoreEvent[]): WeekTotals {
+function lanesFor(events: ScoreEvent[]): { quest: number; curiosity: number } {
   let quest = 0, curiosity = 0;
   for (const e of events) {
     if (e.kind === 'outcome') continue;
     if (e.lane === 'quest') quest += e.points;
     else curiosity += e.points;
   }
-  const curiosityCounted = Math.min(curiosity, CURIOSITY_CAP);
+  return { quest, curiosity };
+}
+
+function totalsFor(rule: WeekRule, events: ScoreEvent[]): WeekTotals {
+  const { quest, curiosity } = lanesFor(events);
+  const curiosityCounted = Math.min(curiosity, rule.cap);
   const bar = quest + curiosityCounted;
   return {
-    start, quest, curiosity, curiosityCounted, bar,
-    full: bar >= WEEKLY_BAR, extra: Math.max(0, bar - WEEKLY_BAR),
+    start: rule.start, quest, curiosity, curiosityCounted, bar, max: rule.bar, cap: rule.cap,
+    full: bar >= rule.bar, extra: Math.max(0, bar - rule.bar),
   };
 }
 
@@ -155,7 +171,7 @@ function itemView(item: ScoreItem, weekPoints: number, weekMinutes = 0): ItemVie
     parked: item.parked, weekMinutes,
     hasBlock: item.hasBlock, needsSetup: item.needsSetup,
     earned, total, pct: total ? Math.round((earned / total) * 100) : 0, summary,
-    weekPoints, weeklyHours: item.weeklyHours, paced: item.paced, deadline: item.deadline, outcome: item.outcome,
+    weekPoints, weeklyHours: item.weeklyHours, paced: item.paced, deadline: item.deadline, fixedDate: item.fixedDate, outcome: item.outcome,
     remeasure: item.remeasure,
     parts,
     repeat: item.repeat.map((g, index) => ({
@@ -193,19 +209,31 @@ export function computeScore(extracted: Extracted, today: string = authorDay()):
     (byWeek.get(w) ?? byWeek.set(w, []).get(w)!).push(e);
   }
 
+  /* Every week's bar, cap and plate limit, from the first week shown to
+     next week (as it stands now). */
+  const firstShown = addDays(thisWeek, -7 * 11);
+  const epochWeek = weekStart(SCORE_EPOCH);
+  const rules = weekRules(items, firstShown < epochWeek ? firstShown : epochWeek, addDays(thisWeek, 7), (start, cap) => {
+    const l = lanesFor(byWeek.get(start) ?? []);
+    return l.quest + Math.min(l.curiosity, cap);
+  });
+  const ruleOf = new Map(rules.map((r) => [r.start, r]));
+  const rule = ruleOf.get(thisWeek)!;
+  const next = ruleOf.get(addDays(thisWeek, 7))!;
+
   const history: WeekTotals[] = [];
   for (let i = 11; i >= 0; i--) {
     const start = addDays(thisWeek, -7 * i);
-    history.push(totalsFor(start, byWeek.get(start) ?? []));
+    history.push(totalsFor(ruleOf.get(start)!, byWeek.get(start) ?? []));
   }
   const week = history[history.length - 1];
 
-  /* Full weeks in a row. An unfinished current week does not break the
-     run; it only extends it once the bar is full. */
+  /* Full weeks in a row, each against its own bar. An unfinished current
+     week does not break the run; it only extends it once the bar is full. */
   let streak = 0;
   let cursor = week.full ? thisWeek : addDays(thisWeek, -7);
-  while (cursor >= weekStart(SCORE_EPOCH)) {
-    if (!totalsFor(cursor, byWeek.get(cursor) ?? []).full) break;
+  while (cursor >= epochWeek) {
+    if (!totalsFor(ruleOf.get(cursor)!, byWeek.get(cursor) ?? []).full) break;
     streak++;
     cursor = addDays(cursor, -7);
   }
@@ -255,8 +283,10 @@ export function computeScore(extracted: Extracted, today: string = authorDay()):
     version: 1,
     today,
     epoch: SCORE_EPOCH,
-    bar: WEEKLY_BAR,
-    curiosityCap: CURIOSITY_CAP,
+    bar: rule.bar,
+    curiosityCap: rule.cap,
+    rule,
+    next,
     week,
     history,
     streak,
@@ -270,7 +300,7 @@ export function computeScore(extracted: Extracted, today: string = authorDay()):
     items: views,
     surfaces,
     tallies,
-    load: { hours: Math.round(load * 10) / 10, capacity: WEEKLY_HOURS },
+    load: { hours: Math.round(load * 10) / 10, capacity: rule.limitHours },
     recent: events.slice(0, 15),
     time: { weekMinutes, weekByLane, byKey, totalByKey, recent: recentSessions },
     calibration: calibrate(items, sessions, today),

@@ -26,15 +26,35 @@ export const SCORE_EPOCH = '2026-10-19';
 /** One point is fifteen focused minutes. */
 export const MINUTES_PER_POINT = 15;
 
-/** The weekly bar. Full means done for the week; anything past it is
- *  optional extra. 200 points = 50 hours. */
+/** The most a weekly bar can be. Full means done for the week; anything
+ *  past it is optional extra. 200 points = 50 hours. Before BAR.from this
+ *  was the bar every week. */
 export const WEEKLY_BAR = 200;
 export const WEEKLY_HOURS = (WEEKLY_BAR * MINUTES_PER_POINT) / 60;
 
-/** Curiosity can fill at most this much of the weekly bar (20 hours).
+/** Curiosity can fill at most this much of a 200 bar (20 hours): 40%.
  *  Quests are uncapped. Curiosity past the cap still counts toward the
  *  lifetime total, never the week. */
 export const CURIOSITY_CAP = 80;
+
+/* -- The weekly bar ---------------------------------------------------
+ * From BAR.from, each week's bar is set at the start of the week and
+ * holds until Sunday, whatever comes on or off the plate:
+ *   - it moves halfway from last week's bar to what last week counted
+ *     (quests plus curiosity up to that week's cap), to the nearest 5;
+ *   - never below the floor: what every item with a date someone else
+ *     fixed (an exam, a task marked so) needs that week, on the plate or
+ *     not, worked out from what was left at the start of the week;
+ *   - never above WEEKLY_BAR.
+ * The curiosity cap is 40% of the bar, and the plate can hold the bar in
+ * hours. All of it replays from the vault on every recompute.
+ */
+export const BAR = {
+  from: '2026-11-02',
+  pull: 0.5,
+  round: 5,
+  capShare: CURIOSITY_CAP / WEEKLY_BAR,
+} as const;
 
 /** A level per this many lifetime points (about five full weeks). */
 export const LEVEL_SIZE = 1000;
@@ -350,10 +370,10 @@ export interface TemplateField {
   hint?: string;
 }
 
-/** Every template asks this: it is what the 50-hour limit adds up. */
+/** Every template asks this: it is what the week's hour limit adds up. */
 const WEEKLY: TemplateField = {
   key: 'weeklyHours', label: 'Hours a week it will take while active', kind: 'number',
-  hint: `counts toward the ${WEEKLY_HOURS}-hour week`,
+  hint: "counts toward this week's hour limit",
 };
 
 export const TEMPLATES: Record<TemplateId, { label: string; fields: TemplateField[] }> = {

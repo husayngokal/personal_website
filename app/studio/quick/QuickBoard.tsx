@@ -39,7 +39,13 @@ export interface QuickData {
 
 type ScoreSlice = Pick<ScoreState, 'week' | 'lifetime' | 'streak' | 'items'> & {
   load?: ScoreState['load']; time?: ScoreState['time']; calibration?: ScoreState['calibration'];
+  bar?: number; curiosityCap?: number; next?: ScoreState['next'];
 };
+
+/* This week's bar and curiosity cap: set at the start of the week; a
+   score stored before they moved week to week carries 200 and 80. */
+const barOf = (sl: ScoreSlice) => sl.week.max ?? sl.bar ?? 200;
+const capOf = (sl: ScoreSlice) => sl.week.cap ?? sl.curiosityCap ?? 80;
 
 interface ApiOk {
   ok: true;
@@ -93,7 +99,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
         const h = hold.current;
         if (h && Date.now() < h.until && v.lifetime.points < h.points) return;
         if (h && v.lifetime.points >= h.points) hold.current = null;
-        setScore({ week: v.week, lifetime: v.lifetime, streak: v.streak, items: v.items, load: v.load, time: v.time, calibration: v.calibration });
+        setScore({ week: v.week, lifetime: v.lifetime, streak: v.streak, items: v.items, load: v.load, time: v.time, calibration: v.calibration, bar: v.bar, curiosityCap: v.curiosityCap, next: v.next });
       })
       .subscribe();
     return () => { void supabase.removeChannel(channel); };
@@ -166,10 +172,10 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
     const w = { ...sl.week };
     if (p.lane === 'quest') w.quest += sign * p.gained;
     else w.curiosity += sign * p.gained;
-    w.curiosityCounted = Math.min(w.curiosity, 80);
+    w.curiosityCounted = Math.min(w.curiosity, capOf(sl));
     w.bar = w.quest + w.curiosityCounted;
-    w.full = w.bar >= 200;
-    w.extra = Math.max(0, w.bar - 200);
+    w.full = w.bar >= barOf(sl);
+    w.extra = Math.max(0, w.bar - barOf(sl));
     const points = sl.lifetime.points + sign * p.gained;
     const items = p.itemKey === undefined ? sl.items : sl.items.map((i) => i.key !== p.itemKey ? i : {
       ...i,
@@ -198,7 +204,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
       setScore(optimistic);
       hold.current = { points: optimistic.lifetime.points, until: now + 60_000 };
       emitScoreFx({
-        before: snapshot.week, after: optimistic.week, barMax: 200,
+        before: snapshot.week, after: optimistic.week, barMax: barOf(snapshot),
         levelBefore: snapshot.lifetime.level, levelAfter: optimistic.lifetime.level,
         gained: p.gained, origin: press.current ?? undefined, combo: run.current.n, sound: true,
       });
@@ -209,7 +215,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
       window.dispatchEvent(new Event('score:release'));
       setScore(snapshot);
       emitScoreFx({
-        before: optimistic.week, after: snapshot.week, barMax: 200,
+        before: optimistic.week, after: snapshot.week, barMax: barOf(snapshot),
         levelBefore: optimistic.lifetime.level, levelAfter: snapshot.lifetime.level, gained: -(p?.gained ?? 0),
       });
     };
@@ -331,7 +337,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
             run.current = now - run.current.at < 90_000 ? { at: now, n: run.current.n + 1 } : { at: now, n: 1 };
             hold.current = { points: gainedSlice.lifetime.points, until: now + 60_000 };
             emitScoreFx({
-              before: snap.week, after: gainedSlice.week, barMax: 200,
+              before: snap.week, after: gainedSlice.week, barMax: barOf(snap),
               levelBefore: snap.lifetime.level, levelAfter: gainedSlice.lifetime.level,
               gained: scored.points, origin: press.current ?? undefined, combo: run.current.n, sound: true,
             });
@@ -503,6 +509,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
                 {i.table === 'tasks' && !i.needsSetup ? (
                   <PaceForm
                     deadline={i.deadline}
+                    fixedDate={!!i.fixedDate}
                     weeklyHours={i.weeklyHours}
                     paced={i.paced}
                     busy={busy === `${i.key}:due`}
@@ -1001,8 +1008,8 @@ function WeekCard({ score, load, time }: { score: ScoreSlice; load: ScoreState['
       <ScoreMeter
         compact
         week={score.week}
-        barMax={200}
-        cap={80}
+        barMax={barOf(score)}
+        cap={capOf(score)}
         level={score.lifetime.level}
         lifetime={score.lifetime.points}
         streak={score.streak}
@@ -1311,10 +1318,11 @@ function BringOn({ busy, disabled, onBring }: {
 /* A task's pace: a due date (the hours a week work themselves out from
    what is left) or hours a week chosen by hand. Moving the date never
    changes points, only the hours it asks of the week. */
-function PaceForm({ deadline, weeklyHours, paced, busy, disabled, onSave }: {
-  deadline: string | null; weeklyHours: number | null; paced: boolean; busy: boolean; disabled: boolean;
-  onSave: (p: { due: string | null; weeklyHours?: number }) => void;
+function PaceForm({ deadline, fixedDate, weeklyHours, paced, busy, disabled, onSave }: {
+  deadline: string | null; fixedDate: boolean; weeklyHours: number | null; paced: boolean; busy: boolean; disabled: boolean;
+  onSave: (p: { due: string | null; weeklyHours?: number; fixed?: boolean }) => void;
 }) {
+  const [fixed, setFixed] = useState(fixedDate);
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dubai' }).format(new Date());
   const [mode, setMode] = useState<'due' | 'hours'>(deadline ? 'due' : 'hours');
   const [due, setDue] = useState(deadline && deadline >= today ? deadline : '');
@@ -1329,7 +1337,7 @@ function PaceForm({ deadline, weeklyHours, paced, busy, disabled, onSave }: {
       className={styles.partsAdd}
       onSubmit={(e) => {
         e.preventDefault();
-        if (mode === 'due') { if (due) onSave({ due }); return; }
+        if (mode === 'due') { if (due) onSave({ due, fixed }); return; }
         const n = Number(wh);
         if (n > 0) onSave({ due: null, weeklyHours: n });
       }}
@@ -1344,7 +1352,16 @@ function PaceForm({ deadline, weeklyHours, paced, busy, disabled, onSave }: {
           </select>
         </label>
         {mode === 'due' ? (
-          <label className={styles.setupField}><span>Due date</span><input required type="date" min={today} value={due} onChange={(e) => setDue(e.target.value)} /></label>
+          <>
+            <label className={styles.setupField}><span>Due date</span><input required type="date" min={today} value={due} onChange={(e) => setDue(e.target.value)} /></label>
+            <label className={styles.setupField}>
+              <span>Who set it</span>
+              <select value={fixed ? 'fixed' : 'mine'} onChange={(e) => setFixed(e.target.value === 'fixed')}>
+                <option value="mine">I chose it</option>
+                <option value="fixed">Someone else, like an exam (sets the week's floor)</option>
+              </select>
+            </label>
+          </>
         ) : (
           <label className={styles.setupField}><span>Hours a week</span><input required type="number" min={0.5} step="any" inputMode="decimal" value={wh} onChange={(e) => setWh(e.target.value)} /></label>
         )}

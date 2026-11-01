@@ -43,7 +43,7 @@ export type QuickTarget = FrontmatterTarget | 'atlas' | 'score';
 /* Tables whose items carry a score block, and where their files live. */
 export const SCORE_TABLES: Record<string, { folder: string | null; keys: string[]; columns: string[] }> = {
   library_books:     { folder: 'library',           keys: ['status', 'progress-pct', 'finished'], columns: ['status', 'progress_pct', 'finished'] },
-  tasks:             { folder: 'tasks',             keys: ['status', 'scope', 'completed', 'due'],  columns: ['status', 'scope', 'completed', 'due'] },
+  tasks:             { folder: 'tasks',             keys: ['status', 'scope', 'completed', 'due', 'due-kind'], columns: ['status', 'scope', 'completed', 'due'] },
   courses:           { folder: 'courses',           keys: ['status', 'finished'],                  columns: ['status', 'finished'] },
   study_credentials: { folder: 'study/credentials', keys: [],                                      columns: [] },
   projects:          { folder: 'projects',          keys: ['status'],                              columns: ['status'] },
@@ -73,7 +73,7 @@ export type QuickRequest =
   | { target: 'score'; table: string; slug: string; action: 'delete' }
   | { target: 'score'; table: string; slug: string; action: 'set-weekly'; hours: number }
   | { target: 'score'; table: string; slug: string; action: 'activate'; due?: string; weeklyHours?: number }
-  | { target: 'score'; table: string; slug: string; action: 'set-due'; due: string | null; weeklyHours?: number }
+  | { target: 'score'; table: string; slug: string; action: 'set-due'; due: string | null; weeklyHours?: number; fixed?: boolean }
   | { target: 'score'; table: string; slug: string; action: 'page'; page: number }
   | { target: 'score'; table: string; slug: string; action: 'setup'; template: TemplateId; inputs: TemplateInputs }
   | { target: 'score'; table: string; slug: string; action: 'add-group'; unit: string; name?: string; count: number; basis: GroupBasis; hours?: number; content?: Content }
@@ -349,8 +349,11 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string,
     }
     const wh = Math.round(Number(req.weeklyHours) * 10) / 10;
     if (!due && !(Number.isFinite(wh) && wh > 0)) throw new QuickError('bad-request', 'with no due date, say how many hours a week it gets');
-    const prev: Record<string, ScalarChange> = { due: scalar(fm.due) };
-    let next = patchFrontmatter(raw, { due });
+    /* A date someone else fixed (a client, an exam board) sets the weekly
+       bar's floor; one you chose does not. */
+    const fixed = !!due && req.fixed === true;
+    const prev: Record<string, ScalarChange> = { due: scalar(fm.due), 'due-kind': scalar(fm['due-kind']) };
+    let next = patchFrontmatter(raw, { due, 'due-kind': fixed ? 'fixed' : null });
     if (!due) {
       const item = itemFromFile({ path, content: raw });
       const base: ScoreBlock = own ?? (item ? effectiveBlock(item) : { parts: [], repeat: [] });
@@ -358,7 +361,7 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string,
     }
     return {
       raw: next, changed: next !== raw, row: {},
-      summary: `${title}: ${due ? `due ${due}` : `no due date, ${wh} hours a week`}`,
+      summary: `${title}: ${due ? `due ${due}${fixed ? ', a fixed date' : ''}` : `no due date, ${wh} hours a week`}`,
       undo: { target: 'score', table: req.table, slug: req.slug, action: 'restore-block', block: own, fields: prev },
     };
   }

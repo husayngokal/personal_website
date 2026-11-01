@@ -4,7 +4,7 @@ import {
   ATLAS, CURIOSITY_CAP, FORMULA_FACTOR, GUT_FACTOR, LEVEL_SIZE, MINUTES_PER_POINT,
   READING_TIERS, RECURRING_GUT_HOURS, SCORE_EPOCH, TASK_GUT_HOURS, WEEKLY_BAR, WEEKLY_HOURS,
   WORDS_PER_HOUR, estimate, pagesPerPoint, type Tier,
-  ACTIVITIES, CALIBRATION, RETRIEVAL_FACTOR, SOURCES, STARTING_FACTORS, TIMED_FACTOR, TIMED_SESSION_CAP_MIN, TIMED_UNCAPPED_FROM, UNIT_CAP, VARIANCE,
+  ACTIVITIES, CALIBRATION, RETRIEVAL_FACTOR, SOURCES, STARTING_FACTORS, TIMED_FACTOR, TIMED_SESSION_CAP_MIN, TIMED_UNCAPPED_FROM, UNIT_CAP, BAR, VARIANCE,
   activityRate, factorLabel, type ActivityKind, type Learning,
 } from '@/lib/score/rules';
 import { shortDay } from '@/lib/score/format';
@@ -46,6 +46,9 @@ export default async function ScoringPage() {
   const tiers = Object.entries(READING_TIERS) as [Tier, (typeof READING_TIERS)[Tier]][];
   const wordsPerPoint = (WORDS_PER_HOUR * MINUTES_PER_POINT) / 60;
   const capHours = (CURIOSITY_CAP * MINUTES_PER_POINT) / 60;
+  const rule = score?.rule ?? null;
+  const next = score?.next ?? null;
+  const hours = (pts: number) => fmt((pts * MINUTES_PER_POINT) / 60);
 
   return (
     <div className="page page--life">
@@ -53,7 +56,7 @@ export default async function ScoringPage() {
       <Eyebrow number="11.5">Scoring</Eyebrow>
       <h1 className={styles.title}>How scoring works.</h1>
       <p className={styles.dek}>
-        One number a week. {WEEKLY_BAR} points. When the bar is full, the week is done.
+        One number a week{rule ? <>: {rule.bar} points this week</> : null}. When the bar is full, the week is done.
       </p>
       <p>
         This is the rulebook behind the bar on the <Link href="/#this-week">homepage</Link>. It is
@@ -64,7 +67,10 @@ export default async function ScoringPage() {
       <h2 className={styles.h2}>The week</h2>
       <ul className={styles.list}>
         <li><strong>One point is {MINUTES_PER_POINT} focused minutes.</strong></li>
-        <li><strong>The bar is {WEEKLY_BAR} points</strong>, which is {WEEKLY_HOURS} hours. Weeks run Monday to Sunday, Dubai time.</li>
+        <li>
+          <strong>The bar is set at the start of each week</strong> and holds until Sunday, whatever comes on
+          or off the plate. Weeks run Monday to Sunday, Dubai time.{rule ? <> This week it is {rule.bar} points, {hours(rule.bar)} hours.</> : null}
+        </li>
         <li><strong>Full means done.</strong> Nothing more is owed that week. Anything past full shows as extra, and extra is a choice.</li>
         <li><strong>Points only come from finishing something.</strong> Starting, planning and backlog earn nothing.</li>
         <li>Scoring began on {shortDay(SCORE_EPOCH)} {SCORE_EPOCH.slice(0, 4)}. Earlier work shows as progress but earns no points.</li>
@@ -80,8 +86,8 @@ export default async function ScoringPage() {
         <li>
           <strong>Curiosity.</strong> No, and it does not have to. Reading, courses taken for interest,
           the Field Atlas, The List, and anything I write about them. Curiosity fills at most{' '}
-          {CURIOSITY_CAP} points of the bar ({fmt(capHours)} hours). Past that it still counts toward
-          the lifetime total, never the week.
+          {fmt(BAR.capShare * 100)}% of the bar{rule ? <> ({rule.cap} points this week, {hours(rule.cap)} hours)</> : <> ({CURIOSITY_CAP} points of a {WEEKLY_BAR} bar, {fmt(capHours)} hours)</>}.
+          Past that it still counts toward the lifetime total, never the week.
         </li>
       </ul>
       <p>A textbook or reading takes the lane of whatever it belongs to. On its own, it is curiosity.</p>
@@ -203,10 +209,31 @@ export default async function ScoringPage() {
         Levels never go down.
       </p>
 
+      <h2 className={styles.h2}>The bar</h2>
+      <p>
+        A bar I miss week after week only teaches me to miss it. So it moves with what I actually do,
+        and a few rules keep it from drifting where it should not.
+      </p>
+      <ul className={styles.list}>
+        <li><strong>Halfway.</strong> Each Monday the bar moves halfway from last week&apos;s bar to what last week counted, to the nearest {BAR.round}. Score 100 against 200 and next week&apos;s bar is 150; beat it and it rises the same way.</li>
+        <li><strong>A floor.</strong> It never drops below what work with a date someone else fixed needs that week: every exam, and any task whose date was set for me, on the plate or not. That need is what each one had left at the start of the week, over the weeks to its date.</li>
+        <li><strong>A ceiling.</strong> It never goes above {WEEKLY_BAR} points, {WEEKLY_HOURS} hours.</li>
+        <li><strong>Everything follows it.</strong> The curiosity cap is {fmt(BAR.capShare * 100)}% of the bar, and the plate can hold the bar in hours.</li>
+        <li><strong>Nothing by hand.</strong> It is worked out from the record every time the score is, and changing what is on the plate midweek changes none of it.</li>
+      </ul>
+      {rule && (
+        <p>
+          This week: a bar of {rule.bar}, a curiosity cap of {rule.cap}, room for {fmt(rule.limitHours)} hours on the plate
+          {rule.floor ? <>, and a floor of {rule.floor}</> : null}.
+          {next ? <> Next week, as it stands today: {next.bar}{next.floor ? <>, with a floor of {next.floor}</> : null}.</> : null}
+          {' '}Until {longDay(BAR.from)} the bar was {WEEKLY_BAR} every week.
+        </p>
+      )}
+
       <h2 className={styles.h2}>Load</h2>
       <p>
         Only what is active counts. Every active thing says how many hours a week it takes, and
-        together they cannot pass {WEEKLY_HOURS}. Anything with a deadline works its figure out on its
+        together they cannot pass the week&apos;s limit: the bar in hours{rule ? <>, {fmt(rule.limitHours)} this week</> : null}. Anything with a deadline works its figure out on its
         own: the hours its unfinished parts are worth, over the weeks left. Fall behind and the pace
         rises; get ahead and it drops. Anything without one carries the hours a week I choose to give it.
         The limit is the same for quests and curiosity; the curiosity cap is a different thing, and only
