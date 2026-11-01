@@ -73,6 +73,7 @@ export type QuickRequest =
   | { target: 'score'; table: string; slug: string; action: 'delete' }
   | { target: 'score'; table: string; slug: string; action: 'set-weekly'; hours: number }
   | { target: 'score'; table: string; slug: string; action: 'activate'; due?: string; weeklyHours?: number }
+  | { target: 'score'; table: string; slug: string; action: 'set-due'; due: string | null; weeklyHours?: number }
   | { target: 'score'; table: string; slug: string; action: 'page'; page: number }
   | { target: 'score'; table: string; slug: string; action: 'setup'; template: TemplateId; inputs: TemplateInputs }
   | { target: 'score'; table: string; slug: string; action: 'add-group'; unit: string; name?: string; count: number; basis: GroupBasis; hours?: number; content?: Content }
@@ -330,6 +331,34 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string,
     }
     return {
       raw: next, changed: true, row: {}, summary: `${title}: on the plate${due ? `, due ${due}` : `, ${wh} hours a week`}`,
+      undo: { target: 'score', table: req.table, slug: req.slug, action: 'restore-block', block: own, fields: prev },
+    };
+  }
+
+  if (req.action === 'set-due') {
+    /* A task's due date, moved or cleared. The pace follows on its own;
+       points never change. With no date it must say what hours a week it
+       gets. An exam's date is someone else's fact, so it is not here. The
+       route's weekly-limit check runs on the result. */
+    if (req.table !== 'tasks') throw new QuickError('bad-request', 'only a task has a due date you set; an exam keeps its date');
+    let due: string | null = null;
+    if (req.due) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(req.due)) throw new QuickError('bad-request', 'that is not a date');
+      if (req.due < today) throw new QuickError('bad-request', 'a due date has to be today or later');
+      due = req.due;
+    }
+    const wh = Math.round(Number(req.weeklyHours) * 10) / 10;
+    if (!due && !(Number.isFinite(wh) && wh > 0)) throw new QuickError('bad-request', 'with no due date, say how many hours a week it gets');
+    const prev: Record<string, ScalarChange> = { due: scalar(fm.due) };
+    let next = patchFrontmatter(raw, { due });
+    if (!due) {
+      const item = itemFromFile({ path, content: raw });
+      const base: ScoreBlock = own ?? (item ? effectiveBlock(item) : { parts: [], repeat: [] });
+      next = setScoreBlock(next, { ...cloneBlock(base), weeklyHours: wh });
+    }
+    return {
+      raw: next, changed: next !== raw, row: {},
+      summary: `${title}: ${due ? `due ${due}` : `no due date, ${wh} hours a week`}`,
       undo: { target: 'score', table: req.table, slug: req.slug, action: 'restore-block', block: own, fields: prev },
     };
   }

@@ -406,7 +406,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
                 {[
                   liveSummary(i), i.lane, i.weekPoints ? `+${i.weekPoints} this week` : null,
                   i.weekMinutes || i.weeklyHours ? `${hoursLabel(i.weekMinutes ?? 0)} timed this week${i.weeklyHours ? ` of ${i.weeklyHours} h` : ''}` : null,
-                  !i.paced && !i.weeklyHours && !i.needsSetup ? 'no hours a week set (see More)' : null,
+                  !i.paced && !i.weeklyHours && !i.needsSetup ? 'no hours a week set (see Change)' : null,
                   i.paced && i.deadline ? `the pace to be ready by ${shortDay(i.deadline)}` : null,
                 ].filter(Boolean).join(' · ')}
               </span>
@@ -485,9 +485,28 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
               />
             )}
             <details className={styles.parts}>
-              <summary className={styles.partsHead}>More</summary>
+              <summary className={styles.partsHead}>Change</summary>
               <div className={styles.moreBody}>
-                {!i.paced && !i.needsSetup && (
+                <p className={styles.setupHead}>
+                  Any time: its due date or hours a week, the names of its parts, and whether it is on the plate.
+                  Until a part in a group is logged: how many parts that group has, and removing it.
+                  Never by hand: points. They are fixed when it is priced.
+                </p>
+                {i.table === 'tasks' && !i.needsSetup ? (
+                  <PaceForm
+                    deadline={i.deadline}
+                    weeklyHours={i.weeklyHours}
+                    paced={i.paced}
+                    busy={busy === `${i.key}:due`}
+                    disabled={!!busy}
+                    onSave={(p) => send({ target: 'score', table: i.table, slug: i.slug, action: 'set-due', ...p }, `${i.key}:due`)}
+                  />
+                ) : i.paced && i.deadline ? (
+                  <p className={styles.setupHead}>
+                    Its pace comes from the exam on {shortDay(i.deadline)}, a date the exam board sets: {i.weeklyHours} hours a week now.
+                    It moves on its own as parts get done.
+                  </p>
+                ) : !i.needsSetup && (
                   <WeeklyHours
                     value={i.weeklyHours}
                     busy={busy === `${i.key}:wk`}
@@ -1199,7 +1218,10 @@ function PartsEditor({ item, busy, send }: {
   const counted = adding.basis === 'formula';
   return (
     <details className={styles.parts}>
-      <summary className={styles.partsHead}>Edit parts · {item.parts.length} {item.parts.length === 1 ? 'group' : 'groups'}</summary>
+      <summary className={styles.partsHead}>Parts · {item.parts.length} {item.parts.length === 1 ? 'group' : 'groups'}</summary>
+      <p className={styles.setupHead}>
+        A name can change any time. How many, and how many were done before scoring, lock once a part in that group is logged; a group with nothing logged can be removed. Points are fixed when priced.
+      </p>
       <ul className={styles.partsList}>
         {item.parts.map((g) => (
           <GroupRow key={`${item.key}-${g.index}-${g.count}-${g.prior}-${g.name ?? ''}`} itemKey={item.key} g={g} busy={busy} send={send} />
@@ -1281,6 +1303,52 @@ function BringOn({ busy, disabled, onBring }: {
         <Btn primary busy={busy} disabled={disabled} onClick={() => undefined} submit>Bring it on</Btn>
       </form>
     </details>
+  );
+}
+
+/* A task's pace: a due date (the hours a week work themselves out from
+   what is left) or hours a week chosen by hand. Moving the date never
+   changes points, only the hours it asks of the week. */
+function PaceForm({ deadline, weeklyHours, paced, busy, disabled, onSave }: {
+  deadline: string | null; weeklyHours: number | null; paced: boolean; busy: boolean; disabled: boolean;
+  onSave: (p: { due: string | null; weeklyHours?: number }) => void;
+}) {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dubai' }).format(new Date());
+  const [mode, setMode] = useState<'due' | 'hours'>(deadline ? 'due' : 'hours');
+  const [due, setDue] = useState(deadline && deadline >= today ? deadline : '');
+  const [wh, setWh] = useState(!paced && weeklyHours != null ? String(weeklyHours) : '');
+  const now = deadline
+    ? deadline < today
+      ? `Was due ${shortDay(deadline)}, now passed, so everything left counts this week (${weeklyHours ?? 0} hours). Give it a new date to spread it out.`
+      : `Due ${shortDay(deadline)}: that needs ${weeklyHours ?? 0} hours a week. Move the date and the hours follow.`
+    : `No due date: it gets the ${weeklyHours ?? 0} hours a week you give it.`;
+  return (
+    <form
+      className={styles.partsAdd}
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (mode === 'due') { if (due) onSave({ due }); return; }
+        const n = Number(wh);
+        if (n > 0) onSave({ due: null, weeklyHours: n });
+      }}
+    >
+      <p className={styles.setupHead}>{now}</p>
+      <div className={styles.partsGrid}>
+        <label className={styles.setupField}>
+          <span>Paced by</span>
+          <select value={mode} onChange={(e) => setMode(e.target.value as 'due' | 'hours')}>
+            <option value="due">a due date</option>
+            <option value="hours">hours a week I choose</option>
+          </select>
+        </label>
+        {mode === 'due' ? (
+          <label className={styles.setupField}><span>Due date</span><input required type="date" min={today} value={due} onChange={(e) => setDue(e.target.value)} /></label>
+        ) : (
+          <label className={styles.setupField}><span>Hours a week</span><input required type="number" min={0.5} step="any" inputMode="decimal" value={wh} onChange={(e) => setWh(e.target.value)} /></label>
+        )}
+      </div>
+      <Btn primary busy={busy} disabled={disabled} onClick={() => undefined} submit>Save</Btn>
+    </form>
   );
 }
 
