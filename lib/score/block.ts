@@ -33,7 +33,7 @@
  */
 
 import {
-  estimate, factorLabel, fitsCap, isSource, minParts, unitCap, DEFAULT_LANE, READING_TIERS, STARTING_FACTORS,
+  estimate, factorLabel, fitsCap, isSource, minParts, partFloor, unitCap, DEFAULT_LANE, READING_TIERS, STARTING_FACTORS,
   type Content, type Factors, type Lane, type Source, type Tier, type TemplateId,
 } from './rules';
 
@@ -433,12 +433,13 @@ export function addGroup(b: ScoreBlock, g: GroupInput): ScoreBlock {
   if (!g.unit.trim()) throw new Error('a part needs a name for its unit');
   if (!Number.isFinite(count) || count < 1) throw new Error('count must be at least 1');
   if (!Number.isFinite(g.points) || g.points < 1) throw new Error('points must be at least 1');
-  capCheck(Math.round(g.points), count, g.basis, g.unit.trim());
+  const points = partFloor(Math.round(g.points), count, g.unit.trim());
+  capCheck(points, count, g.basis, g.unit.trim());
   next.parts.push({
     unit: g.unit.trim(),
     name: g.name?.trim() || undefined,
     count,
-    points: Math.round(g.points),
+    points,
     prior: Math.max(0, Math.min(Math.round(g.prior ?? 0), count)),
     done: [],
     basis: g.basis,
@@ -476,6 +477,10 @@ export function editGroup(
     if (!Number.isFinite(c) || c < 1) throw new Error('count must be at least 1');
     /* Fewer parts means bigger ones: the cap holds here too. */
     if (g.basis && c < g.count) capCheck(g.points, c, g.basis, g.unit);
+    /* More parts means smaller ones: none below a point. */
+    if (c > g.count && partFloor(g.points, c, g.unit) > g.points) {
+      throw new Error(`${g.name ?? g.unit} is worth ${g.points} ${g.points === 1 ? 'point' : 'points'}, and every part is worth at least one, so it can have at most ${g.points} parts`);
+    }
     g.count = c;
   }
   if (change.prior !== undefined) {
@@ -557,9 +562,13 @@ export function remeasure(
     after += Math.max(1, share);
     const left = g.count - done;
     const count = Math.max(left, minParts(share, 'formula'));
+    const unit = count === left ? g.unit : 'part';
+    const points = partFloor(Math.max(1, share), count, unit);
+    after += points - Math.max(1, share);
     groups.push({
-      unit: count === left ? g.unit : 'part', name: g.name, count, points: Math.max(1, share), prior: 0, done: [],
-      basis: 'formula', factor: formulaFactor, why,
+      unit, name: g.name, count, points, prior: 0, done: [],
+      basis: 'formula', factor: formulaFactor,
+      why: points > share ? `${why}; at least a point a ${unit}` : why,
     });
   });
   next.parts = groups;
@@ -617,7 +626,7 @@ function buildParts(id: TemplateId, inputs: TemplateInputs, surface: string, fac
       const count = Math.round(needNum(inputs, 'count', 'Number of parts'));
       const each = needNum(inputs, 'hoursEach', 'Hours per part');
       const unit = String(inputs.unit || 'module').trim();
-      const points = estimate.gut(count * each, factors.gut);
+      const points = partFloor(estimate.gut(count * each, factors.gut), count, String(inputs.unit || 'module').trim());
       const block: ScoreBlock = {
         lane: 'quest', template: id, outcome: points,
         parts: [{
@@ -651,11 +660,12 @@ function buildParts(id: TemplateId, inputs: TemplateInputs, surface: string, fac
       const count = Math.round(needNum(inputs, 'count', 'Number of parts'));
       const basis: Source = inputs.basis === 'gut' ? 'gut' : 'stated';
       const factor = factors[basis];
-      const points = basis === 'gut' ? estimate.gut(hours, factor) : estimate.stated(hours, factor);
+      const unit = String(inputs.unit || 'module').trim();
+      const points = partFloor(basis === 'gut' ? estimate.gut(hours, factor) : estimate.stated(hours, factor), count, unit);
       return {
         lane: laneOf(inputs, surface), template: id,
         parts: [{
-          unit: String(inputs.unit || 'module').trim(), count, points, prior: 0, done: [],
+          unit, count, points, prior: 0, done: [],
           basis, factor, why: `${hrs(hours)}, ${basis === 'gut' ? 'guessed' : 'published'}, x ${factorLabel(factor)}`,
         }],
         repeat: [],
@@ -665,7 +675,7 @@ function buildParts(id: TemplateId, inputs: TemplateInputs, surface: string, fac
       const hours = needNum(inputs, 'hours', 'Hours');
       const count = Math.max(1, Math.round(Number(inputs.count) || 1));
       const lane = laneOf(inputs, surface);
-      const points = estimate.gut(hours, factors.gut);
+      const points = partFloor(estimate.gut(hours, factors.gut), count, 'milestone');
       return {
         lane, template: id,
         parts: [{
@@ -689,7 +699,7 @@ export function guessedParts(total: number, names: string[], factor: number, why
     return [{ ...base, unit: count > 1 ? 'piece' : 'task', count, points: total }];
   }
   return names.map((name, i) => {
-    const points = Math.round((total * (i + 1)) / names.length) - Math.round((total * i) / names.length);
+    const points = Math.max(1, Math.round((total * (i + 1)) / names.length) - Math.round((total * i) / names.length));
     const count = minParts(points, 'gut');
     return { ...base, unit: count > 1 ? 'piece' : 'milestone', name, count, points };
   });

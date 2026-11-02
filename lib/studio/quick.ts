@@ -446,7 +446,7 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string,
         why = `${Math.round(hours * 100) / 100} hours, ${basis === 'measured' ? 'an official timing' : basis === 'stated' ? 'published' : 'guessed'}${basis === 'measured' ? '' : `, x ${factorLabel(factor)}`}`;
       }
       nextBlock = addGroup(block, { unit: String(req.unit ?? ''), name: req.name, count: Number(req.count), points, basis, factor, why });
-      verb = `added ${req.name?.trim() || req.unit} (${Math.round(Number(req.count))} ${plural(String(req.unit).trim())}, ${points} points)`;
+      verb = `added ${req.name?.trim() || req.unit} (${Math.round(Number(req.count))} ${plural(String(req.unit).trim())}, ${nextBlock.parts[nextBlock.parts.length - 1].points} points)`;
     } else if (req.action === 'edit-group') {
       const g = block.parts[req.group];
       if (!g) throw new Error('no such part');

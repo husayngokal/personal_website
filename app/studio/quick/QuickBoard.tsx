@@ -1265,7 +1265,7 @@ function PartsEditor({ item, busy, send }: {
           setContent((c) => ({ ...c, pages: '', words: '', video: '' }));
         }}
       >
-        <p className={styles.setupHead}>Add a group (a book, a module set). Price it from the first of these that exists: its content counted, an official timing, published hours, your guess. Frozen once added; a part can be worth at most {UNIT_CAP.default} points ({UNIT_CAP.gut} for a guess).</p>
+        <p className={styles.setupHead}>Add a group (a book, a module set). Price it from the first of these that exists: its content counted, an official timing, published hours, your guess. Frozen once added; a part is worth at least 1 point and at most {UNIT_CAP.default} ({UNIT_CAP.gut} for a guess).</p>
         <div className={styles.partsGrid}>
           <label className={styles.setupField}><span>Name</span><input value={adding.name} placeholder="Tort Law (Book 3)" onChange={(e) => setAdding({ ...adding, name: e.target.value })} /></label>
           <label className={styles.setupField}><span>Unit</span><input required value={adding.unit} onChange={(e) => setAdding({ ...adding, unit: e.target.value })} /></label>

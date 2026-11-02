@@ -142,6 +142,14 @@ export function fitsCap(points: number, count: number, source: Source): boolean 
 }
 
 /** The fewest parts `points` can be split into under its cap. */
+/** Every part is worth at least a point: a button that finishes a piece of
+ *  work never pays nothing. A group priced below a point a part is raised
+ *  to one. Pages are the exception: a book is logged by the page reached,
+ *  not a tap a page, so its pages share its price. */
+export function partFloor(points: number, count: number, unit: string): number {
+  return unit === 'page' ? points : Math.max(points, count);
+}
+
 export function minParts(points: number, source: Source): number {
   return source === 'measured' ? 1 : Math.max(1, Math.ceil(points / unitCap(source)));
 }
