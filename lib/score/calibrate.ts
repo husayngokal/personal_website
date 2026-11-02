@@ -9,8 +9,8 @@
  *   finished since scoring began, all of them timed, the latest within
  *   26 weeks, and at least 20 timed minutes:
  *     B = what those parts were priced at, at the source's starting factor
- *     T = live-timed minutes up to the latest of them: overlapping
- *         sessions once, nothing typed in by hand, held within B/3 and 3B
+ *     T = live-timed minutes up to the latest of them, each session at
+ *         its own minutes, nothing typed in by hand, held within B/3 and 3B
  *   R      = sum(w T/B) / sum(w)   no item above a quarter of the weight
  *                                  (four or fewer: equal weights)
  *   n_eff  = sum(w)^2 / sum(w^2)   how many items the record is worth
@@ -22,9 +22,14 @@
  * parts: the parts of one course share one source of error, so twenty of
  * them are not twenty observations of my estimating.
  *
- * Time is matched to the part it bought: each session counts toward the
- * first part finished after its middle, and time after an item's latest
- * finished part belongs to work not finished yet, so it is left out.
+ * Time is matched to the part it bought: each timer session counts toward
+ * the first part finished after its middle, and time after an item's
+ * latest finished part belongs to work not finished yet, so it is left
+ * out. Time typed in by hand has no real clock (the form stamps it when
+ * it is logged), so it goes by its date: it counts toward every part
+ * finished that day, or the first finished after it. Sessions are never
+ * trimmed against each other: pausing, deleting and typing time in leave
+ * overlaps that mean nothing.
  *
  * Everything is worked out again from the dated logs on every recompute,
  * so the factors' history can be checked by anyone with the vault.
@@ -151,42 +156,20 @@ function finishesOf(item: ScoreItem): Finish[] {
 
 interface Slice { mid: number; minutes: number }
 
-/** Live-timed, record-only minutes on an item, starting before `cut`.
- *  Overlapping sessions count once: each adds only the part of its span
- *  no earlier session covered, and never more than its own minutes. */
-function liveSlices(sessions: Session[], key: string, cut: number, manual = false): Slice[] {
-  const own = sessions
-    .filter((s) => s.key === key && !s.scores && !!s.manual === manual && s.date >= SCORE_EPOCH)
+/** Timer minutes on an item, record-only, starting before `cut`. Every
+ *  session counts its own minutes in full, placed at the middle of its
+ *  span: overlaps are never trimmed. */
+function liveSlices(sessions: Session[], key: string, cut: number): Slice[] {
+  return sessions
+    .filter((s) => s.key === key && !s.scores && !s.manual && s.date >= SCORE_EPOCH && s.minutes > 0)
     .map((s) => {
       const start = dayIndex(s.date) * DAY + hm(s.from);
       let span = hm(s.to) - hm(s.from);
       if (span < 0) span += DAY;
-      return { start, end: start + span, minutes: s.minutes };
+      return { start, mid: start + span / 2, minutes: s.minutes };
     })
     .filter((s) => s.start < cut)
-    .sort((a, b) => a.start - b.start || (b.end - b.start) - (a.end - a.start));
-
-  const covered: [number, number][] = [];
-  const out: Slice[] = [];
-  for (const s of own) {
-    let overlap = 0;
-    for (const [a, b] of covered) overlap += Math.max(0, Math.min(b, s.end) - Math.max(a, s.start));
-    const minutes = s.end > s.start ? Math.min(s.minutes, s.end - s.start - overlap) : s.minutes;
-    if (minutes > 0) out.push({ mid: (s.start + s.end) / 2, minutes });
-    if (s.end > s.start) merge(covered, s.start, s.end);
-  }
-  return out;
-}
-
-function merge(list: [number, number][], a: number, b: number): void {
-  list.push([a, b]);
-  list.sort((x, y) => x[0] - y[0]);
-  for (let i = 0; i < list.length - 1;) {
-    if (list[i + 1][0] <= list[i][1]) {
-      list[i][1] = Math.max(list[i][1], list[i + 1][1]);
-      list.splice(i + 1, 1);
-    } else i++;
-  }
+    .map(({ mid, minutes }) => ({ mid, minutes }));
 }
 
 /** The moments whose work had a tenth or more of its time typed in by
@@ -194,8 +177,22 @@ function merge(list: [number, number][], a: number, b: number): void {
  *  a review and in a note alike, it would otherwise read as faster than it
  *  was. A few minutes typed in beside a long timed stretch do not. */
 function handTyped(fins: Finish[], sessions: Session[], key: string, cut: number, timed: Map<number, number>): Set<number> {
+  /* Its clock is only when it was logged, so time typed in for a day may
+     belong to any part finished that day: it counts toward each of them
+     (or, with none that day, the first finished after it). */
+  const byMoment = new Map<number, number>();
+  for (const s of sessions) {
+    if (s.key !== key || s.scores || !s.manual || s.date < SCORE_EPOCH || !(s.minutes > 0)) continue;
+    if (dayIndex(s.date) * DAY >= cut) continue;
+    let moments = [...new Set(fins.filter((f) => f.date === s.date).map((f) => f.at))];
+    if (!moments.length) {
+      const next = fins.find((f) => f.date > s.date);
+      moments = next ? [next.at] : [];
+    }
+    for (const at of moments) byMoment.set(at, (byMoment.get(at) ?? 0) + s.minutes);
+  }
   const out = new Set<number>();
-  for (const [at, hand] of attribute(fins, liveSlices(sessions, key, cut, true)).byMoment) {
+  for (const [at, hand] of byMoment) {
     if (hand >= CALIBRATION.handShare * (hand + (timed.get(at) ?? 0))) out.add(at);
   }
   return out;
