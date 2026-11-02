@@ -21,6 +21,7 @@ import type { ItemView, ScoreState } from '@/lib/score/compute';
 import { READING_TIERS, TEMPLATES, UNIT_CAP, type TemplateId, type Tier } from '@/lib/score/rules';
 import { IDLE, TIMER_KEY, elapsedMs, hms, hoursLabel, type TimerNow } from '@/lib/score/time';
 import { shortDay } from '@/lib/score/format';
+import { needsYou, type Need } from '@/lib/score/needs';
 
 interface SwapPlateItem { table: string; slug: string; title: string; hours: number | null; parkable: boolean }
 interface SwapState { retry: () => void; detail: string; plate: SwapPlateItem[] }
@@ -310,6 +311,9 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
       {/* -- This week ------------------------------------------------ */}
       {score && <WeekCard score={score} load={score.load ?? initial.score?.load ?? null} time={score.time ?? null} />}
 
+      {/* -- Needs you: only when something does ------------------------ */}
+      {score && <NeedsYou items={score.items} load={score.load ?? null} busy={busy} send={send} />}
+
       {/* -- Timer ---------------------------------------------------- */}
       <TimerCard
         initial={initial.timer}
@@ -413,7 +417,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
       {/* -- On the plate --------------------------------------------- */}
       <Section title="On the plate" count={plate.length} empty="Nothing active is scored. Mark something as reading, studying or this week.">
         {plate.map((i) => (
-          <li key={i.key} className={styles.row}>
+          <li key={i.key} id={rowId(i)} className={styles.row}>
             <div className={styles.rowText}>
               <span className={styles.rowTitle}>{i.title}</span>
               <span className={styles.rowMeta}>
@@ -1523,6 +1527,90 @@ function PageLog({ at, of, busy, disabled, onLog }: {
       </label>
       <Btn primary busy={busy} disabled={disabled || !page || Number(page) <= at} onClick={() => undefined} submit>Log page</Btn>
     </form>
+  );
+}
+
+const rowId = (i: { table: string; slug: string }) => `item-${i.table}-${i.slug}`;
+
+/* Go to an item's row on the plate, where its form already sits. */
+function goTo(i: { table: string; slug: string }) {
+  const reduce = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  document.getElementById(rowId(i))?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+}
+
+/* What needs a hand: worked out from the score (lib/score/needs.ts), so it
+   clears itself once the thing is done. Absent when nothing needs you. */
+function NeedsYou({ items, load, busy, send }: {
+  items: ItemView[]; load: ScoreState['load'] | null; busy: string | null;
+  send: (req: QuickRequest, key: string) => Promise<unknown> | void;
+}) {
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dubai' }).format(new Date());
+  const needs = needsYou(items, load, today);
+  if (!needs.length) return null;
+  return (
+    <Section title="Needs you" count={needs.length}>
+      {needs.map((n) => <NeedRow key={n.kind === 'over' ? 'over' : `${n.kind}:${n.item.key}`} n={n} busy={busy} send={send} today={today} />)}
+    </Section>
+  );
+}
+
+function NeedRow({ n, busy, send, today }: {
+  n: Need; busy: string | null; today: string;
+  send: (req: QuickRequest, key: string) => Promise<unknown> | void;
+}) {
+  const [due, setDue] = useState('');
+  if (n.kind === 'over') {
+    return (
+      <li className={styles.row}>
+        <div className={styles.rowText}>
+          <span className={styles.rowTitle}>The plate is over its limit</span>
+          <span className={styles.rowMeta}>{n.hours} of {n.capacity} hours a week. Take something off, or give it a later date in its Change panel.</span>
+        </div>
+        <div className={styles.rowActions}>
+          {n.biggest.map((i) => (
+            <Btn key={i.key} busy={busy === `need:park:${i.key}`} disabled={!!busy} onClick={() => void send({ target: 'score', table: i.table, slug: i.slug, action: 'park' }, `need:park:${i.key}`)}>
+              Take off {i.title} ({i.weeklyHours} h)
+            </Btn>
+          ))}
+        </div>
+      </li>
+    );
+  }
+  const i = n.item;
+  if (n.kind === 'overdue') {
+    return (
+      <li className={styles.row}>
+        <div className={styles.rowText}>
+          <span className={styles.rowTitle}>{i.title}</span>
+          <span className={styles.rowMeta}>Was due {shortDay(i.deadline!)}, so everything left counts this week ({i.weeklyHours ?? 0} h). Give it a new date.</span>
+        </div>
+        <form
+          className={styles.pageLog}
+          onSubmit={(e) => { e.preventDefault(); if (due) void send({ target: 'score', table: i.table, slug: i.slug, action: 'set-due', due, fixed: !!i.fixedDate }, `need:due:${i.key}`); }}
+        >
+          <label><span className={styles.srOnly}>New due date</span><input required type="date" min={today} value={due} onChange={(e) => setDue(e.target.value)} /></label>
+          <Btn primary busy={busy === `need:due:${i.key}`} disabled={!!busy || !due} onClick={() => undefined} submit>New date</Btn>
+        </form>
+      </li>
+    );
+  }
+  const text = n.kind === 'exam-passed'
+    ? `The exam on ${shortDay(i.deadline!)} has passed. Record the result in the exam's own file and it comes off the plate.`
+    : n.kind === 'setup'
+      ? 'Not priced yet, so finishing it earns nothing.'
+      : 'Due its one re-measure from what is left in it.';
+  return (
+    <li className={styles.row}>
+      <div className={styles.rowText}>
+        <span className={styles.rowTitle}>{i.title}</span>
+        <span className={styles.rowMeta}>{text}</span>
+      </div>
+      {n.kind !== 'exam-passed' && (
+        <div className={styles.rowActions}>
+          <Btn onClick={() => goTo(i)}>{n.kind === 'setup' ? 'Set it up' : 'Re-measure'}</Btn>
+        </div>
+      )}
+    </li>
   );
 }
 

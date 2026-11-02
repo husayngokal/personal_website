@@ -289,7 +289,11 @@ function fromFile(src: VaultSource, today: string = authorDay()): ScoreItem | nu
     const left = base.parts.reduce((n, g) => n + g.points - Math.round((g.points * Math.min(g.count, g.prior + g.done.reduce((q, e) => q + (parseDone(e)?.qty ?? 0), 0))) / g.count), 0);
     const days = Math.round((Date.parse(`${base.deadline}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
     const weeks = Math.max(7, days) / 7;           // due within a week: all of it this week
-    base.weeklyHours = Math.round(((left * MINUTES_PER_POINT) / 60 / weeks) * 10) / 10;
+    /* An exam whose date has passed was sat (or missed): nothing is left
+       to prepare, so it asks for no hours until its result is recorded.
+       Anything else past its date keeps all of it on this week, until it
+       is given a new date. */
+    base.weeklyHours = surface === 'exams' && days < 0 ? 0 : Math.round(((left * MINUTES_PER_POINT) / 60 / weeks) * 10) / 10;
     base.paced = true;
   }
 
