@@ -36,6 +36,8 @@ export interface QuickData {
   atlas: { slug: string; title: string; groups: DoneGroup[] } | null;
   score: ScoreState | null;
   timer: TimerNow;
+  /** When the midnight refresh last ran (null: no record yet). */
+  refreshAt?: string | null;
 }
 
 type ScoreSlice = Pick<ScoreState, 'week' | 'lifetime' | 'streak' | 'items'> & {
@@ -312,7 +314,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
       {score && <WeekCard score={score} load={score.load ?? initial.score?.load ?? null} time={score.time ?? null} />}
 
       {/* -- Needs you: only when something does ------------------------ */}
-      {score && <NeedsYou items={score.items} load={score.load ?? null} busy={busy} send={send} />}
+      {score && <NeedsYou items={score.items} load={score.load ?? null} calibration={score.calibration ?? null} refreshAt={initial.refreshAt} busy={busy} send={send} />}
 
       {/* -- Timer ---------------------------------------------------- */}
       <TimerCard
@@ -1540,16 +1542,17 @@ function goTo(i: { table: string; slug: string }) {
 
 /* What needs a hand: worked out from the score (lib/score/needs.ts), so it
    clears itself once the thing is done. Absent when nothing needs you. */
-function NeedsYou({ items, load, busy, send }: {
-  items: ItemView[]; load: ScoreState['load'] | null; busy: string | null;
+function NeedsYou({ items, load, calibration, refreshAt, busy, send }: {
+  items: ItemView[]; load: ScoreState['load'] | null; calibration: ScoreState['calibration'] | null;
+  refreshAt: string | null | undefined; busy: string | null;
   send: (req: QuickRequest, key: string) => Promise<unknown> | void;
 }) {
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dubai' }).format(new Date());
-  const needs = needsYou(items, load, today);
+  const needs = needsYou(items, load, today, { calibration, refreshAt });
   if (!needs.length) return null;
   return (
     <Section title="Needs you" count={needs.length}>
-      {needs.map((n) => <NeedRow key={n.kind === 'over' ? 'over' : `${n.kind}:${n.item.key}`} n={n} busy={busy} send={send} today={today} />)}
+      {needs.map((n) => <NeedRow key={'item' in n ? `${n.kind}:${n.item.key}` : n.kind} n={n} busy={busy} send={send} today={today} />)}
     </Section>
   );
 }
@@ -1559,6 +1562,20 @@ function NeedRow({ n, busy, send, today }: {
   send: (req: QuickRequest, key: string) => Promise<unknown> | void;
 }) {
   const [due, setDue] = useState('');
+  if (n.kind === 'refresh' || n.kind === 'held') {
+    return (
+      <li className={styles.row}>
+        <div className={styles.rowText}>
+          <span className={styles.rowTitle}>{n.kind === 'refresh' ? 'The nightly refresh has stopped' : 'An estimate factor is held'}</span>
+          <span className={styles.rowMeta}>
+            {n.kind === 'refresh'
+              ? `${n.last ? `It last ran ${shortDay(n.last.slice(0, 10))}.` : 'It has no record of running.'} The score still updates on every tap and sync, but not overnight, so a quiet Monday shows last week. Worth a look.`
+              : `The ${shortDay(n.date)} review would have moved ${n.sources.join(' and ')} past half or double where it started, so it held them. Prices stay as they are until it has been looked at.`}
+          </span>
+        </div>
+      </li>
+    );
+  }
   if (n.kind === 'over') {
     return (
       <li className={styles.row}>

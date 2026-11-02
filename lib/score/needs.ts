@@ -9,16 +9,45 @@
 
 import type { ItemView, ScoreState } from './compute';
 
+/** current_state key the midnight refresh writes each time it runs. */
+export const REFRESH_KEY = 'score_refresh';
+/** It runs every night; a day and a half without a run means it stopped. */
+const REFRESH_STALE_MS = 36 * 3_600_000;
+/** Before this the refresh had no record to keep; a missing one after it
+ *  means it has never run since it started keeping one. */
+const REFRESH_WATCH_FROM = '2026-11-04';
+
 export type Need =
+  | { kind: 'refresh'; last: string | null }
+  | { kind: 'held'; sources: string[]; date: string }
   | { kind: 'over'; hours: number; capacity: number; biggest: ItemView[] }
   | { kind: 'overdue'; item: ItemView }
   | { kind: 'exam-passed'; item: ItemView }
   | { kind: 'setup'; item: ItemView }
   | { kind: 'remeasure'; item: ItemView };
 
-export function needsYou(items: ItemView[], load: ScoreState['load'] | null | undefined, today: string): Need[] {
+const SOURCE_NAMES: Record<string, string> = { gut: 'guesses', stated: 'published hours', formula: 'counted content' };
+
+export function needsYou(
+  items: ItemView[],
+  load: ScoreState['load'] | null | undefined,
+  today: string,
+  extra: { calibration?: ScoreState['calibration'] | null; refreshAt?: string | null; now?: number } = {},
+): Need[] {
   const plate = items.filter((i) => i.active);
   const out: Need[] = [];
+  const now = extra.now ?? Date.now();
+  if (extra.refreshAt !== undefined) {
+    const last = extra.refreshAt;
+    if (last ? now - Date.parse(last) > REFRESH_STALE_MS : today >= REFRESH_WATCH_FROM) out.push({ kind: 'refresh', last });
+  }
+  /* A monthly review that would have moved a factor past half or double
+     where it started holds it instead: the one thing that asks for a look. */
+  const review = extra.calibration?.history?.[extra.calibration.history.length - 1];
+  if (review) {
+    const held = Object.entries(review.classes).filter(([, c]) => c.held).map(([k]) => SOURCE_NAMES[k] ?? k);
+    if (held.length) out.push({ kind: 'held', sources: held, date: review.date });
+  }
   if (load && load.hours > load.capacity) {
     const biggest = plate
       .filter((i) => (i.weeklyHours ?? 0) > 0)

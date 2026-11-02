@@ -16,6 +16,7 @@ import { revalidatePath } from 'next/cache';
 import { getServerAdminClient, isSupabaseConfigured } from '@/lib/supabase';
 import { fetchVaultMarkdown, headCommit } from '@/lib/vault/tarball';
 import { recomputeScore } from '@/lib/score/store';
+import { REFRESH_KEY } from '@/lib/score/needs';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -28,8 +29,11 @@ export async function GET(req: NextRequest) {
   if (!ok) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   if (!isSupabaseConfigured()) return NextResponse.json({ error: 'no-database' }, { status: 503 });
 
+  const db = getServerAdminClient();
   const head = await headCommit();
-  const s = await recomputeScore(getServerAdminClient(), await fetchVaultMarkdown(head.sha), { asOf: head.date });
+  const s = await recomputeScore(db, await fetchVaultMarkdown(head.sha), { asOf: head.date });
+  /* Proof that it ran: Studio's Needs you list warns when this goes stale. */
+  await db.from('current_state').upsert({ key: REFRESH_KEY, value: { at: new Date().toISOString() }, updated_at: new Date().toISOString() }, { onConflict: 'key' });
   for (const p of ['/', '/life/tasks', '/field-atlas', '/bucket-list', '/library', '/courses']) revalidatePath(p);
   return NextResponse.json({ ok: true, week: s.week.start, bar: s.week.bar });
 }
