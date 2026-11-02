@@ -46,8 +46,10 @@ export const CURIOSITY_CAP = 80;
  *     fixed (an exam, a task marked so) needs that week, on the plate or
  *     not, worked out from what was left at the start of the week;
  *   - never above WEEKLY_BAR.
- * The curiosity cap is 40% of the bar, and the plate can hold the bar in
- * hours. All of it replays from the vault on every recompute.
+ * The curiosity cap is 40% of the bar. The plate keeps its own limit,
+ * WEEKLY_HOURS: the bar says when a week is full, not how much there is
+ * to do, so a low bar never squeezes the plate. All of it replays from
+ * the vault on every recompute.
  */
 export const BAR = {
   from: '2026-11-02',

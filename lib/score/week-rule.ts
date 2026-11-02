@@ -19,7 +19,7 @@ export interface WeekRule {
   bar: number;          // points that make the week full
   floor: number;        // what fixed-date work needed that week
   cap: number;          // curiosity points that can count toward the bar
-  limitHours: number;   // hours a week the plate can hold
+  limitHours: number;   // hours a week the plate can hold (always WEEKLY_HOURS)
 }
 
 const DAY_MS = 86_400_000;
@@ -84,7 +84,7 @@ export function weekRules(
         bar,
         floor,
         cap: Math.round(bar * BAR.capShare),
-        limitHours: Math.round(((bar * MINUTES_PER_POINT) / 60) * 10) / 10,
+        limitHours: (WEEKLY_BAR * MINUTES_PER_POINT) / 60,
       };
     }
     out.push(rule);
