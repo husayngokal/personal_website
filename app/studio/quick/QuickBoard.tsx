@@ -18,7 +18,7 @@ const TIMED_RATE = timedPoints(60);
 import type { QuickRequest } from '@/lib/studio/quick';
 import type { DoneGroup } from '@/lib/vault/done-items';
 import type { ItemView, ScoreState } from '@/lib/score/compute';
-import { READING_TIERS, TEMPLATES, UNIT_CAP, type TemplateId, type Tier } from '@/lib/score/rules';
+import { MINUTES_PER_POINT, READING_TIERS, TEMPLATES, UNIT_CAP, type TemplateId, type Tier } from '@/lib/score/rules';
 import { IDLE, TIMER_KEY, elapsedMs, hms, hoursLabel, type TimerNow } from '@/lib/score/time';
 import { shortDay } from '@/lib/score/format';
 import { needsYou, type Need } from '@/lib/score/needs';
@@ -328,6 +328,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
             time: snap.time ? {
               ...snap.time,
               weekMinutes: snap.time.weekMinutes + minutes,
+              totalByKey: key && !scored ? { ...snap.time.totalByKey, [key]: (snap.time.totalByKey[key] ?? 0) + minutes } : snap.time.totalByKey,
               ...(snap.time.weekByLane ? { weekByLane: (() => {
                 const l = { ...snap.time.weekByLane };
                 l[scored?.lane ?? snap.items.find((it) => it.key === key)?.lane ?? 'other'] += minutes;
@@ -425,9 +426,15 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
               <span className={styles.rowMeta}>
                 {[
                   liveSummary(i), i.lane, i.weekPoints ? `+${i.weekPoints} this week` : null,
-                  i.weekMinutes || i.weeklyHours ? `${hoursLabel(i.weekMinutes ?? 0)} timed this week${i.weeklyHours ? ` of ${i.weeklyHours} h` : ''}` : null,
+                  /* Hours on the whole thing against its whole price: carries
+                     over from week to week until it is done. */
+                  i.total > 0
+                    ? `${hoursLabel(score?.time?.totalByKey?.[i.key] ?? 0)} logged of ${hoursLabel(i.total * MINUTES_PER_POINT)} in all`
+                    : score?.time?.totalByKey?.[i.key] ? `${hoursLabel(score.time.totalByKey[i.key])} logged` : null,
+                  i.weeklyHours
+                    ? i.paced && i.deadline ? `needs ${i.weeklyHours} h a week to be ready by ${shortDay(i.deadline)}` : `${i.weeklyHours} h a week`
+                    : null,
                   !i.paced && !i.weeklyHours && !i.needsSetup ? 'no hours a week set (see Change)' : null,
-                  i.paced && i.deadline ? `the pace to be ready by ${shortDay(i.deadline)}` : null,
                 ].filter(Boolean).join(' · ')}
               </span>
               {i.total > 0 && (
