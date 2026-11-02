@@ -216,7 +216,7 @@ export default async function ScoringPage() {
       </p>
       <ul className={styles.list}>
         <li><strong>Halfway.</strong> Each Monday the bar moves halfway from last week&apos;s bar to what last week counted, to the nearest {BAR.round}. Score 100 against 200 and next week&apos;s bar is 150; beat it and it rises the same way.</li>
-        <li><strong>A floor.</strong> It never drops below what work with a date someone else fixed needs that week: every exam, and any task whose date was set for me, on the plate or not. That need is what each one had left at the start of the week, over the weeks to its date.</li>
+        <li><strong>A floor.</strong> It never drops below what work with a date someone else fixed needs that week: every exam, and any task whose date was set for me, on the plate or not. That need is what each one had left at the start of the week, over the weeks to its date: unfinished parts, plus what is left of any activity plan, priced as they stood that Monday. A plan or re-measure made during a week counts from the next one.</li>
         <li><strong>A ceiling.</strong> It never goes above {WEEKLY_BAR} points, {WEEKLY_HOURS} hours.</li>
         <li><strong>The cap follows it.</strong> Curiosity can fill {fmt(BAR.capShare * 100)}% of the bar. The plate does not: it holds {WEEKLY_HOURS} hours whatever the bar is, because the bar says when a week is full, not how much there is to do.</li>
         <li><strong>Nothing by hand.</strong> It is worked out from the record every time the score is, and changing what is on the plate midweek changes none of it.</li>
@@ -234,7 +234,7 @@ export default async function ScoringPage() {
       <p>
         Only what is active counts. Every active thing says how many hours a week it takes, and
         together they cannot pass {WEEKLY_HOURS}. Anything with a deadline works its figure out on its
-        own: the hours its unfinished parts are worth, over the weeks left. Fall behind and the pace
+        own: the hours its unfinished parts and what is left of its activity plans are worth, over the weeks left. Fall behind and the pace
         rises; get ahead and it drops. Anything without one carries the hours a week I choose to give it.
         The limit is the same for quests and curiosity; the curiosity cap is a different thing, and only
         limits how much of the weekly bar curiosity can fill. What cannot be given hours yet goes in the
@@ -250,7 +250,9 @@ export default async function ScoringPage() {
         scores by count against a fixed rate: realistic minutes per unit, turned into points.
         <strong> Retrieval practice earns {RETRIEVAL_FACTOR}&times;</strong>: recalling from memory is what
         turns understanding into marks, and it is the work least likely to happen on its own. Making
-        flashcards never scores; they are made by AI.
+        flashcards never scores; they are made by AI. Activities on something with a date can carry a
+        plan: how many I mean to do in all. What is left of the plan counts toward its hours a week
+        and, for a fixed date, the floor. The plan itself never pays; only logged units do.
       </p>
       <table className={styles.table}>
         <thead>

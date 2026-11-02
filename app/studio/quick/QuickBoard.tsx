@@ -426,10 +426,11 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
               <span className={styles.rowMeta}>
                 {[
                   liveSummary(i), i.lane, i.weekPoints ? `+${i.weekPoints} this week` : null,
-                  /* Hours on the whole thing against its whole price: carries
-                     over from week to week until it is done. */
-                  i.total > 0
-                    ? `${hoursLabel(score?.time?.totalByKey?.[i.key] ?? 0)} logged of ${hoursLabel(i.total * MINUTES_PER_POINT)} in all`
+                  /* Hours on the whole thing against its whole price (parts
+                     plus any activity plans): carries over from week to week
+                     until it is done. */
+                  i.total + (i.planned ?? 0) > 0
+                    ? `${hoursLabel(score?.time?.totalByKey?.[i.key] ?? 0)} logged of ${hoursLabel((i.total + (i.planned ?? 0)) * MINUTES_PER_POINT)} in all`
                     : score?.time?.totalByKey?.[i.key] ? `${hoursLabel(score.time.totalByKey[i.key])} logged` : null,
                   i.weeklyHours
                     ? i.paced && i.deadline ? `needs ${i.weeklyHours} h a week to be ready by ${shortDay(i.deadline)}` : `${i.weeklyHours} h a week`
@@ -1170,6 +1171,7 @@ function pluralUnit(u: string): string {
 type GroupAction =
   | { action: 'add-activity'; kind: string; paperHours?: number; unit?: string; minutesPerUnit?: number }
   | { action: 'remove-activity'; group: number }
+  | { action: 'set-plan'; group: number; count: number }
   | { action: 'part'; group: number }
   | { action: 'edit-group'; group: number; name?: string; count?: number; prior?: number }
   | { action: 'remove-group'; group: number }
@@ -1186,8 +1188,8 @@ function ContentFields({ v, set }: {
 }) {
   return (
     <>
-      <label className={styles.setupField}><span>Pages</span><input type="number" min={0} inputMode="numeric" value={v.pages} onChange={(e) => set({ ...v, pages: e.target.value })} /></label>
-      <label className={styles.setupField}><span>Words (articles, web pages)</span><input type="number" min={0} inputMode="numeric" value={v.words} onChange={(e) => set({ ...v, words: e.target.value })} /></label>
+      <label className={styles.setupField}><span>Printed pages (a book or PDF)</span><input type="number" min={0} inputMode="numeric" value={v.pages} onChange={(e) => set({ ...v, pages: e.target.value })} /></label>
+      <label className={styles.setupField}><span>Or words (notes, articles, web pages; not the same text again)</span><input type="number" min={0} inputMode="numeric" value={v.words} onChange={(e) => set({ ...v, words: e.target.value })} /></label>
       <label className={styles.setupField}>
         <span>Reading</span>
         <select value={v.tier} onChange={(e) => set({ ...v, tier: e.target.value })}>
@@ -1415,17 +1417,13 @@ function ActivityEditor({ item, busy, send }: {
   const spec = ACTIVITIES[kind];
   return (
     <div className={styles.partsAdd}>
-      <p className={styles.setupHead}>Activities: the work around the material. Rates come from the rules, not from you.</p>
+      <p className={styles.setupHead}>
+        Activities: the work around the material. Rates come from the rules, not from you. Each pays as you log it.
+        {item.deadline ? ' Plan how many you will do in all and what is left of the plan counts toward its hours a week' + (item.fixedDate ? ', and toward the bar\'s floor from next Monday' : '') + '. A plan never pays on its own.' : ''}
+      </p>
       <ul className={styles.partsList}>
         {item.repeat.map((g) => (
-          <li key={g.index} className={styles.groupRow}>
-            <p className={styles.groupTitle}>
-              {g.unit} · {g.per ? (g.per >= 1 ? `1 point per ${Math.round(g.per * 10) / 10} ${pluralUnit(g.unit)}` : `${Math.round((1 / g.per) * 10) / 10} points each`) : `${g.points} points each`} · {g.count} logged
-            </p>
-            {g.count === 0 && (
-              <Btn busy={busy === `${item.key}:ra${g.index}`} disabled={!!busy} onClick={() => send({ action: 'remove-activity', group: g.index }, `${item.key}:ra${g.index}`)}>Remove</Btn>
-            )}
-          </li>
+          <ActivityRow key={`${g.index}-${g.plan}`} itemKey={item.key} g={g} dated={!!item.deadline} busy={busy} send={send} />
         ))}
       </ul>
       <form
@@ -1460,6 +1458,32 @@ function ActivityEditor({ item, busy, send }: {
       </form>
       <p className={styles.setupHead}>{spec.basis}.</p>
     </div>
+  );
+}
+
+function ActivityRow({ itemKey, g, dated, busy, send }: {
+  itemKey: string; g: ItemView['repeat'][number]; dated: boolean; busy: string | null; send: (req: GroupAction, key: string) => void;
+}) {
+  const [plan, setPlanValue] = useState(g.plan ? String(g.plan) : '');
+  const key = `${itemKey}:rp${g.index}`;
+  return (
+    <li className={styles.groupRow}>
+      <p className={styles.groupTitle}>
+        {g.unit} · {g.per ? (g.per >= 1 ? `1 point per ${Math.round(g.per * 10) / 10} ${pluralUnit(g.unit)}` : `${Math.round((1 / g.per) * 10) / 10} points each`) : `${g.points} points each`} · {g.count} logged{g.plan ? ` of ${g.plan} planned` : ''}
+      </p>
+      {dated && (
+        <form className={styles.pageLog} onSubmit={(e) => { e.preventDefault(); send({ action: 'set-plan', group: g.index, count: Number(plan) || 0 }, key); }}>
+          <label>
+            <span className={styles.srOnly}>{pluralUnit(g.unit)} planned in all</span>
+            <input type="number" min={0} inputMode="numeric" placeholder={`${pluralUnit(g.unit)} planned`} value={plan} onChange={(e) => setPlanValue(e.target.value)} />
+          </label>
+          <Btn busy={busy === key} disabled={!!busy || (Number(plan) || 0) === g.plan} onClick={() => undefined} submit>Plan</Btn>
+        </form>
+      )}
+      {g.count === 0 && (
+        <Btn busy={busy === `${itemKey}:ra${g.index}`} disabled={!!busy} onClick={() => send({ action: 'remove-activity', group: g.index }, `${itemKey}:ra${g.index}`)}>Remove</Btn>
+      )}
+    </li>
   );
 }
 

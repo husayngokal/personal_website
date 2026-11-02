@@ -21,7 +21,7 @@ import {
   DEFAULT_LANE, MINUTES_PER_POINT, RECURRING_GUT_HOURS, SCOPE_WEEKS, SCORE_EPOCH, TASK_GUT_HOURS, atlasPoints, countGain, estimate,
   type Lane, type TemplateId,
 } from './rules';
-import { doneOrder, parseDone, readBlock, remeasureDue, type PartGroup, type RepeatGroup, type ScoreBlock } from './block';
+import { doneOrder, parseDone, planOf, readBlock, remeasureDue, repeatLeft, type PartGroup, type RepeatGroup, type ScoreBlock } from './block';
 import { parseSessions, type Session } from './time';
 import { authorDay } from '../content/streak';
 
@@ -66,6 +66,10 @@ export interface ScoreItem {
   /** Due its one content re-measure (block.ts): priced from published
    *  hours or a guess, first part done, not yet re-measured. */
   remeasure: boolean;
+  /** Its one re-measure, when it changed the price: the points what was
+   *  left held before and after, so weeks that began before it keep the
+   *  floor they started with. */
+  remeasured: { on: string; before: number; after: number } | null;
   events: ScoreEvent[];
 }
 
@@ -201,6 +205,9 @@ function fromFile(src: VaultSource, today: string = authorDay()): ScoreItem | nu
     deadline: null,
     fixedDate: false,
     remeasure: remeasureDue(block),
+    remeasured: block?.remeasured?.counted && block.remeasured.before !== undefined && block.remeasured.after !== undefined
+      ? { on: block.remeasured.on, before: block.remeasured.before, after: block.remeasured.after }
+      : null,
   };
 
   switch (surface) {
@@ -283,10 +290,13 @@ function fromFile(src: VaultSource, today: string = authorDay()): ScoreItem | nu
   /* Pace. Anything with a deadline and finite parts needs a certain number
      of hours a week to be ready in time: the hours its unfinished parts are
      worth, over the weeks left. That replaces a figure chosen by hand, and
-     moves on its own as work gets done (or does not). Open-ended activities
-     (flashcards, papers) have no finish line, so they are not in it. */
-  if (base.deadline && base.parts.length) {
-    const left = base.parts.reduce((n, g) => n + g.points - Math.round((g.points * Math.min(g.count, g.prior + g.done.reduce((q, e) => q + (parseDone(e)?.qty ?? 0), 0))) / g.count), 0);
+     moves on its own as work gets done (or does not). Activities (flashcards,
+     papers) have no finish line of their own; the ones given a plan count
+     what the plan has still to do. */
+  const planned = base.repeat.some((g) => planOf(g) > 0);
+  if (base.deadline && (base.parts.length || planned)) {
+    const left = base.parts.reduce((n, g) => n + g.points - Math.round((g.points * Math.min(g.count, g.prior + g.done.reduce((q, e) => q + (parseDone(e)?.qty ?? 0), 0))) / g.count), 0)
+      + base.repeat.reduce((n, g) => n + repeatLeft(g), 0);
     const days = Math.round((Date.parse(`${base.deadline}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000);
     const weeks = Math.max(7, days) / 7;           // due within a week: all of it this week
     /* An exam whose date has passed was sat (or missed): nothing is left
@@ -343,7 +353,7 @@ function atlasItem(src: VaultSource, tallies: Extracted['tallies']): ScoreItem |
     key: src.path, table: 'living_entries', surface: 'atlas', slug: 'field-atlas',
     title: 'The Field Atlas', href: '/field-atlas', lane: DEFAULT_LANE.atlas,
     active: false, parked: false, private: false, hasBlock: false, needsSetup: null,
-    parts: [], repeat: [], outcome: null, weeklyHours: null, paced: false, deadline: null, fixedDate: false, remeasure: false, events,
+    parts: [], repeat: [], outcome: null, weeklyHours: null, paced: false, deadline: null, fixedDate: false, remeasure: false, remeasured: null, events,
   };
 }
 
@@ -375,7 +385,7 @@ export function effectiveBlock(item: ScoreItem): ScoreBlock {
     weeklyHours: item.weeklyHours ?? undefined,
     outcome: item.outcome?.points,
     parts: item.parts.map((g) => ({ ...g, done: [...g.done] })),
-    repeat: item.repeat.map((g) => ({ ...g, done: [...g.done] })),
+    repeat: item.repeat.map((g) => ({ ...g, done: [...g.done], ...(g.plan ? { plan: [...g.plan] } : {}) })),
   };
 }
 

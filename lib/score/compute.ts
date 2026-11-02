@@ -15,7 +15,7 @@ import {
   LEVEL_SIZE, SCORE_EPOCH, type Lane, type Source,
 } from './rules';
 import { weekRules, type WeekRule } from './week-rule';
-import { partsDone, repeatCount } from './block';
+import { partsDone, planOf, repeatCount } from './block';
 import { calibrate, varianceNotes, type Calibration, type VarianceNote } from './calibrate';
 import { plural, type Extracted, type ScoreEvent, type ScoreItem, type Surface, type Tally } from './items';
 import type { Session } from './time';
@@ -62,6 +62,7 @@ export interface ItemView {
   needsSetup: string | null;
   earned: number;               // points of finished parts (prior work included)
   total: number;                // points of all parts
+  planned: number;              // points of every activity plan, in all
   pct: number;                  // 0-100
   summary: string;              // "16 of 120 chapters"
   weekPoints: number;
@@ -74,7 +75,7 @@ export interface ItemView {
   /** Due its one content re-measure (block.ts). */
   remeasure: boolean;
   parts: ItemGroupView[];
-  repeat: { index: number; unit: string; points: number; per: number | null; kind: string | null; count: number }[];
+  repeat: { index: number; unit: string; points: number; per: number | null; kind: string | null; count: number; plan: number }[];
 }
 
 export interface ScoreState {
@@ -171,11 +172,12 @@ function itemView(item: ScoreItem, weekPoints: number, weekMinutes = 0): ItemVie
     parked: item.parked, weekMinutes,
     hasBlock: item.hasBlock, needsSetup: item.needsSetup,
     earned, total, pct: total ? Math.round((earned / total) * 100) : 0, summary,
+    planned: Math.round(item.repeat.reduce((n, g) => n + (g.per ? planOf(g) / g.per : planOf(g) * g.points), 0)),
     weekPoints, weeklyHours: item.weeklyHours, paced: item.paced, deadline: item.deadline, fixedDate: item.fixedDate, outcome: item.outcome,
     remeasure: item.remeasure,
     parts,
     repeat: item.repeat.map((g, index) => ({
-      index, unit: g.unit, points: g.points, per: g.per ?? null, kind: g.kind ?? null, count: repeatCount(g),
+      index, unit: g.unit, points: g.points, per: g.per ?? null, kind: g.kind ?? null, count: repeatCount(g), plan: planOf(g),
     })),
   };
 }

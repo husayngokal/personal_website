@@ -67,6 +67,11 @@ export interface RepeatGroup {
   per?: number;
   /** The activity kind from rules.ts, when it came from the menu. */
   kind?: string;
+  /** How many units I plan to do in all, as dated entries ("2026-11-02 3"):
+   *  the latest counts. Planned units still to do count toward the item's
+   *  pace and, for a fixed date, the bar's floor; a week's floor only sees
+   *  plans made before it started. A plan never pays: logging does. */
+  plan?: string[];
   done: string[];
 }
 
@@ -84,7 +89,7 @@ export interface ScoreBlock {
   parkedFrom?: Record<string, string>;
   /** The one content re-measure of its unstarted parts (rules.ts): when,
    *  and whether anything could be counted. */
-  remeasured?: { on: string; counted: boolean };
+  remeasured?: { on: string; counted: boolean; before?: number; after?: number };
   parts: PartGroup[];
   repeat: RepeatGroup[];
 }
@@ -126,6 +131,13 @@ function num(v: unknown): number | undefined {
 
 function str(v: unknown): string | undefined {
   return typeof v === 'string' && v.trim() ? v.trim() : undefined;
+}
+
+const PLAN = /^(\d{4}-\d{2}-\d{2}) (\d+)$/;
+
+function planList(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v.map((x) => (typeof x === 'string' ? x.trim() : '')).filter((x) => PLAN.test(x));
 }
 
 function doneList(v: unknown): string[] {
@@ -183,6 +195,7 @@ export function readBlock(fm: Record<string, unknown>): ScoreBlock | null {
       points: Math.round(points ?? 0),
       ...(per && per > 0 ? { per } : {}),
       ...(str(o.kind) ? { kind: str(o.kind) } : {}),
+      ...(planList(o.plan).length ? { plan: planList(o.plan) } : {}),
       done: doneList(o.done),
     });
   }
@@ -209,7 +222,12 @@ export function readBlock(fm: Record<string, unknown>): ScoreBlock | null {
       if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
       const o = v as Record<string, unknown>;
       const on = o.on instanceof Date ? o.on.toISOString().slice(0, 10) : str(o.on);
-      return on && ISO_DAY.test(on) ? { on, counted: o.counted === true } : undefined;
+      if (!on || !ISO_DAY.test(on)) return undefined;
+      const before = num(o.before), after = num(o.after);
+      return {
+        on, counted: o.counted === true,
+        ...(before !== undefined && after !== undefined ? { before: Math.round(before), after: Math.round(after) } : {}),
+      };
     })(),
     parts,
     repeat,
@@ -254,6 +272,7 @@ export function serializeBlock(b: ScoreBlock): string[] {
       if (g.kind) out.push(`      kind: ${q(g.kind)}`);
       if (g.per) out.push(`      per: ${g.per}`);
       else out.push(`      points: ${g.points}`);
+      if (g.plan?.length) out.push(`      plan: ${list(g.plan)}`);
       out.push(`      done: ${list(g.done)}`);
     }
   }
@@ -295,7 +314,7 @@ export function cloneBlock(b: ScoreBlock): ScoreBlock {
   return {
     ...b,
     parts: b.parts.map((g) => ({ ...g, done: [...g.done] })),
-    repeat: b.repeat.map((g) => ({ ...g, done: [...g.done] })),
+    repeat: b.repeat.map((g) => ({ ...g, done: [...g.done], ...(g.plan ? { plan: [...g.plan] } : {}) })),
   };
 }
 
@@ -325,9 +344,45 @@ export function logRepeat(b: ScoreBlock, groupIndex: number, day: string, qty = 
   return next;
 }
 
-/** Units logged on a repeat group so far. */
-export function repeatCount(g: RepeatGroup): number {
-  return g.done.reduce((n, e) => n + (parseDone(e)?.qty ?? 0), 0);
+/** Units logged on a repeat group so far, or only those logged before
+ *  the day `before`. */
+export function repeatCount(g: RepeatGroup, before?: string): number {
+  return g.done.reduce((n, e) => {
+    const d = parseDone(e);
+    return d && (!before || d.date < before) ? n + d.qty : n;
+  }, 0);
+}
+
+/** Units planned in all: the latest plan, or the latest made before the
+ *  day `before`. 0 when there is none. */
+export function planOf(g: RepeatGroup, before?: string): number {
+  let at = '', n = 0;
+  for (const e of g.plan ?? []) {
+    const m = e.match(PLAN);
+    if (!m || (before && m[1] >= before) || m[1] < at) continue;
+    at = m[1]; n = Number(m[2]);
+  }
+  return n;
+}
+
+/** Points a repeat group's plan has still to do (unrounded), as of now or
+ *  of the Monday `before`. */
+export function repeatLeft(g: RepeatGroup, before?: string): number {
+  const units = Math.max(0, planOf(g, before) - repeatCount(g, before));
+  return g.per ? units / g.per : units * g.points;
+}
+
+/** Plan `count` units of a repeat group in all, from `day`. A second plan
+ *  the same day replaces the first. */
+export function setPlan(b: ScoreBlock, groupIndex: number, count: number, day: string): ScoreBlock {
+  const next = cloneBlock(b);
+  const g = next.repeat[groupIndex];
+  if (!g) throw new Error('no such activity');
+  if (!ISO_DAY.test(day)) throw new Error('bad day');
+  const n = Math.round(Number(count));
+  if (!Number.isFinite(n) || n < 0 || n > 5000) throw new Error('the plan must be a whole number from 0 to 5,000');
+  g.plan = [...(g.plan ?? []).filter((e) => !e.startsWith(`${day} `)), `${day} ${n}`];
+  return next;
 }
 
 export function addActivity(b: ScoreBlock, g: { unit: string; kind: string; per?: number; points?: number }): ScoreBlock {
@@ -479,7 +534,7 @@ export function remeasure(
   const groups: PartGroup[] = [];
   const weights = next.parts.map((g) => (open(g) ? leftPoints(g) : 0));
   const wSum = weights.reduce((a, c) => a + c, 0) || 1;
-  let given = 0, wSeen = 0;
+  let given = 0, wSeen = 0, after = 0;
   next.parts.forEach((g, i) => {
     if (!open(g)) { groups.push(g); return; }
     const done = partsDone(g);
@@ -499,6 +554,7 @@ export function remeasure(
     wSeen += weights[i];
     const share = Math.round((total * wSeen) / wSum) - given;
     given += share;
+    after += Math.max(1, share);
     const left = g.count - done;
     const count = Math.max(left, minParts(share, 'formula'));
     groups.push({
@@ -507,8 +563,10 @@ export function remeasure(
     });
   });
   next.parts = groups;
-  next.remeasured = { on: day, counted: true };
-  return { block: next, before, after: total };
+  /* Before and after, so a week that started before today keeps the floor
+     it began with (week-rule.ts). */
+  next.remeasured = { on: day, counted: true, before, after };
+  return { block: next, before, after };
 }
 
 export function contentWhy(c: Content, factor: number): string {

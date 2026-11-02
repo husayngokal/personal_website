@@ -10,7 +10,7 @@
  * Pure module, no I/O.
  */
 
-import { parseDone } from './block';
+import { parseDone, planOf, repeatLeft } from './block';
 import type { ScoreItem } from './items';
 import { BAR, CURIOSITY_CAP, MINUTES_PER_POINT, WEEKLY_BAR } from './rules';
 
@@ -36,12 +36,17 @@ function addDays(isoDay: string, n: number): string {
 
 /** Points a week that every fixed-date item needs, as of the Monday
  *  `start`: what it had left then, over the weeks left to its date (all
- *  of it, when the date falls within the week). On the plate or not. */
+ *  of it, when the date falls within the week). On the plate or not.
+ *  Only what was known before that Monday counts: parts finished before
+ *  it, activity plans made before it, and the price it had then (a
+ *  re-measure on or after that Monday leaves the week alone). */
 export function floorFor(items: ScoreItem[], start: string): number {
   let pts = 0;
   for (const item of items) {
-    if (!item.fixedDate || !item.deadline || item.deadline < start || !item.parts.length) continue;
-    let left = 0;
+    const planned = item.repeat.some((g) => planOf(g, start) > 0);
+    if (!item.fixedDate || !item.deadline || item.deadline < start || (!item.parts.length && !planned)) continue;
+    let left = item.repeat.reduce((n, g) => n + repeatLeft(g, start), 0);
+    if (item.remeasured && start <= item.remeasured.on) left += item.remeasured.before - item.remeasured.after;
     for (const g of item.parts) {
       const before = g.done.reduce((n, e) => {
         const d = parseDone(e);
