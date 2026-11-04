@@ -15,7 +15,7 @@ import {
   LEVEL_SIZE, SCORE_EPOCH, type Lane, type Source,
 } from './rules';
 import { weekRules, type WeekRule } from './week-rule';
-import { partsDone, planOf, repeatCount } from './block';
+import { extraLeftMinutes, extraMinutes, partsDone, planOf, practiceOf, repeatCount } from './block';
 import { calibrate, varianceNotes, type Calibration, type VarianceNote } from './calibrate';
 import { plural, type Extracted, type ScoreEvent, type ScoreItem, type Surface, type Tally } from './items';
 import type { Session } from './time';
@@ -62,7 +62,11 @@ export interface ItemView {
   needsSetup: string | null;
   earned: number;               // points of finished parts (prior work included)
   total: number;                // points of all parts
-  planned: number;              // points of every activity plan, in all
+  /** Minutes planned outside the parts, in all: practice hours, or every
+   *  activity plan at its rate. */
+  extra: number;
+  /** Practice hours planned, and how many the logged activities cover. */
+  practice: { hours: number; done: number } | null;
   pct: number;                  // 0-100
   summary: string;              // "16 of 120 chapters"
   weekPoints: number;
@@ -175,7 +179,10 @@ function itemView(item: ScoreItem, weekPoints: number, weekMinutes = 0): ItemVie
     parked: item.parked, weekMinutes,
     hasBlock: item.hasBlock, needsSetup: item.needsSetup,
     earned, total, pct: total ? Math.round((earned / total) * 100) : 0, summary,
-    planned: Math.round(item.repeat.reduce((n, g) => n + (g.per ? planOf(g) / g.per : planOf(g) * g.points), 0)),
+    extra: Math.round(extraMinutes(item)),
+    practice: practiceOf(item) > 0
+      ? { hours: practiceOf(item), done: Math.round(((practiceOf(item) * 60 - extraLeftMinutes(item)) / 60) * 10) / 10 }
+      : null,
     weekPoints, weeklyHours: item.weeklyHours, paced: item.paced, deadline: item.deadline, fixedDate: item.fixedDate, outcome: item.outcome,
     remeasure: item.remeasure,
     parts,

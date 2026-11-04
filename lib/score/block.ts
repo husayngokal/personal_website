@@ -33,7 +33,8 @@
  */
 
 import {
-  estimate, factorLabel, fitsCap, isSource, minParts, partFloor, unitCap, DEFAULT_LANE, READING_TIERS, STARTING_FACTORS,
+  estimate, factorLabel, fitsCap, isSource, minParts, partFloor, unitCap, ACTIVITIES, DEFAULT_LANE, MINUTES_PER_POINT, READING_TIERS, RETRIEVAL_FACTOR, STARTING_FACTORS,
+  type ActivityKind,
   type Content, type Factors, type Lane, type Source, type Tier, type TemplateId,
 } from './rules';
 
@@ -90,6 +91,11 @@ export interface ScoreBlock {
   /** The one content re-measure of its unstarted parts (rules.ts): when,
    *  and whether anything could be counted. */
   remeasured?: { on: string; counted: boolean; before?: number; after?: number };
+  /** Hours of practice planned in all (cards, papers, questions, boxes:
+   *  every activity together), as dated entries ("2026-11-04 25"); the
+   *  latest counts. What is left counts toward the pace and, for a fixed
+   *  date, the floor, in place of any per-activity plans. Never pays. */
+  practice?: string[];
   parts: PartGroup[];
   repeat: RepeatGroup[];
 }
@@ -133,7 +139,7 @@ function str(v: unknown): string | undefined {
   return typeof v === 'string' && v.trim() ? v.trim() : undefined;
 }
 
-const PLAN = /^(\d{4}-\d{2}-\d{2}) (\d+)$/;
+const PLAN = /^(\d{4}-\d{2}-\d{2}) (\d+(?:\.\d+)?)$/;
 
 function planList(v: unknown): string[] {
   if (!Array.isArray(v)) return [];
@@ -229,6 +235,7 @@ export function readBlock(fm: Record<string, unknown>): ScoreBlock | null {
         ...(before !== undefined && after !== undefined ? { before: Math.round(before), after: Math.round(after) } : {}),
       };
     })(),
+    ...(planList(r.practice).length ? { practice: planList(r.practice) } : {}),
     parts,
     repeat,
   };
@@ -249,6 +256,7 @@ export function serializeBlock(b: ScoreBlock): string[] {
   if (b.parked) out.push('  parked: true');
   if (b.parked && b.parkedFrom) out.push(`  parked-from: ${JSON.stringify(b.parkedFrom)}`);
   if (b.remeasured) out.push(`  remeasured: ${JSON.stringify(b.remeasured)}`);
+  if (b.practice?.length) out.push(`  practice: ${list(b.practice)}`);
   if (b.parts.length) {
     out.push('  parts:');
     for (const g of b.parts) {
@@ -315,6 +323,7 @@ export function cloneBlock(b: ScoreBlock): ScoreBlock {
     ...b,
     parts: b.parts.map((g) => ({ ...g, done: [...g.done] })),
     repeat: b.repeat.map((g) => ({ ...g, done: [...g.done], ...(g.plan ? { plan: [...g.plan] } : {}) })),
+    ...(b.practice ? { practice: [...b.practice] } : {}),
   };
 }
 
@@ -356,13 +365,63 @@ export function repeatCount(g: RepeatGroup, before?: string): number {
 /** Units planned in all: the latest plan, or the latest made before the
  *  day `before`. 0 when there is none. */
 export function planOf(g: RepeatGroup, before?: string): number {
+  return latest(g.plan, before);
+}
+
+/** Real minutes one unit of an activity takes, at its rate: its points
+ *  back in time, without the retrieval weighting. */
+export function unitMinutes(g: RepeatGroup): number {
+  const pts = g.per ? 1 / g.per : g.points;
+  const spec = g.kind ? ACTIVITIES[g.kind as ActivityKind] : undefined;
+  return (pts * MINUTES_PER_POINT) / (spec?.retrieval ? RETRIEVAL_FACTOR : 1);
+}
+
+/** The latest of a list of dated figures ("2026-11-04 25"), or the latest
+ *  dated before `before`. 0 when there is none. */
+function latest(list: string[] | undefined, before?: string): number {
   let at = '', n = 0;
-  for (const e of g.plan ?? []) {
+  for (const e of list ?? []) {
     const m = e.match(PLAN);
     if (!m || (before && m[1] >= before) || m[1] < at) continue;
     at = m[1]; n = Number(m[2]);
   }
   return n;
+}
+
+/** Practice hours planned in all, as of now or of the Monday `before`. */
+export function practiceOf(b: { practice?: string[] }, before?: string): number {
+  return latest(b.practice, before);
+}
+
+/** Minutes of work still to do outside the parts: what is left of the
+ *  practice hours (less the activities logged, at their rates), or with
+ *  none set, what is left of each activity plan. As of now or of the
+ *  Monday `before`. */
+export function extraLeftMinutes(b: { practice?: string[]; repeat: RepeatGroup[] }, before?: string): number {
+  const h = practiceOf(b, before);
+  if (h > 0) {
+    const done = b.repeat.reduce((n, g) => n + repeatCount(g, before) * unitMinutes(g), 0);
+    return Math.max(0, h * 60 - done);
+  }
+  return b.repeat.reduce((n, g) => n + Math.max(0, planOf(g, before) - repeatCount(g, before)) * unitMinutes(g), 0);
+}
+
+/** Minutes of work planned outside the parts, in all: the practice hours,
+ *  or with none set, every activity plan at its rate. */
+export function extraMinutes(b: { practice?: string[]; repeat: RepeatGroup[] }): number {
+  const h = practiceOf(b);
+  return h > 0 ? h * 60 : b.repeat.reduce((n, g) => n + planOf(g) * unitMinutes(g), 0);
+}
+
+/** Set the practice hours planned in all, from `day`. A second figure the
+ *  same day replaces the first; 0 clears it. */
+export function setPractice(b: ScoreBlock, hours: number, day: string): ScoreBlock {
+  if (!ISO_DAY.test(day)) throw new Error('bad day');
+  const h = Math.round(Number(hours) * 10) / 10;
+  if (!Number.isFinite(h) || h < 0 || h > 2000) throw new Error('practice hours must be between 0 and 2,000');
+  const next = cloneBlock(b);
+  next.practice = [...(b.practice ?? []).filter((e) => !e.startsWith(`${day} `)), `${day} ${h}`];
+  return next;
 }
 
 /** Points a repeat group's plan has still to do (unrounded), as of now or

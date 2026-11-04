@@ -10,7 +10,7 @@
  * Pure module, no I/O.
  */
 
-import { parseDone, planOf, repeatLeft } from './block';
+import { extraLeftMinutes, parseDone } from './block';
 import type { ScoreItem } from './items';
 import { BAR, CURIOSITY_CAP, MINUTES_PER_POINT, WEEKLY_BAR } from './rules';
 
@@ -43,9 +43,11 @@ function addDays(isoDay: string, n: number): string {
 export function floorFor(items: ScoreItem[], start: string): number {
   let pts = 0;
   for (const item of items) {
-    const planned = item.repeat.some((g) => planOf(g, start) > 0);
-    if (!item.fixedDate || !item.deadline || item.deadline < start || (!item.parts.length && !planned)) continue;
-    let left = item.repeat.reduce((n, g) => n + repeatLeft(g, start), 0);
+    /* Practice still to do, in points at the base rate (a quarter hour
+       each, without the retrieval weighting): a floor, so it errs low. */
+    const extra = extraLeftMinutes(item, start) / MINUTES_PER_POINT;
+    if (!item.fixedDate || !item.deadline || item.deadline < start || (!item.parts.length && !extra)) continue;
+    let left = extra;
     if (item.remeasured && start <= item.remeasured.on) left += item.remeasured.before - item.remeasured.after;
     for (const g of item.parts) {
       const before = g.done.reduce((n, e) => {

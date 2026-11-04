@@ -29,7 +29,7 @@ import {
   type ActivityKind, type Content, type Factors, type TemplateId, type Tier,
 } from '../score/rules';
 import {
-  addActivity, addGroup, buildFromTemplate, cloneBlock, contentWhy, editGroup, logParts, logRepeat, partsDone, readBlock, remeasure, removeActivity, removeGroup, repeatCount, setPlan, setScoreBlock,
+  addActivity, addGroup, buildFromTemplate, cloneBlock, contentWhy, editGroup, logParts, logRepeat, partsDone, readBlock, remeasure, removeActivity, removeGroup, repeatCount, setPlan, setPractice, setScoreBlock,
   type ScoreBlock, type TemplateInputs,
 } from '../score/block';
 import { atlasPoints, effectiveBlock, itemFromFile, plural } from '../score/items';
@@ -70,6 +70,7 @@ export type QuickRequest =
   | { target: 'score'; table: string; slug: string; action: 'add-activity'; kind: string; paperHours?: number; unit?: string; minutesPerUnit?: number }
   | { target: 'score'; table: string; slug: string; action: 'remove-activity'; group: number }
   | { target: 'score'; table: string; slug: string; action: 'set-plan'; group: number; count: number }
+  | { target: 'score'; table: string; slug: string; action: 'set-practice'; hours: number }
   | { target: 'score'; table: string; slug: string; action: 'remeasure'; content?: Content; none?: boolean }
   | { target: 'score'; table: string; slug: string; action: 'delete' }
   | { target: 'score'; table: string; slug: string; action: 'set-weekly'; hours: number }
@@ -508,6 +509,10 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string,
       nextBlock = setPlan(block, req.group, Number(req.count), today);
       const n = Math.round(Number(req.count));
       verb = n ? `${n} ${n === 1 ? g.unit : plural(g.unit)} planned in all` : `no ${plural(g.unit)} planned`;
+    } else if (req.action === 'set-practice') {
+      nextBlock = setPractice(block, Number(req.hours), today);
+      const h = Math.round(Number(req.hours) * 10) / 10;
+      verb = h ? `${h} hours of practice planned in all` : 'no practice hours planned';
     } else if (req.action === 'remove-activity') {
       const g = block.repeat[req.group];
       if (!g) throw new Error('no such activity');

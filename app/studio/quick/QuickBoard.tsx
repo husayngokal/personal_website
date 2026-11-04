@@ -432,9 +432,10 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
                   /* Hours on the whole thing against its whole price (parts
                      plus any activity plans): carries over from week to week
                      until it is done. */
-                  i.total + (i.planned ?? 0) > 0
-                    ? `${hoursLabel(score?.time?.totalByKey?.[i.key] ?? 0)} logged of ${hoursLabel((i.total + (i.planned ?? 0)) * MINUTES_PER_POINT)} in all`
+                  i.total * MINUTES_PER_POINT + (i.extra ?? 0) > 0
+                    ? `${hoursLabel(score?.time?.totalByKey?.[i.key] ?? 0)} logged of ${hoursLabel(i.total * MINUTES_PER_POINT + (i.extra ?? 0))} in all`
                     : score?.time?.totalByKey?.[i.key] ? `${hoursLabel(score.time.totalByKey[i.key])} logged` : null,
+                  i.practice ? `practice ${i.practice.done} of ${i.practice.hours} h done` : null,
                   i.weeklyHours
                     ? i.paced && i.deadline ? `needs ${i.weeklyHours} h a week to be ready by ${shortDay(i.deadline)}` : `${i.weeklyHours} h a week`
                     : null,
@@ -1175,6 +1176,7 @@ type GroupAction =
   | { action: 'add-activity'; kind: string; paperHours?: number; unit?: string; minutesPerUnit?: number }
   | { action: 'remove-activity'; group: number }
   | { action: 'set-plan'; group: number; count: number }
+  | { action: 'set-practice'; hours: number }
   | { action: 'part'; group: number }
   | { action: 'edit-group'; group: number; name?: string; count?: number; prior?: number }
   | { action: 'remove-group'; group: number }
@@ -1422,8 +1424,9 @@ function ActivityEditor({ item, busy, send }: {
     <div className={styles.partsAdd}>
       <p className={styles.setupHead}>
         Activities: the work around the material. Rates come from the rules, not from you. Each pays as you log it.
-        {item.deadline ? ' Plan how many you will do in all and what is left of the plan counts toward its hours a week' + (item.fixedDate ? ', and toward the bar\'s floor from next Monday' : '') + '. A plan never pays on its own.' : ''}
+        {item.deadline ? ' Say how many hours of practice it needs in all, every activity together; what the logged activities have not covered counts toward its hours a week' + (item.fixedDate ? ', and toward the bar\'s floor from next Monday' : '') + '. Or plan a count per activity instead. Neither pays on its own.' : ''}
       </p>
+      {item.deadline && <PracticeHours item={item} busy={busy} send={send} />}
       <ul className={styles.partsList}>
         {item.repeat.map((g) => (
           <ActivityRow key={`${g.index}-${g.plan}`} itemKey={item.key} g={g} dated={!!item.deadline} busy={busy} send={send} />
@@ -1461,6 +1464,23 @@ function ActivityEditor({ item, busy, send }: {
       </form>
       <p className={styles.setupHead}>{spec.basis}.</p>
     </div>
+  );
+}
+
+function PracticeHours({ item, busy, send }: {
+  item: ItemView; busy: string | null; send: (req: GroupAction, key: string) => void;
+}) {
+  const [h, setH] = useState(item.practice ? String(item.practice.hours) : '');
+  const key = `${item.key}:practice`;
+  const current = item.practice?.hours ?? 0;
+  return (
+    <form className={styles.pageLog} onSubmit={(e) => { e.preventDefault(); send({ action: 'set-practice', hours: Number(h) || 0 }, key); }}>
+      <label>
+        <span className={styles.srOnly}>Practice hours in all</span>
+        <input type="number" min={0} step="any" inputMode="decimal" placeholder="practice hours in all" value={h} onChange={(e) => setH(e.target.value)} />
+      </label>
+      <Btn busy={busy === key} disabled={!!busy || (Number(h) || 0) === current} onClick={() => undefined} submit>Set practice hours</Btn>
+    </form>
   );
 }
 
