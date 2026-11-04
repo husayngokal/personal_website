@@ -295,7 +295,7 @@ export function pagesPerPoint(tier: Tier): number {
 
 export const RETRIEVAL_FACTOR = 1.5;
 
-export type ActivityKind = 'flashcard-review' | 'mcq' | 'written-question' | 'past-paper' | 'statute' | 'case' | 'other';
+export type ActivityKind = 'flashcard-review' | 'mcq' | 'written-question' | 'past-paper' | 'statute' | 'case' | 'box-easy' | 'box-medium' | 'box-hard' | 'other';
 
 export interface ActivitySpec {
   label: string;
@@ -305,6 +305,8 @@ export interface ActivitySpec {
   /** What setting it up asks: a past paper's official length, or (for
    *  anything else) a unit and your gut minutes per unit. */
   asks?: 'paperHours' | 'custom';
+  /** Paid in whole points per unit (a practice box), not counted in batches. */
+  whole?: boolean;
   basis: string;
 }
 
@@ -315,6 +317,12 @@ export const ACTIVITIES: Record<ActivityKind, ActivitySpec> = {
   'past-paper': { label: 'Past paper', unit: 'past paper', retrieval: true, asks: 'paperHours', basis: 'its official length, and half again to mark it' },
   statute: { label: 'Learning statutes', unit: 'statute', minutesPerUnit: 10, retrieval: false, basis: '10 minutes to read, understand and note one' },
   case: { label: 'Learning cases', unit: 'case', minutesPerUnit: 8, retrieval: false, basis: '8 minutes for the facts, the ratio and the principle' },
+  /* A practice box (Hack The Box and the like): done when root is owned.
+     Its size by the platform's own difficulty rating, at a learner's pace.
+     A fixed rate, so getting faster pays. */
+  'box-easy': { label: 'Practice box, easy', unit: 'easy box', minutesPerUnit: 120, retrieval: true, whole: true, basis: '2 hours to own an easy box, user and root' },
+  'box-medium': { label: 'Practice box, medium', unit: 'medium box', minutesPerUnit: 240, retrieval: true, whole: true, basis: '4 hours to own a medium box, user and root' },
+  'box-hard': { label: 'Practice box, hard', unit: 'hard box', minutesPerUnit: 480, retrieval: true, whole: true, basis: '8 hours to own a hard box, user and root' },
   other: { label: 'Something else (your guess per unit)', unit: '', retrieval: false, asks: 'custom', basis: 'your gut minutes per unit, times the guess factor in force, at most 8 points a unit' },
 };
 
@@ -330,6 +338,7 @@ export function activityRate(kind: ActivityKind, opts: { paperHours?: number; mi
     if (!Number.isFinite(h) || h <= 0) throw new Error("a past paper needs its official length in hours");
     return { points: hoursToPoints(h * PAPER_MARKING_FACTOR * RETRIEVAL_FACTOR) };
   }
+  if (a.whole) return { points: hoursToPoints(((a.minutesPerUnit ?? 0) / 60) * (a.retrieval ? RETRIEVAL_FACTOR : 1)) };
   const m = kind === 'other' ? Number(opts.minutesPerUnit) * (opts.gut ?? STARTING_FACTORS.gut) : (a.minutesPerUnit ?? 0) * (a.retrieval ? RETRIEVAL_FACTOR : 1);
   if (!Number.isFinite(m) || m <= 0) throw new Error('minutes per unit must be a positive number');
   if (kind === 'other' && m / MINUTES_PER_POINT > UNIT_CAP.gut) {

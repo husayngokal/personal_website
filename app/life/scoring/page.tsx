@@ -266,7 +266,7 @@ export default async function ScoringPage() {
             return (
               <tr key={k}>
                 <td>{a.label}</td>
-                <td>{r.per ? (r.per >= 1 ? `1 per ${fmt(r.per)} ${a.unit}s` : `${fmt(1 / r.per)} per ${a.unit}`) : `${r.points} for a 3-hour paper`}</td>
+                <td>{r.per ? (r.per >= 1 ? `1 per ${fmt(r.per)} ${a.unit}s` : `${fmt(1 / r.per)} per ${a.unit}`) : a.whole ? `${r.points} per ${a.unit}` : `${r.points} for a 3-hour paper`}</td>
                 <td>{a.basis}{a.retrieval ? `, ${RETRIEVAL_FACTOR}× as retrieval` : ''}.</td>
               </tr>
             );
