@@ -42,7 +42,7 @@ export interface QuickData {
 
 type ScoreSlice = Pick<ScoreState, 'week' | 'lifetime' | 'streak' | 'items'> & {
   load?: ScoreState['load']; time?: ScoreState['time']; calibration?: ScoreState['calibration'];
-  bar?: number; curiosityCap?: number; next?: ScoreState['next'];
+  bar?: number; curiosityCap?: number; next?: ScoreState['next']; priced?: ScoreState['priced'];
 };
 
 /* This week's bar and curiosity cap: set at the start of the week; a
@@ -102,7 +102,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
         const h = hold.current;
         if (h && Date.now() < h.until && v.lifetime.points < h.points) return;
         if (h && v.lifetime.points >= h.points) hold.current = null;
-        setScore({ week: v.week, lifetime: v.lifetime, streak: v.streak, items: v.items, load: v.load, time: v.time, calibration: v.calibration, bar: v.bar, curiosityCap: v.curiosityCap, next: v.next });
+        setScore({ week: v.week, lifetime: v.lifetime, streak: v.streak, items: v.items, load: v.load, time: v.time, calibration: v.calibration, bar: v.bar, curiosityCap: v.curiosityCap, next: v.next, priced: v.priced });
       })
       .subscribe();
     return () => { void supabase.removeChannel(channel); };
@@ -272,14 +272,17 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
 
   const taskRow = (t: Task) => {
     const sized = score?.items.find((i) => i.table === 'tasks' && i.slug === t.slug);
-    const worth = sized && sized.total > 0 ? sized.total : estimate.gut(TASK_GUT_HOURS[t.scope] ?? 4);
+    /* Priced already (on the plate or not): its own frozen points. */
+    const own = score?.priced?.[t.slug];
+    const priced = !!sized?.hasBlock || own !== undefined;
+    const worth = sized && sized.total > 0 ? sized.total : own ?? estimate.gut(TASK_GUT_HOURS[t.scope] ?? 4);
     return (
     <li key={t.slug} className={styles.row}>
       <div className={styles.rowText}>
         <span className={styles.rowTitle}>{t.title}</span>
         <span className={styles.rowMeta}>{[t.category, t.scope.replace('-', ' '), `${worth} points`].filter(Boolean).join(' · ')}</span>
       </div>
-      {!sized?.hasBlock && (<details className={styles.parts}>
+      {!priced && (<details className={styles.parts}>
         <summary className={styles.partsHead}>Size it</summary>
         <SetupForm
           template="task"

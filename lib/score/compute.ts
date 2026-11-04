@@ -94,6 +94,9 @@ export interface ScoreState {
   streak: number;               // full weeks in a row
   lifetime: { points: number; outcomes: number; level: number; intoLevel: number; levelSize: number };
   items: ItemView[];            // the plate, plus anything that scored this week
+  /** Every task already priced, off the plate or not, by slug: its points
+   *  in all. So the backlog shows the real price, not a default. */
+  priced?: Record<string, number>;
   surfaces: Record<Surface, { weekPoints: number }>;
   tallies: { tasks: Tally; atlas: Tally; list: Tally };
   load: { hours: number; capacity: number };
@@ -300,6 +303,9 @@ export function computeScore(extracted: Extracted, today: string = authorDay()):
       levelSize: LEVEL_SIZE,
     },
     items: views,
+    priced: Object.fromEntries(items
+      .filter((i) => i.table === 'tasks' && i.hasBlock)
+      .map((i) => [i.slug, i.parts.reduce((n, g) => n + g.points, 0) || i.repeat.reduce((n, g) => n + g.points, 0)])),
     surfaces,
     tallies,
     load: { hours: Math.round(load * 10) / 10, capacity: rule.limitHours },
