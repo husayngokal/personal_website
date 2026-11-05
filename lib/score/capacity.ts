@@ -85,11 +85,17 @@ export function overCapacity(score: ScoreState | null, path: string, raw: string
   if (load <= cap) return null;
   const fit = offer(r1(cap - rest));
   const why = curLogged > 0 ? ` (${hrs(r1(curLogged))} already logged, the rest still planned)` : '';
+  /* Next week's room, known now: the plate's other curiosity plus this. */
+  const nextCap = score.next ? r1((score.next.cap * MINUTES_PER_POINT) / 60) : null;
+  const nextRest = others.reduce((n, i) => n + (i.weeklyHours ?? 0), 0);
+  const monday = nextCap === null ? 'put it on from Monday, when the logged hours start again'
+    : nextRest + willCur <= nextCap ? `put it on from Monday, when the logged hours start again (next week has room for ${hrs(nextCap)})`
+    : `wait: next week has room for only ${hrs(nextCap)} of curiosity`;
   return {
-    detail: `That would bring this week's curiosity to ${hrs(load)}${why}, over this week's ${hrs(cap)} (the curiosity cap of ${score.curiosityCap} points). `
+    detail: `That would bring this week's curiosity to ${hrs(load)}${why}, over this week's ${hrs(cap)} of room for curiosity (${score.curiosityCap} points: the bar less what dated work needs). `
       + (fit !== undefined ? `Give it ${hrs(fit)} a week or less, or take other curiosity off.`
         : item.paced ? `Its date sets its ${hrs(will)} a week, so take other curiosity off first.`
-        : curLogged > 0 ? 'Take other curiosity off, or put it on from Monday, when the logged hours start again.' : 'Take other curiosity off first.'),
+        : curLogged > 0 ? `Take other curiosity off, or ${monday}.` : 'Take other curiosity off first.'),
     load,
     capacity: cap,
     adding: r1(willCur - wasCur),

@@ -12,7 +12,7 @@
 
 import { extraLeftMinutes, parseDone } from './block';
 import type { ScoreItem } from './items';
-import { BAR, BOOKED_FROM, CURIOSITY_CAP, MINUTES_PER_POINT, WEEKLY_BAR } from './rules';
+import { BAR, BOOKED_FROM, CURIOSITY_CAP, RATIO_FROM, MINUTES_PER_POINT, WEEKLY_BAR } from './rules';
 
 export interface WeekRule {
   start: string;        // Monday
@@ -91,7 +91,7 @@ export function weekRules(
         start: w,
         bar,
         floor,
-        cap: Math.round(bar * BAR.capShare),
+        cap: w >= RATIO_FROM ? Math.max(0, bar - floor) : Math.round(bar * BAR.capShare),
         limitHours: (WEEKLY_BAR * MINUTES_PER_POINT) / 60,
       };
     }

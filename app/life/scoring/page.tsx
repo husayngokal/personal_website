@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import { Eyebrow } from '@/components/Primitives';
 import {
-  ATLAS, CURIOSITY_CAP, FORMULA_FACTOR, GUT_FACTOR, LEVEL_SIZE, MINUTES_PER_POINT,
-  READING_TIERS, RECURRING_GUT_HOURS, SCORE_EPOCH, TASK_GUT_HOURS, WEEKLY_BAR, WEEKLY_HOURS,
+  ATLAS, FORMULA_FACTOR, GUT_FACTOR, LEVEL_SIZE, MINUTES_PER_POINT,
+  READING_TIERS, RATIO_FROM, RECURRING_GUT_HOURS, SCORE_EPOCH, TASK_GUT_HOURS, WEEKLY_BAR, WEEKLY_HOURS,
   WORDS_PER_HOUR, estimate, pagesPerPoint, type Tier,
   ACTIVITIES, CALIBRATION, RETRIEVAL_FACTOR, SOURCES, STARTING_FACTORS, TIMED_FACTOR, TIMED_SESSION_CAP_MIN, TIMED_UNCAPPED_FROM, UNIT_CAP, BAR, VARIANCE,
   activityRate, factorLabel, type ActivityKind, type Learning,
@@ -45,7 +45,6 @@ export default async function ScoringPage() {
   const notes = score?.variance ?? [];
   const tiers = Object.entries(READING_TIERS) as [Tier, (typeof READING_TIERS)[Tier]][];
   const wordsPerPoint = (WORDS_PER_HOUR * MINUTES_PER_POINT) / 60;
-  const capHours = (CURIOSITY_CAP * MINUTES_PER_POINT) / 60;
   const rule = score?.rule ?? null;
   const next = score?.next ?? null;
   const hours = (pts: number) => fmt((pts * MINUTES_PER_POINT) / 60);
@@ -86,8 +85,8 @@ export default async function ScoringPage() {
         <li><strong>Quest.</strong> Yes. A booked exam, a deadline, work, anything someone else depends on. Quests are uncapped.</li>
         <li>
           <strong>Curiosity.</strong> No, and it does not have to. Reading, courses taken for interest,
-          the Field Atlas, The List, and anything I write about them. Curiosity fills at most{' '}
-          {fmt(BAR.capShare * 100)}% of the bar{rule ? <> ({rule.cap} points this week, {hours(rule.cap)} hours)</> : <> ({CURIOSITY_CAP} points of a {WEEKLY_BAR} bar, {fmt(capHours)} hours)</>}.
+          the Field Atlas, The List, and anything I write about them. Curiosity fills whatever the
+          week has left after dated commitments: the bar less the floor{rule ? <> ({rule.cap} points this week, {hours(rule.cap)} hours)</> : null}.
           Past that it still counts toward the lifetime total, never the week.
         </li>
       </ul>
@@ -226,14 +225,14 @@ export default async function ScoringPage() {
         <li><strong>Halfway.</strong> Each Monday the bar moves halfway from last week&apos;s bar to what last week counted, to the nearest {BAR.round}. Score 100 against 200 and next week&apos;s bar is 150; beat it and it rises the same way.</li>
         <li><strong>A floor.</strong> It never drops below what work with a date someone else fixed needs that week: every booked exam, and any task whose date was set for me, on the plate or not. That need is what each one had left at the start of the week, over the weeks to its date: unfinished parts, plus practice still to do, priced as they stood that Monday. A plan or re-measure made during a week counts from the next one.</li>
         <li><strong>A ceiling.</strong> It never goes above {WEEKLY_BAR} points, {WEEKLY_HOURS} hours.</li>
-        <li><strong>The cap follows it.</strong> Curiosity can fill {fmt(BAR.capShare * 100)}% of the bar. The plate does not: it holds {WEEKLY_HOURS} hours whatever the bar is, because the bar says when a week is full, not how much there is to do.</li>
+        <li><strong>Curiosity gets the rest.</strong> What dated work needs (the floor) is the quests&apos; share of the week; curiosity can fill everything else, and nothing more. There is no fixed split: an exam week can leave curiosity an hour or none, and a week with nothing dated leaves it the whole bar. Before {longDay(RATIO_FROM)} curiosity had a flat {fmt(BAR.capShare * 100)}%. The plate does not follow the bar: it holds {WEEKLY_HOURS} hours whatever the bar is, because the bar says when a week is full, not how much there is to do.</li>
         <li><strong>Nothing by hand.</strong> It is worked out from the record every time the score is, and changing what is on the plate midweek changes none of it.</li>
       </ul>
       {rule && (
         <p>
-          This week: a bar of {rule.bar} and a curiosity cap of {rule.cap}
+          This week: a bar of {rule.bar}, with room for {rule.cap} of curiosity
           {rule.floor ? <>, with a floor of {rule.floor}</> : null}.
-          {next ? <> Next week, as it stands today: {next.bar}{next.floor ? <>, with a floor of {next.floor}</> : null}.</> : null}
+          {next ? <> Next week, as it stands today: {next.bar}{next.floor ? <>, with a floor of {next.floor}</> : null}, and room for {next.cap} of curiosity.</> : null}
           {' '}Until {longDay(BAR.from)} the bar was {WEEKLY_BAR} every week.
         </p>
       )}
@@ -245,7 +244,7 @@ export default async function ScoringPage() {
         own: the hours its unfinished parts and what is left of its activity plans are worth, over the weeks left. Fall behind and the pace
         rises; get ahead and it drops. Anything without one carries the hours a week I choose to give it.
         Curiosity has a second limit: this week&rsquo;s curiosity, the hours already logged plus what
-        the plate still asks for, cannot pass this week&rsquo;s curiosity cap in
+        the plate still asks for, cannot pass its room in
         hours{rule ? <> ({hours(rule.cap)} hours this week)</> : null}, since hours past it could not
         fill the bar. Something refused for that can go on at the hours that still fit, or wait for
         Monday, when the logged hours start again. What cannot be given hours yet goes in the

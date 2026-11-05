@@ -42,6 +42,13 @@ export const CURIOSITY_CAP = 80;
  *  move is a plan, not a commitment. Earlier weeks keep the floor they had. */
 export const BOOKED_FROM = '2026-11-09';
 
+/** From this Monday, curiosity's room is what the week has left after
+ *  its dated commitments: the bar minus the floor, with no fixed share.
+ *  Heavy exam weeks leave little or none; weeks with nothing dated leave
+ *  all of it. Earlier weeks keep the 40% cap (BAR.capShare). Applied to
+ *  the week it was decided in, as a one-time exception. */
+export const RATIO_FROM = '2026-11-02';
+
 /* -- The weekly bar ---------------------------------------------------
  * From BAR.from, each week's bar is set at the start of the week and
  * holds until Sunday, whatever comes on or off the plate:
