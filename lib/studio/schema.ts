@@ -247,6 +247,7 @@ export const CONTENT_TYPES: ContentType[] = [
       { name: 'earned', label: 'Earned', type: 'date' },
       { name: 'pending', label: 'Pending', type: 'boolean' },
       { name: 'exam-date', label: 'Exam date', type: 'date' },
+      { name: 'booked', label: 'Booked (the date counts toward the floor)', type: 'boolean' },
       { name: 'expires', label: 'Expires', type: 'date' },
       { name: 'tags', label: 'Tags', type: 'tags' },
     ],

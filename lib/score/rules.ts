@@ -37,6 +37,11 @@ export const WEEKLY_HOURS = (WEEKLY_BAR * MINUTES_PER_POINT) / 60;
  *  lifetime total, never the week. */
 export const CURIOSITY_CAP = 80;
 
+/** From this Monday, an exam's date counts toward the floor only once
+ *  it is booked (booked: true on the credential). A date I could still
+ *  move is a plan, not a commitment. Earlier weeks keep the floor they had. */
+export const BOOKED_FROM = '2026-11-09';
+
 /* -- The weekly bar ---------------------------------------------------
  * From BAR.from, each week's bar is set at the start of the week and
  * holds until Sunday, whatever comes on or off the plate:

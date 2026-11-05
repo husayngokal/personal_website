@@ -402,7 +402,9 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string,
     /* Nothing goes on the plate without hours a week: a deadline gives its
        own pace; anything else must say what it will get. */
     const back = itemFromFile({ path, content: next });
-    if (back?.active && !back.paced && back.weeklyHours == null) {
+    /* Hours given with the tap replace any the item had (the plate's
+       "use N hours a week" retry); without them, it keeps its own. */
+    if (back?.active && !back.paced && (back.weeklyHours == null || req.weeklyHours !== undefined)) {
       const wh = Math.round(Number(req.weeklyHours) * 10) / 10;
       if (!(Number.isFinite(wh) && wh > 0)) throw new QuickError('bad-request', 'say how many hours a week it will get first');
       const nb = readBlock(matter(next).data) ?? { parts: [], repeat: [] };

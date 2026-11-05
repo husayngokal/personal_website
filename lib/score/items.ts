@@ -63,6 +63,8 @@ export interface ScoreItem {
   /** The deadline is a date someone else fixed (an exam's, or a task's
    *  marked `due-kind: fixed`), so it sets the weekly bar's floor. */
   fixedDate: boolean;
+  /** An exam with a date it is not booked for: the floor leaves it out from BOOKED_FROM. */
+  unbooked: boolean;
   /** Due its one content re-measure (block.ts): priced from published
    *  hours or a guess, first part done, not yet re-measured. */
   remeasure: boolean;
@@ -206,6 +208,7 @@ function fromFile(src: VaultSource, today: string = authorDay()): ScoreItem | nu
     paced: false,
     deadline: null,
     fixedDate: false,
+    unbooked: false,
     remeasure: remeasureDue(block),
     remeasured: block?.remeasured?.counted && block.remeasured.before !== undefined && block.remeasured.after !== undefined
       ? { on: block.remeasured.on, before: block.remeasured.before, after: block.remeasured.after }
@@ -262,6 +265,7 @@ function fromFile(src: VaultSource, today: string = authorDay()): ScoreItem | nu
       const pending = row.pending === true;
       base.deadline = day(row.exam_date);
       base.fixedDate = pending && !!base.deadline;
+      base.unbooked = base.fixedDate && fm.booked !== true;
       base.active = pending && (!!base.deadline || !!block);
       if (base.active && !block) base.needsSetup = 'exam-prep';
       if (base.outcome) base.outcome.achieved = !pending ? day(row.earned) : null;
@@ -356,7 +360,7 @@ function atlasItem(src: VaultSource, tallies: Extracted['tallies']): ScoreItem |
     key: src.path, table: 'living_entries', surface: 'atlas', slug: 'field-atlas',
     title: 'The Field Atlas', href: '/field-atlas', lane: DEFAULT_LANE.atlas,
     active: false, parked: false, private: false, hasBlock: false, needsSetup: null,
-    parts: [], repeat: [], outcome: null, weeklyHours: null, paced: false, deadline: null, fixedDate: false, remeasure: false, remeasured: null, practice: [], events,
+    parts: [], repeat: [], outcome: null, weeklyHours: null, paced: false, deadline: null, fixedDate: false, unbooked: false, remeasure: false, remeasured: null, practice: [], events,
   };
 }
 

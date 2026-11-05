@@ -78,11 +78,12 @@ export default async function ScoringPage() {
 
       <h2 className={styles.h2}>Two lanes</h2>
       <p>
-        One question sorts everything: <em>if this vanished tomorrow, would a date, a person or
-        money be affected?</em>
+        One question sorts everything: <em>is there a commitment outside my head?</em> That means
+        a date someone else holds me to, a person waiting on it, or money already spent or at stake.
+        Good for me someday does not count; nearly everything I would choose to do is.
       </p>
       <ul className={styles.list}>
-        <li><strong>Quest.</strong> Yes. Exams, deadlines, work, anything someone else depends on. Quests are uncapped.</li>
+        <li><strong>Quest.</strong> Yes. A booked exam, a deadline, work, anything someone else depends on. Quests are uncapped.</li>
         <li>
           <strong>Curiosity.</strong> No, and it does not have to. Reading, courses taken for interest,
           the Field Atlas, The List, and anything I write about them. Curiosity fills at most{' '}
@@ -91,6 +92,10 @@ export default async function ScoringPage() {
         </li>
       </ul>
       <p>A textbook or reading takes the lane of whatever it belongs to. On its own, it is curiosity.</p>
+      <p>
+        The lane changes on an event, not a mood. An exam I mean to sit but have not booked is
+        curiosity; the day it is booked, paid for or needed by someone, it becomes a quest.
+      </p>
 
       <h2 className={styles.h2}>How things score</h2>
       <ul className={styles.list}>
@@ -217,7 +222,7 @@ export default async function ScoringPage() {
       </p>
       <ul className={styles.list}>
         <li><strong>Halfway.</strong> Each Monday the bar moves halfway from last week&apos;s bar to what last week counted, to the nearest {BAR.round}. Score 100 against 200 and next week&apos;s bar is 150; beat it and it rises the same way.</li>
-        <li><strong>A floor.</strong> It never drops below what work with a date someone else fixed needs that week: every exam, and any task whose date was set for me, on the plate or not. That need is what each one had left at the start of the week, over the weeks to its date: unfinished parts, plus practice still to do, priced as they stood that Monday. A plan or re-measure made during a week counts from the next one.</li>
+        <li><strong>A floor.</strong> It never drops below what work with a date someone else fixed needs that week: every booked exam, and any task whose date was set for me, on the plate or not. That need is what each one had left at the start of the week, over the weeks to its date: unfinished parts, plus practice still to do, priced as they stood that Monday. A plan or re-measure made during a week counts from the next one.</li>
         <li><strong>A ceiling.</strong> It never goes above {WEEKLY_BAR} points, {WEEKLY_HOURS} hours.</li>
         <li><strong>The cap follows it.</strong> Curiosity can fill {fmt(BAR.capShare * 100)}% of the bar. The plate does not: it holds {WEEKLY_HOURS} hours whatever the bar is, because the bar says when a week is full, not how much there is to do.</li>
         <li><strong>Nothing by hand.</strong> It is worked out from the record every time the score is, and changing what is on the plate midweek changes none of it.</li>
@@ -237,8 +242,9 @@ export default async function ScoringPage() {
         together they cannot pass {WEEKLY_HOURS}. Anything with a deadline works its figure out on its
         own: the hours its unfinished parts and what is left of its activity plans are worth, over the weeks left. Fall behind and the pace
         rises; get ahead and it drops. Anything without one carries the hours a week I choose to give it.
-        The limit is the same for quests and curiosity; the curiosity cap is a different thing, and only
-        limits how much of the weekly bar curiosity can fill. What cannot be given hours yet goes in the
+        Curiosity has a second limit: what is on the plate cannot pass this week&rsquo;s curiosity cap
+        in hours{rule ? <> ({hours(rule.cap)} hours this week)</> : null}, since hours past it could not
+        fill the bar. Something refused for that can go on at the hours that still fit. What cannot be given hours yet goes in the
         backlog, which counts for nothing until it is brought onto the plate with a date or hours a week. Anything that would push the plate over is refused
         until something comes off: a swap, so the load stays level. A task with no figure of its own
         takes its estimate spread over its scope (all of it in a this-week task, a thirteenth in a

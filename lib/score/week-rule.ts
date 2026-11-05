@@ -12,7 +12,7 @@
 
 import { extraLeftMinutes, parseDone } from './block';
 import type { ScoreItem } from './items';
-import { BAR, CURIOSITY_CAP, MINUTES_PER_POINT, WEEKLY_BAR } from './rules';
+import { BAR, BOOKED_FROM, CURIOSITY_CAP, MINUTES_PER_POINT, WEEKLY_BAR } from './rules';
 
 export interface WeekRule {
   start: string;        // Monday
@@ -47,6 +47,7 @@ export function floorFor(items: ScoreItem[], start: string): number {
        each, without the retrieval weighting): a floor, so it errs low. */
     const extra = extraLeftMinutes(item, start) / MINUTES_PER_POINT;
     if (!item.fixedDate || !item.deadline || item.deadline < start || (!item.parts.length && !extra)) continue;
+    if (item.unbooked && start >= BOOKED_FROM) continue;
     let left = extra;
     if (item.remeasured && start <= item.remeasured.on) left += item.remeasured.before - item.remeasured.after;
     for (const g of item.parts) {

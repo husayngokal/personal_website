@@ -183,7 +183,7 @@ function itemView(item: ScoreItem, weekPoints: number, weekMinutes = 0): ItemVie
     practice: practiceOf(item) > 0
       ? { hours: practiceOf(item), done: Math.round(((practiceOf(item) * 60 - extraLeftMinutes(item)) / 60) * 10) / 10 }
       : null,
-    weekPoints, weeklyHours: item.weeklyHours, paced: item.paced, deadline: item.deadline, fixedDate: item.fixedDate, outcome: item.outcome,
+    weekPoints, weeklyHours: item.weeklyHours, paced: item.paced, deadline: item.deadline, fixedDate: item.fixedDate && !item.unbooked, outcome: item.outcome,
     remeasure: item.remeasure,
     parts,
     repeat: item.repeat.map((g, index) => ({

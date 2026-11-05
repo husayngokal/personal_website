@@ -24,7 +24,18 @@ import { shortDay } from '@/lib/score/format';
 import { needsYou, type Need } from '@/lib/score/needs';
 
 interface SwapPlateItem { table: string; slug: string; title: string; hours: number | null; parkable: boolean }
-interface SwapState { retry: () => void; detail: string; plate: SwapPlateItem[] }
+interface SwapState { retry: () => void; detail: string; plate: SwapPlateItem[]; fit?: number; retryAt?: (hours: number) => void }
+
+/* The same request with a different number of hours a week, for the
+   requests that carry one; null when the hours come from a due date. */
+function withHours(req: QuickRequest, hours: number): QuickRequest | null {
+  const r = req as QuickRequest & { action?: string; inputs?: Record<string, unknown> };
+  if (r.action === 'set-weekly') return { ...r, hours } as QuickRequest;
+  if (r.action === 'unpark') return { ...r, weeklyHours: hours } as QuickRequest;
+  if (r.action === 'activate' && !(r as { due?: string }).due) return { ...r, weeklyHours: hours } as QuickRequest;
+  if (r.action === 'setup' && r.inputs) return { ...r, inputs: { ...r.inputs, weeklyHours: hours } } as QuickRequest;
+  return null;
+}
 import styles from './quick.module.css';
 
 interface Task { slug: string; title: string; status: string; scope: string; category: string | null; recurrence: string | null }
@@ -233,7 +244,11 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
       if (!res.ok) {
         rollback();
         if (j.error === 'over-capacity') {
-          setSwap({ retry: () => { void send(req, key); }, detail: j.detail, plate: j.plate ?? [] });
+          const at = typeof j.fit === 'number' && j.fit > 0 ? j.fit : undefined;
+          setSwap({
+            retry: () => { void send(req, key); }, detail: j.detail, plate: j.plate ?? [], fit: at,
+            retryAt: at !== undefined && withHours(req, at) ? (h) => { const r = withHours(req, h); if (r) void send(r, key); } : undefined,
+          });
           return;
         }
         setNote({
@@ -370,7 +385,9 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
             const j = await res.json();
             if (!res.ok) {
               if (j.error === 'over-capacity') {
-                setSwap({ retry: () => { void fetch('/api/studio/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) }).then(async (r) => { const k = await r.json(); setNote(r.ok ? { kind: 'ok', text: `${k.summary}. It shows here in a few seconds.`, undo: null } : { kind: 'error', text: k.detail || k.error }); }); }, detail: j.detail, plate: j.plate ?? [] });
+                const post = (f: typeof form) => { void fetch('/api/studio/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(f) }).then(async (r) => { const k = await r.json(); setNote(r.ok ? { kind: 'ok', text: `${k.summary}. It shows here in a few seconds.`, undo: null } : { kind: 'error', text: k.detail || k.error }); }); };
+                const at = typeof j.fit === 'number' && j.fit > 0 && !form.due ? j.fit : undefined;
+                setSwap({ retry: () => post(form), detail: j.detail, plate: j.plate ?? [], fit: at, retryAt: at !== undefined ? (h) => post({ ...form, weeklyHours: h }) : undefined });
                 return false;
               }
               setNote({ kind: 'error', text: j.detail || j.error || 'Could not add it.' });
@@ -414,7 +431,12 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
             ))}
           </ul>
           <div className={styles.rowActions}>
-            <Btn primary disabled={!!busy} onClick={() => { const sw = swap; setSwap(null); sw.retry(); }}>Try again</Btn>
+            {swap.retryAt && swap.fit !== undefined && (
+              <Btn primary disabled={!!busy} onClick={() => { const sw = swap; setSwap(null); sw.retryAt?.(sw.fit ?? 0); }}>
+                Use {swap.fit} {swap.fit === 1 ? 'hour' : 'hours'} a week
+              </Btn>
+            )}
+            <Btn primary={!swap.retryAt} disabled={!!busy} onClick={() => { const sw = swap; setSwap(null); sw.retry(); }}>Try again</Btn>
             <Btn disabled={!!busy} onClick={() => setSwap(null)}>Cancel</Btn>
           </div>
         </section>
