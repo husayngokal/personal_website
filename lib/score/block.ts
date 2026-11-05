@@ -96,6 +96,10 @@ export interface ScoreBlock {
    *  latest counts. What is left counts toward the pace and, for a fixed
    *  date, the floor, in place of any per-activity plans. Never pays. */
   practice?: string[];
+  /** Lanes it had before a change ("2026-11-05 quest": quest until that
+   *  day). Work logged before a change keeps the lane it was done in, so
+   *  a lane change never rewrites a week that has already started. */
+  laneWas?: string[];
   parts: PartGroup[];
   repeat: RepeatGroup[];
 }
@@ -140,6 +144,22 @@ function str(v: unknown): string | undefined {
 }
 
 const PLAN = /^(\d{4}-\d{2}-\d{2}) (\d+(?:\.\d+)?)$/;
+const LANE_WAS = /^(\d{4}-\d{2}-\d{2}) (quest|curiosity)$/;
+
+function laneWasList(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v.map((x) => String(x).trim()).filter((x) => LANE_WAS.test(x)).sort();
+}
+
+/** The lane something had on a day: the first change after that day
+ *  says what it was then; past every change, its lane now. */
+export function laneOn(lane: Lane, laneWas: string[] | undefined, day: string): Lane {
+  for (const e of laneWas ?? []) {
+    const m = LANE_WAS.exec(e);
+    if (m && day < m[1]) return m[2] as Lane;
+  }
+  return lane;
+}
 
 function planList(v: unknown): string[] {
   if (!Array.isArray(v)) return [];
@@ -236,6 +256,7 @@ export function readBlock(fm: Record<string, unknown>): ScoreBlock | null {
       };
     })(),
     ...(planList(r.practice).length ? { practice: planList(r.practice) } : {}),
+    ...(laneWasList(r['lane-was']).length ? { laneWas: laneWasList(r['lane-was']) } : {}),
     parts,
     repeat,
   };
@@ -257,6 +278,7 @@ export function serializeBlock(b: ScoreBlock): string[] {
   if (b.parked && b.parkedFrom) out.push(`  parked-from: ${JSON.stringify(b.parkedFrom)}`);
   if (b.remeasured) out.push(`  remeasured: ${JSON.stringify(b.remeasured)}`);
   if (b.practice?.length) out.push(`  practice: ${list(b.practice)}`);
+  if (b.laneWas?.length) out.push(`  lane-was: ${list(b.laneWas)}`);
   if (b.parts.length) {
     out.push('  parts:');
     for (const g of b.parts) {
@@ -324,6 +346,7 @@ export function cloneBlock(b: ScoreBlock): ScoreBlock {
     parts: b.parts.map((g) => ({ ...g, done: [...g.done] })),
     repeat: b.repeat.map((g) => ({ ...g, done: [...g.done], ...(g.plan ? { plan: [...g.plan] } : {}) })),
     ...(b.practice ? { practice: [...b.practice] } : {}),
+    ...(b.laneWas ? { laneWas: [...b.laneWas] } : {}),
   };
 }
 

@@ -21,7 +21,7 @@ import {
   DEFAULT_LANE, MINUTES_PER_POINT, RECURRING_GUT_HOURS, SCOPE_WEEKS, SCORE_EPOCH, TASK_GUT_HOURS, atlasPoints, countGain, estimate,
   type Lane, type TemplateId,
 } from './rules';
-import { doneOrder, extraLeftMinutes, parseDone, readBlock, remeasureDue, type PartGroup, type RepeatGroup, type ScoreBlock } from './block';
+import { doneOrder, extraLeftMinutes, laneOn, parseDone, readBlock, remeasureDue, type PartGroup, type RepeatGroup, type ScoreBlock } from './block';
 import { parseSessions, type Session } from './time';
 import { authorDay } from '../content/streak';
 
@@ -47,6 +47,8 @@ export interface ScoreItem {
   title: string;
   href: string | null;
   lane: Lane;
+  /** Lanes before a change (block.ts laneWas); events take the lane of their day. */
+  laneWas: string[];
   active: boolean;          // on the plate right now
   parked: boolean;          // taken off the plate by its score block
   private: boolean;
@@ -137,7 +139,7 @@ function partEvents(item: Omit<ScoreItem, 'events'>, g: PartGroup): ScoreEvent[]
     const points = Math.round((g.points * n) / g.count) - Math.round((g.points * before) / g.count);
     const what = n - before > 1 ? `${n - before} ${plural(g.unit)}` : g.unit;
     out.push({
-      date: e.date, points, lane: item.lane, kind: 'part', key: item.key, surface: item.surface,
+      date: e.date, points, lane: laneOn(item.lane, item.laneWas, e.date), kind: 'part', key: item.key, surface: item.surface,
       label: `${item.title} · ${g.name ? `${g.name} · ` : ''}${what}`,
     });
   }
@@ -158,7 +160,7 @@ function repeatEvents(item: Omit<ScoreItem, 'events'>, g: RepeatGroup): ScoreEve
     const points = g.per ? countGain(g.per, before, n) : g.points * e.qty;
     const what = e.qty > 1 ? `${e.qty} ${plural(g.unit)}` : g.unit;
     return {
-      date: e.date, points, lane: item.lane, kind: 'repeat' as const,
+      date: e.date, points, lane: laneOn(item.lane, item.laneWas, e.date), kind: 'repeat' as const,
       key: item.key, surface: item.surface, label: `${item.title} · ${what}`,
     };
   });
@@ -196,6 +198,7 @@ function fromFile(src: VaultSource, today: string = authorDay()): ScoreItem | nu
     title,
     href: isPrivate ? null : hrefFor(surface, parsed.slug),
     lane: block?.lane ?? DEFAULT_LANE[surface] ?? 'curiosity',
+    laneWas: block?.laneWas ?? [],
     active: false,
     parked: block?.parked === true,
     private: isPrivate,
@@ -324,7 +327,7 @@ function fromFile(src: VaultSource, today: string = authorDay()): ScoreItem | nu
   for (const g of base.repeat) events.push(...repeatEvents(base, g));
   if (base.outcome?.achieved) {
     events.push({
-      date: base.outcome.achieved, points: base.outcome.points, lane: base.lane, kind: 'outcome',
+      date: base.outcome.achieved, points: base.outcome.points, lane: laneOn(base.lane, base.laneWas, base.outcome.achieved), kind: 'outcome',
       key: base.key, surface, label: `${title} · result`,
     });
   }
@@ -358,7 +361,7 @@ function atlasItem(src: VaultSource, tallies: Extracted['tallies']): ScoreItem |
   tallies.atlas = { done, total };
   return {
     key: src.path, table: 'living_entries', surface: 'atlas', slug: 'field-atlas',
-    title: 'The Field Atlas', href: '/field-atlas', lane: DEFAULT_LANE.atlas,
+    title: 'The Field Atlas', href: '/field-atlas', lane: DEFAULT_LANE.atlas, laneWas: [],
     active: false, parked: false, private: false, hasBlock: false, needsSetup: null,
     parts: [], repeat: [], outcome: null, weeklyHours: null, paced: false, deadline: null, fixedDate: false, unbooked: false, remeasure: false, remeasured: null, practice: [], events,
   };
@@ -394,6 +397,7 @@ export function effectiveBlock(item: ScoreItem): ScoreBlock {
     parts: item.parts.map((g) => ({ ...g, done: [...g.done] })),
     repeat: item.repeat.map((g) => ({ ...g, done: [...g.done], ...(g.plan ? { plan: [...g.plan] } : {}) })),
     ...(item.practice.length ? { practice: [...item.practice] } : {}),
+    ...(item.laneWas.length ? { laneWas: [...item.laneWas] } : {}),
   };
 }
 

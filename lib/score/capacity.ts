@@ -62,20 +62,34 @@ export function overCapacity(score: ScoreState | null, path: string, raw: string
   }
 
   /* Curiosity: this week's cap in hours. A lane change counts too, so a
-     quest turned curiosity is checked like one put on fresh. */
+     quest turned curiosity is checked like one put on fresh.
+     This week's curiosity is what is already logged plus what the plate
+     still asks for: each curiosity item on the plate takes its hours a
+     week or what it has already had, whichever is more, and curiosity
+     logged on anything else adds on top. Logged hours start again on
+     Monday, so a plate refused late in a week can fit the next one. */
   const wasCur = prev?.active && prev.lane === 'curiosity' ? prev.weeklyHours ?? 0 : 0;
   const willCur = item.lane === 'curiosity' ? will : 0;
   if (willCur <= wasCur) return null;
+  const logged = (key: string) => (score.time?.byKey?.[key] ?? 0) / 60;
+  const curLogged = (score.time?.weekByLane?.curiosity ?? 0) / 60;
   const others = score.items.filter((i) => i.active && i.lane === 'curiosity' && (i.weeklyHours ?? 0) > 0 && i.key !== path);
-  const rest = others.reduce((n, i) => n + (i.weeklyHours ?? 0), 0);
+  /* This item's own time this week counts as curiosity only if it was
+     curiosity when logged. */
+  const ownLogged = !prev || prev.lane === 'curiosity' ? Math.min(curLogged, logged(path)) : 0;
+  const othersLogged = others.reduce((n, i) => n + logged(i.key), 0);
+  const offPlate = Math.max(0, curLogged - othersLogged - ownLogged);
+  const rest = others.reduce((n, i) => n + Math.max(i.weeklyHours ?? 0, logged(i.key)), 0) + offPlate;
   const cap = r1((score.curiosityCap * MINUTES_PER_POINT) / 60);
-  const load = r1(rest + willCur);
+  const load = r1(rest + Math.max(willCur, ownLogged));
   if (load <= cap) return null;
   const fit = offer(r1(cap - rest));
+  const why = curLogged > 0 ? ` (${hrs(r1(curLogged))} already logged, the rest still planned)` : '';
   return {
-    detail: `That would put ${hrs(load)} a week of curiosity on the plate, over this week's ${hrs(cap)} (the curiosity cap of ${score.curiosityCap} points). `
+    detail: `That would bring this week's curiosity to ${hrs(load)}${why}, over this week's ${hrs(cap)} (the curiosity cap of ${score.curiosityCap} points). `
       + (fit !== undefined ? `Give it ${hrs(fit)} a week or less, or take other curiosity off.`
-        : item.paced ? `Its date sets its ${hrs(will)} a week, so take other curiosity off first.` : 'Take other curiosity off first.'),
+        : item.paced ? `Its date sets its ${hrs(will)} a week, so take other curiosity off first.`
+        : curLogged > 0 ? 'Take other curiosity off, or put it on from Monday, when the logged hours start again.' : 'Take other curiosity off first.'),
     load,
     capacity: cap,
     adding: r1(willCur - wasCur),

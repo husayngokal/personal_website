@@ -15,7 +15,7 @@ import {
   LEVEL_SIZE, SCORE_EPOCH, type Lane, type Source,
 } from './rules';
 import { weekRules, type WeekRule } from './week-rule';
-import { extraLeftMinutes, extraMinutes, partsDone, planOf, practiceOf, repeatCount } from './block';
+import { extraLeftMinutes, extraMinutes, laneOn, partsDone, planOf, practiceOf, repeatCount } from './block';
 import { calibrate, varianceNotes, type Calibration, type VarianceNote } from './calibrate';
 import { plural, type Extracted, type ScoreEvent, type ScoreItem, type Surface, type Tally } from './items';
 import type { Session } from './time';
@@ -268,7 +268,10 @@ export function computeScore(extracted: Extracted, today: string = authorDay()):
   for (const x of weekSessions) if (x.key) byKey[x.key] = (byKey[x.key] ?? 0) + x.minutes;
   const weekMinutes = weekSessions.reduce((n, x) => n + x.minutes, 0);
   const weekByLane = { quest: 0, curiosity: 0, other: 0 };
-  for (const x of weekSessions) weekByLane[x.scores?.lane ?? (x.key ? byPath.get(x.key)?.lane : undefined) ?? 'other'] += x.minutes;
+  for (const x of weekSessions) {
+    const it = x.key ? byPath.get(x.key) : undefined;
+    weekByLane[x.scores?.lane ?? (it ? laneOn(it.lane, it.laneWas, x.date) : undefined) ?? 'other'] += x.minutes;
+  }
   /* All-time minutes per item on record-only sessions (time spent on the
      work the item's own buttons score): work timed before something is
      priced sets it up at half rate. */

@@ -94,7 +94,9 @@ export default async function ScoringPage() {
       <p>A textbook or reading takes the lane of whatever it belongs to. On its own, it is curiosity.</p>
       <p>
         The lane changes on an event, not a mood. An exam I mean to sit but have not booked is
-        curiosity; the day it is booked, paid for or needed by someone, it becomes a quest.
+        curiosity; the day it is booked, paid for or needed by someone, it becomes a quest. Work
+        logged before a change keeps the lane it was done in, so a change never rewrites a week
+        already under way.
       </p>
 
       <h2 className={styles.h2}>How things score</h2>
@@ -242,9 +244,11 @@ export default async function ScoringPage() {
         together they cannot pass {WEEKLY_HOURS}. Anything with a deadline works its figure out on its
         own: the hours its unfinished parts and what is left of its activity plans are worth, over the weeks left. Fall behind and the pace
         rises; get ahead and it drops. Anything without one carries the hours a week I choose to give it.
-        Curiosity has a second limit: what is on the plate cannot pass this week&rsquo;s curiosity cap
-        in hours{rule ? <> ({hours(rule.cap)} hours this week)</> : null}, since hours past it could not
-        fill the bar. Something refused for that can go on at the hours that still fit. What cannot be given hours yet goes in the
+        Curiosity has a second limit: this week&rsquo;s curiosity, the hours already logged plus what
+        the plate still asks for, cannot pass this week&rsquo;s curiosity cap in
+        hours{rule ? <> ({hours(rule.cap)} hours this week)</> : null}, since hours past it could not
+        fill the bar. Something refused for that can go on at the hours that still fit, or wait for
+        Monday, when the logged hours start again. What cannot be given hours yet goes in the
         backlog, which counts for nothing until it is brought onto the plate with a date or hours a week. Anything that would push the plate over is refused
         until something comes off: a swap, so the load stays level. A task with no figure of its own
         takes its estimate spread over its scope (all of it in a this-week task, a thirteenth in a
