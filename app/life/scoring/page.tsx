@@ -41,6 +41,7 @@ const fmt = (n: number) => (Number.isInteger(n) ? String(n) : String(Number(n.to
 
 export default async function ScoringPage() {
   const score = await getScoreState();
+  const plate = score?.load?.capacity ?? WEEKLY_HOURS;
   const cal = score?.calibration?.factors ? score.calibration : null;
   const notes = score?.variance ?? [];
   const tiers = Object.entries(READING_TIERS) as [Tier, (typeof READING_TIERS)[Tier]][];
@@ -225,7 +226,7 @@ export default async function ScoringPage() {
         <li><strong>Halfway.</strong> Each Monday the bar moves halfway from last week&apos;s bar to what last week counted, to the nearest {BAR.round}. Score 100 against 200 and next week&apos;s bar is 150; beat it and it rises the same way.</li>
         <li><strong>A floor.</strong> It never drops below what work with a date someone else fixed needs that week: every booked exam, and any task whose date was set for me, on the plate or not. That need is what each one had left at the start of the week, over the weeks to its date: unfinished parts, plus practice still to do, priced as they stood that Monday. A plan or re-measure made during a week counts from the next one.</li>
         <li><strong>A ceiling.</strong> It never goes above {WEEKLY_BAR} points, {WEEKLY_HOURS} hours.</li>
-        <li><strong>Curiosity gets the rest.</strong> What dated work needs (the floor) is the quests&apos; share of the week; curiosity can fill everything else, and nothing more. There is no fixed split: an exam week can leave curiosity an hour or none, and a week with nothing dated leaves it the whole bar. Before {longDay(RATIO_FROM)} curiosity had a flat {fmt(BAR.capShare * 100)}%. The plate does not follow the bar: it holds {WEEKLY_HOURS} hours whatever the bar is, because the bar says when a week is full, not how much there is to do.</li>
+        <li><strong>Curiosity gets the rest.</strong> What dated work needs (the floor) is the quests&apos; share of the week; curiosity can fill everything else, and nothing more. There is no fixed split: an exam week can leave curiosity an hour or none, and a week with nothing dated leaves it the whole bar. Before {longDay(RATIO_FROM)} curiosity had a flat {fmt(BAR.capShare * 100)}%. The plate does not follow the bar: it holds {plate} hours whatever the bar is, because the bar says when a week is full, not how much there is to do.</li>
         <li><strong>Nothing by hand.</strong> It is worked out from the record every time the score is, and changing what is on the plate midweek changes none of it.</li>
       </ul>
       {rule && (
@@ -240,7 +241,10 @@ export default async function ScoringPage() {
       <h2 className={styles.h2}>Load</h2>
       <p>
         Only what is active counts. Every active thing says how many hours a week it takes, and
-        together they cannot pass {WEEKLY_HOURS}. Anything with a deadline works its figure out on its
+        together they cannot pass {plate}: how many hours a week I can realistically take on. That
+        figure is mine, set and reviewed by hand whenever I see fit, and in force as soon as it changes;
+        it limits what goes on the plate and changes no points. It was {WEEKLY_HOURS} until
+        10 November, when the timer showed about 22 to 26 hours in a real week. Anything with a deadline works its figure out on its
         own: the hours its unfinished parts and what is left of its activity plans are worth, over the weeks left. Fall behind and the pace
         rises; get ahead and it drops. Anything without one carries the hours a week I choose to give it.
         Curiosity has a second limit: this week&rsquo;s curiosity, the hours already logged plus what

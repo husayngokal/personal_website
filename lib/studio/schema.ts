@@ -96,6 +96,20 @@ export const CONTENT_TYPES: ContentType[] = [
     body: { mode: 'none' },
   },
 
+  /* One file, now/plate.md: how many hours a week I can realistically
+     take on. Read by the score (lib/score/items.ts PLATE_FILE), not by the
+     sync, which skips the file. In force as soon as it is saved. */
+  {
+    key: 'now-plate', label: 'Plate size', group: 'Now',
+    folder: 'now', route: '', titleField: 'hours',
+    singleton: 'plate.md', viewUrl: '/studio/quick',
+    blurb: 'hours a week I can realistically take on',
+    fields: [
+      { name: 'hours', label: 'Hours a week', type: 'number', required: true, help: 'What the plate can hold. Nothing new goes on past it; it changes no points.' },
+    ],
+    body: { mode: 'none' },
+  },
+
   /* ---- Notebook ---- */
   /* One content type. Notes and threads were removed in August 2026;
      `draft` is the only axis left, and it defaults to true so a new

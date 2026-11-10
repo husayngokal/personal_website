@@ -89,6 +89,23 @@ export interface Extracted {
   items: ScoreItem[];
   tallies: { tasks: Tally; atlas: Tally; list: Tally };
   sessions: Session[];
+  /** Hours a week the plate can hold, as set by hand in now/plate.md;
+   *  null when the file is missing or unreadable (rules.ts WEEKLY_HOURS). */
+  plateHours: number | null;
+}
+
+/** now/plate.md: how many hours a week I can realistically take on. Set
+ *  and reviewed by hand, never worked out. In force as soon as it is
+ *  saved; it limits what goes on the plate and changes no points. */
+export const PLATE_FILE = 'now/plate.md';
+
+function plateHoursOf(content: string): number | null {
+  try {
+    const h = Number(matter(content).data.hours);
+    return Number.isFinite(h) && h >= 1 && h <= 100 ? Math.round(h * 10) / 10 : null;
+  } catch {
+    return null;
+  }
 }
 
 export interface VaultSource { path: string; content: string }
@@ -416,8 +433,13 @@ export function extractAll(files: VaultSource[], today: string = authorDay()): E
   };
   const items: ScoreItem[] = [];
   const sessions: Session[] = [];
+  let plateHours: number | null = null;
   for (const f of files) {
     if (!f.path.endsWith('.md')) continue;
+    if (f.path === PLATE_FILE) {
+      plateHours = plateHoursOf(f.content);
+      continue;
+    }
     if (f.path.startsWith('time/')) {
       sessions.push(...parseSessions(f.content));
       continue;
@@ -452,5 +474,5 @@ export function extractAll(files: VaultSource[], today: string = authorDay()): E
       tallies.tasks.total++;
     } catch { /* reported by the sync */ }
   }
-  return { items, tallies, sessions };
+  return { items, tallies, sessions, plateHours };
 }

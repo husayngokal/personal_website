@@ -43,7 +43,7 @@ export function overCapacity(score: ScoreState | null, path: string, raw: string
      sets its pace (a tap cannot change those hours). */
   const offer = (n: number) => (!item.paced && n > 0 && n > was ? n : undefined);
   if (will > was) {
-    /* The plate's limit, the same every week (rules.ts WEEKLY_HOURS). */
+    /* The plate's limit, set by hand in now/plate.md (rules.ts WEEKLY_HOURS without it). */
     const limit = score.load.capacity;
     const load = r1(score.load.hours - was + will);
     if (load > limit) {

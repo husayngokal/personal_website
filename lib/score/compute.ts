@@ -234,6 +234,11 @@ export function computeScore(extracted: Extracted, today: string = authorDay()):
     return l.quest + Math.min(l.curiosity, cap);
   });
   const ruleOf = new Map(rules.map((r) => [r.start, r]));
+  /* The plate's limit is set by hand (now/plate.md) and in force at once,
+     this week and next; past weeks keep the figure they were shown with. */
+  if (extracted.plateHours) {
+    for (const w of [thisWeek, addDays(thisWeek, 7)]) ruleOf.set(w, { ...ruleOf.get(w)!, limitHours: extracted.plateHours });
+  }
   const rule = ruleOf.get(thisWeek)!;
   const next = ruleOf.get(addDays(thisWeek, 7))!;
 
