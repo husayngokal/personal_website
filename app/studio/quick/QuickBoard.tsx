@@ -457,7 +457,9 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
                   i.total * MINUTES_PER_POINT + (i.extra ?? 0) > 0
                     ? `${hoursLabel(score?.time?.totalByKey?.[i.key] ?? 0)} logged of ${hoursLabel(i.total * MINUTES_PER_POINT + (i.extra ?? 0))} in all`
                     : score?.time?.totalByKey?.[i.key] ? `${hoursLabel(score.time.totalByKey[i.key])} logged` : null,
-                  i.practice ? `practice ${i.practice.done} of ${i.practice.hours} h done` : null,
+                  i.practice ? `practice ${i.practice.done} of ${i.practice.hours} h done${
+                    !i.practice.byHand ? ' (from the parts)'
+                    : i.practice.rule && i.practice.rule !== i.practice.hours ? ` (set by hand; the parts say ${i.practice.rule})` : ''}` : null,
                   i.weeklyHours
                     ? i.paced && i.deadline ? `needs ${i.weeklyHours} h a week to be ready by ${shortDay(i.deadline)}` : `${i.weeklyHours} h a week`
                     : null,
@@ -1502,6 +1504,11 @@ function PracticeHours({ item, busy, send }: {
         <input type="number" min={0} step="any" inputMode="decimal" placeholder="practice hours in all" value={h} onChange={(e) => setH(e.target.value)} />
       </label>
       <Btn busy={busy === key} disabled={!!busy || (Number(h) || 0) === current} onClick={() => undefined} submit>Set practice hours</Btn>
+      {item.practice?.rule != null && (
+        <p className={styles.setupHead}>
+          The parts say {item.practice.rule} hours. A figure of your own overrides that from next Monday; 0 goes back to the parts.
+        </p>
+      )}
     </form>
   );
 }

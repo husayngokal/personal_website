@@ -12,10 +12,10 @@
 
 import { authorDay, weekStart } from '../content/streak';
 import {
-  LEVEL_SIZE, SCORE_EPOCH, type Lane, type Source,
+  LEVEL_SIZE, PRACTICE_FROM, SCORE_EPOCH, type Lane, type Source,
 } from './rules';
 import { weekRules, type WeekRule } from './week-rule';
-import { extraLeftMinutes, extraMinutes, laneOn, partsDone, planOf, practiceOf, repeatCount } from './block';
+import { extraLeftMinutes, extraMinutes, laneOn, partsDone, planOf, practiceIn, repeatCount } from './block';
 import { calibrate, varianceNotes, type Calibration, type VarianceNote } from './calibrate';
 import { plural, type Extracted, type ScoreEvent, type ScoreItem, type Surface, type Tally } from './items';
 import type { Session } from './time';
@@ -66,7 +66,7 @@ export interface ItemView {
    *  activity plan at its rate. */
   extra: number;
   /** Practice hours planned, and how many the logged activities cover. */
-  practice: { hours: number; done: number } | null;
+  practice: { hours: number; done: number; byHand: boolean; rule: number | null } | null;
   pct: number;                  // 0-100
   summary: string;              // "16 of 120 chapters"
   weekPoints: number;
@@ -147,7 +147,8 @@ function totalsFor(rule: WeekRule, events: ScoreEvent[]): WeekTotals {
   };
 }
 
-function itemView(item: ScoreItem, weekPoints: number, weekMinutes = 0): ItemView {
+function itemView(item: ScoreItem, weekPoints: number, weekMinutes: number, today: string): ItemView {
+  const pr = practiceIn(item, undefined, today);
   let earned = 0, total = 0;
   const seen = new Set<string>();
   const parts: ItemGroupView[] = item.parts.map((g, index) => {
@@ -179,9 +180,12 @@ function itemView(item: ScoreItem, weekPoints: number, weekMinutes = 0): ItemVie
     parked: item.parked, weekMinutes,
     hasBlock: item.hasBlock, needsSetup: item.needsSetup,
     earned, total, pct: total ? Math.round((earned / total) * 100) : 0, summary,
-    extra: Math.round(extraMinutes(item)),
-    practice: practiceOf(item) > 0
-      ? { hours: practiceOf(item), done: Math.round(((practiceOf(item) * 60 - extraLeftMinutes(item)) / 60) * 10) / 10 }
+    extra: Math.round(extraMinutes(item, today)),
+    practice: pr.hours > 0
+      ? {
+          hours: pr.hours, byHand: pr.byHand, rule: item.practiceRule && today >= PRACTICE_FROM ? item.practiceRule : null,
+          done: Math.round(((pr.hours * 60 - extraLeftMinutes(item, undefined, today)) / 60) * 10) / 10,
+        }
       : null,
     weekPoints, weeklyHours: item.weeklyHours, paced: item.paced, deadline: item.deadline, fixedDate: item.fixedDate && !item.unbooked, outcome: item.outcome,
     remeasure: item.remeasure,
@@ -283,7 +287,7 @@ export function computeScore(extracted: Extracted, today: string = authorDay()):
 
   const views = items
     .filter((i) => i.active || i.parked || weekByItem.has(i.key))
-    .map((i) => itemView(i, weekByItem.get(i.key) ?? 0, byKey[i.key] ?? 0))
+    .map((i) => itemView(i, weekByItem.get(i.key) ?? 0, byKey[i.key] ?? 0, today))
     .sort((a, b) =>
       Number(b.active) - Number(a.active) ||
       (a.lane === b.lane ? 0 : a.lane === 'quest' ? -1 : 1) ||

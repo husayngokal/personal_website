@@ -49,6 +49,17 @@ export const BOOKED_FROM = '2026-11-09';
  *  the week it was decided in, as a one-time exception. */
 export const RATIO_FROM = '2026-11-02';
 
+/** From this Monday, an exam's practice hours are worked out, not
+ *  guessed: the hours its parts are priced at, times PRACTICE_RATIO.
+ *  Part prices learn from timed sessions every month (calibrate.ts), so
+ *  practice follows them, and nothing about how much practice was done
+ *  feeds back into it (that would pay for skipping it). A figure set by
+ *  hand on or after this day still overrides the rule, from the Monday
+ *  after; figures set before it were guesses made without the rule, and
+ *  retire. Earlier weeks keep the figures they had. */
+export const PRACTICE_FROM = '2026-11-16';
+export const PRACTICE_RATIO = 1;
+
 /* -- The weekly bar ---------------------------------------------------
  * From BAR.from, each week's bar is set at the start of the week and
  * holds until Sunday, whatever comes on or off the plate:

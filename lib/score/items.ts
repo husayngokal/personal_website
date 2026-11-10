@@ -18,7 +18,7 @@ import matter from 'gray-matter';
 import { parseFile } from '../vault/parse';
 import { listDoneItems } from '../vault/done-items';
 import {
-  DEFAULT_LANE, MINUTES_PER_POINT, RECURRING_GUT_HOURS, SCOPE_WEEKS, SCORE_EPOCH, TASK_GUT_HOURS, atlasPoints, countGain, estimate,
+  DEFAULT_LANE, MINUTES_PER_POINT, PRACTICE_RATIO, RECURRING_GUT_HOURS, SCOPE_WEEKS, SCORE_EPOCH, TASK_GUT_HOURS, atlasPoints, countGain, estimate,
   type Lane, type TemplateId,
 } from './rules';
 import { doneOrder, extraLeftMinutes, laneOn, parseDone, readBlock, remeasureDue, type PartGroup, type RepeatGroup, type ScoreBlock } from './block';
@@ -76,6 +76,10 @@ export interface ScoreItem {
   remeasured: { on: string; before: number; after: number } | null;
   /** Practice hours planned in all, dated (block.ts). */
   practice: string[];
+  /** Practice hours by rule, for an exam with parts: the hours its parts
+   *  are priced at, times PRACTICE_RATIO (rules.ts PRACTICE_FROM). 0 when
+   *  the rule does not apply. */
+  practiceRule: number;
   events: ScoreEvent[];
 }
 
@@ -212,6 +216,7 @@ function fromFile(src: VaultSource, today: string = authorDay()): ScoreItem | nu
     deadline: null,
     fixedDate: false,
     unbooked: false,
+    practiceRule: 0,
     remeasure: remeasureDue(block),
     remeasured: block?.remeasured?.counted && block.remeasured.before !== undefined && block.remeasured.after !== undefined
       ? { on: block.remeasured.on, before: block.remeasured.before, after: block.remeasured.after }
@@ -272,6 +277,10 @@ function fromFile(src: VaultSource, today: string = authorDay()): ScoreItem | nu
       base.active = pending && (!!base.deadline || !!block);
       if (base.active && !block) base.needsSetup = 'exam-prep';
       if (base.outcome) base.outcome.achieved = !pending ? day(row.earned) : null;
+      if (base.deadline && base.parts.length) {
+        const hours = (base.parts.reduce((n, g) => n + g.points, 0) * MINUTES_PER_POINT) / 60;
+        base.practiceRule = Math.round(hours * PRACTICE_RATIO * 10) / 10;
+      }
       break;
     }
     case 'projects':
@@ -303,7 +312,7 @@ function fromFile(src: VaultSource, today: string = authorDay()): ScoreItem | nu
      moves on its own as work gets done (or does not). Activities (flashcards,
      papers) have no finish line of their own; practice hours, or plans on
      them, count what is still to do, in real time at their rates. */
-  const extra = extraLeftMinutes(base);
+  const extra = extraLeftMinutes(base, undefined, today);
   if (base.deadline && (base.parts.length || extra > 0)) {
     const left = base.parts.reduce((n, g) => n + g.points - Math.round((g.points * Math.min(g.count, g.prior + g.done.reduce((q, e) => q + (parseDone(e)?.qty ?? 0), 0))) / g.count), 0)
       + extra / MINUTES_PER_POINT;
@@ -363,7 +372,7 @@ function atlasItem(src: VaultSource, tallies: Extracted['tallies']): ScoreItem |
     key: src.path, table: 'living_entries', surface: 'atlas', slug: 'field-atlas',
     title: 'The Field Atlas', href: '/field-atlas', lane: DEFAULT_LANE.atlas, laneWas: [],
     active: false, parked: false, private: false, hasBlock: false, needsSetup: null,
-    parts: [], repeat: [], outcome: null, weeklyHours: null, paced: false, deadline: null, fixedDate: false, unbooked: false, remeasure: false, remeasured: null, practice: [], events,
+    parts: [], repeat: [], outcome: null, weeklyHours: null, paced: false, deadline: null, fixedDate: false, unbooked: false, remeasure: false, remeasured: null, practice: [], practiceRule: 0, events,
   };
 }
 

@@ -33,7 +33,7 @@
  */
 
 import {
-  estimate, factorLabel, fitsCap, isSource, minParts, partFloor, unitCap, ACTIVITIES, DEFAULT_LANE, MINUTES_PER_POINT, READING_TIERS, RETRIEVAL_FACTOR, STARTING_FACTORS,
+  estimate, factorLabel, fitsCap, isSource, minParts, partFloor, unitCap, ACTIVITIES, DEFAULT_LANE, MINUTES_PER_POINT, PRACTICE_FROM, READING_TIERS, RETRIEVAL_FACTOR, STARTING_FACTORS,
   type ActivityKind,
   type Content, type Factors, type Lane, type Source, type Tier, type TemplateId,
 } from './rules';
@@ -414,17 +414,29 @@ function latest(list: string[] | undefined, before?: string): number {
   return n;
 }
 
-/** Practice hours planned in all, as of now or of the Monday `before`. */
-export function practiceOf(b: { practice?: string[] }, before?: string): number {
-  return latest(b.practice, before);
+type PracticeSource = { practice?: string[]; practiceRule?: number };
+
+/** Practice hours planned in all, as of the Monday `before`, or now
+ *  (`today`): a figure set by hand, or the rule's figure from the parts
+ *  (rules.ts PRACTICE_FROM). `byHand` says which. */
+export function practiceIn(b: PracticeSource, before?: string, today?: string): { hours: number; byHand: boolean } {
+  const at = before ?? today;
+  const ruled = !!b.practiceRule && !!at && at >= PRACTICE_FROM;
+  const hand = latest(ruled ? (b.practice ?? []).filter((e) => e.slice(0, 10) >= PRACTICE_FROM) : b.practice, before);
+  if (hand > 0) return { hours: hand, byHand: true };
+  return { hours: ruled ? b.practiceRule! : 0, byHand: false };
+}
+
+export function practiceOf(b: PracticeSource, before?: string, today?: string): number {
+  return practiceIn(b, before, today).hours;
 }
 
 /** Minutes of work still to do outside the parts: what is left of the
  *  practice hours (less the activities logged, at their rates), or with
  *  none set, what is left of each activity plan. As of now or of the
  *  Monday `before`. */
-export function extraLeftMinutes(b: { practice?: string[]; repeat: RepeatGroup[] }, before?: string): number {
-  const h = practiceOf(b, before);
+export function extraLeftMinutes(b: PracticeSource & { repeat: RepeatGroup[] }, before?: string, today?: string): number {
+  const h = practiceOf(b, before, today);
   if (h > 0) {
     const done = b.repeat.reduce((n, g) => n + repeatCount(g, before) * unitMinutes(g), 0);
     return Math.max(0, h * 60 - done);
@@ -434,8 +446,8 @@ export function extraLeftMinutes(b: { practice?: string[]; repeat: RepeatGroup[]
 
 /** Minutes of work planned outside the parts, in all: the practice hours,
  *  or with none set, every activity plan at its rate. */
-export function extraMinutes(b: { practice?: string[]; repeat: RepeatGroup[] }): number {
-  const h = practiceOf(b);
+export function extraMinutes(b: PracticeSource & { repeat: RepeatGroup[] }, today?: string): number {
+  const h = practiceOf(b, undefined, today);
   return h > 0 ? h * 60 : b.repeat.reduce((n, g) => n + planOf(g) * unitMinutes(g), 0);
 }
 

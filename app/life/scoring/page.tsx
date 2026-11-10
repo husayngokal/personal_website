@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Eyebrow } from '@/components/Primitives';
 import {
   ATLAS, FORMULA_FACTOR, GUT_FACTOR, LEVEL_SIZE, MINUTES_PER_POINT,
-  READING_TIERS, RATIO_FROM, RECURRING_GUT_HOURS, SCORE_EPOCH, TASK_GUT_HOURS, WEEKLY_BAR, WEEKLY_HOURS,
+  PRACTICE_FROM, PRACTICE_RATIO, READING_TIERS, RATIO_FROM, RECURRING_GUT_HOURS, SCORE_EPOCH, TASK_GUT_HOURS, WEEKLY_BAR, WEEKLY_HOURS,
   WORDS_PER_HOUR, estimate, pagesPerPoint, type Tier,
   ACTIVITIES, CALIBRATION, RETRIEVAL_FACTOR, SOURCES, STARTING_FACTORS, TIMED_FACTOR, TIMED_SESSION_CAP_MIN, TIMED_UNCAPPED_FROM, UNIT_CAP, BAR, VARIANCE,
   activityRate, factorLabel, type ActivityKind, type Learning,
@@ -261,7 +261,12 @@ export default async function ScoringPage() {
         <strong> Retrieval practice earns {RETRIEVAL_FACTOR}&times;</strong>: recalling from memory is what
         turns understanding into marks, and it is the work least likely to happen on its own. Making
         flashcards never scores; they are made by AI. Something with a date can carry practice hours:
-        how long all its activities together should take. What the logged activities have not covered,
+        how long all its activities together should take. From {shortDay(PRACTICE_FROM)}, an exam&rsquo;s
+        practice hours are worked out, not guessed: the hours its parts are priced at
+        {PRACTICE_RATIO === 1 ? ', one to one' : `, times ${PRACTICE_RATIO}`}. Part prices learn from timed
+        sessions every month, so practice follows them; how much practice I actually do never feeds back,
+        or skipping it would pay. A figure of my own still overrides the rule, from the Monday after.
+        What the logged activities have not covered,
         at their own rates, counts toward its hours a week and, for a fixed date, the floor (at four
         points an hour, so the floor errs low). Without practice hours, each activity can carry a plan
         instead: how many I mean to do. Neither ever pays; only logged units do.
