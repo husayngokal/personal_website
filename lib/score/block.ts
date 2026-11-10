@@ -143,7 +143,9 @@ function str(v: unknown): string | undefined {
   return typeof v === 'string' && v.trim() ? v.trim() : undefined;
 }
 
-const PLAN = /^(\d{4}-\d{2}-\d{2}) (\d+(?:\.\d+)?)$/;
+/* "2026-11-10 13" counts from the Monday after that day. A logged
+   one-time exception adds "from <Monday>" to count from that week. */
+const PLAN = /^(\d{4}-\d{2}-\d{2}) (\d+(?:\.\d+)?)(?: from (\d{4}-\d{2}-\d{2}))?$/;
 const LANE_WAS = /^(\d{4}-\d{2}-\d{2}) (quest|curiosity)$/;
 
 function laneWasList(v: unknown): string[] {
@@ -400,12 +402,13 @@ export function unitMinutes(g: RepeatGroup): number {
 }
 
 /** The latest of a list of dated figures ("2026-11-04 25"), or the latest
- *  dated before `before`. 0 when there is none. */
+ *  in force for the week starting `before`: dated before it, or marked to
+ *  count from that week or earlier. 0 when there is none. */
 function latest(list: string[] | undefined, before?: string): number {
   let at = '', n = 0;
   for (const e of list ?? []) {
     const m = e.match(PLAN);
-    if (!m || (before && m[1] >= before) || m[1] < at) continue;
+    if (!m || (before && (m[3] ? m[3] > before : m[1] >= before)) || m[1] < at) continue;
     at = m[1]; n = Number(m[2]);
   }
   return n;
