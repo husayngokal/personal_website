@@ -12,7 +12,7 @@
  * this week's is lower. Pure apart from reading the item through the parser.
  */
 
-import { itemFromFile } from './items';
+import { ATLAS_FILE, itemFromFile } from './items';
 import { MINUTES_PER_POINT } from './rules';
 import type { ScoreState } from './compute';
 
@@ -72,7 +72,9 @@ export function overCapacity(score: ScoreState | null, path: string, raw: string
   const willCur = item.lane === 'curiosity' ? will : 0;
   if (willCur <= wasCur) return null;
   const logged = (key: string) => (score.time?.byKey?.[key] ?? 0) / 60;
-  const curLogged = (score.time?.weekByLane?.curiosity ?? 0) / 60;
+  /* Outing hours show as curiosity time, but outings score as quests and
+     take none of curiosity's room (rules.ts, OUTINGS_FROM). */
+  const curLogged = Math.max(0, (score.time?.weekByLane?.curiosity ?? 0) - (score.time?.byKey?.[ATLAS_FILE] ?? 0)) / 60;
   const others = score.items.filter((i) => i.active && i.lane === 'curiosity' && (i.weeklyHours ?? 0) > 0 && i.key !== path);
   /* This item's own time this week counts as curiosity only if it was
      curiosity when logged. */

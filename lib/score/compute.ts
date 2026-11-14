@@ -279,7 +279,9 @@ export function computeScore(extracted: Extracted, today: string = authorDay()):
   const weekByLane = { quest: 0, curiosity: 0, other: 0 };
   for (const x of weekSessions) {
     const it = x.key ? byPath.get(x.key) : undefined;
-    weekByLane[x.scores?.lane ?? (it ? laneOn(it.lane, it.laneWas, x.date) : undefined) ?? 'other'] += x.minutes;
+    /* Outings score as quests, but the time is curiosity time. */
+    const lane = it?.surface === 'atlas' ? 'curiosity' : it ? laneOn(it.lane, it.laneWas, x.date) : undefined;
+    weekByLane[x.scores?.lane ?? lane ?? 'other'] += x.minutes;
   }
   /* All-time minutes per item on record-only sessions (time spent on the
      work the item's own buttons score): work timed before something is

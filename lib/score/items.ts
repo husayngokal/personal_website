@@ -360,6 +360,8 @@ function fromFile(src: VaultSource, today: string = authorDay()): ScoreItem | nu
   return { ...base, events };
 }
 
+export const ATLAS_FILE = 'living/field-atlas.md';
+
 /** Outings were curiosity until OUTINGS_FROM (rules.ts). */
 const ATLAS_LANE_WAS = [`${OUTINGS_FROM} curiosity`];
 
@@ -447,7 +449,7 @@ export function extractAll(files: VaultSource[], today: string = authorDay()): E
       sessions.push(...parseSessions(f.content));
       continue;
     }
-    if (f.path === 'living/field-atlas.md') {
+    if (f.path === ATLAS_FILE) {
       const a = atlasItem(f, tallies);
       if (a) items.push(a);
       continue;

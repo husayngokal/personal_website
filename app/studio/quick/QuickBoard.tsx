@@ -349,7 +349,8 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
               totalByKey: key && !scored ? { ...snap.time.totalByKey, [key]: (snap.time.totalByKey[key] ?? 0) + minutes } : snap.time.totalByKey,
               ...(snap.time.weekByLane ? { weekByLane: (() => {
                 const l = { ...snap.time.weekByLane };
-                l[scored?.lane ?? snap.items.find((it) => it.key === key)?.lane ?? 'other'] += minutes;
+                const it = snap.items.find((x) => x.key === key);
+                l[scored?.lane ?? (it?.surface === 'atlas' ? 'curiosity' : it?.lane) ?? 'other'] += minutes;
                 return l;
               })() } : {}),
             } : snap.time,
