@@ -18,7 +18,7 @@ import matter from 'gray-matter';
 import { parseFile } from '../vault/parse';
 import { listDoneItems } from '../vault/done-items';
 import {
-  DEFAULT_LANE, MINUTES_PER_POINT, PRACTICE_RATIO, RECURRING_GUT_HOURS, SCOPE_WEEKS, SCORE_EPOCH, TASK_GUT_HOURS, atlasPoints, countGain, estimate,
+  DEFAULT_LANE, MINUTES_PER_POINT, OUTINGS_FROM, PRACTICE_RATIO, RECURRING_GUT_HOURS, SCOPE_WEEKS, SCORE_EPOCH, TASK_GUT_HOURS, atlasPoints, countGain, estimate,
   type Lane, type TemplateId,
 } from './rules';
 import { doneOrder, extraLeftMinutes, laneOn, parseDone, readBlock, remeasureDue, type PartGroup, type RepeatGroup, type ScoreBlock } from './block';
@@ -360,6 +360,9 @@ function fromFile(src: VaultSource, today: string = authorDay()): ScoreItem | nu
   return { ...base, events };
 }
 
+/** Outings were curiosity until OUTINGS_FROM (rules.ts). */
+const ATLAS_LANE_WAS = [`${OUTINGS_FROM} curiosity`];
+
 function atlasItem(src: VaultSource, tallies: Extracted['tallies']): ScoreItem | null {
   let body: string;
   try {
@@ -379,7 +382,7 @@ function atlasItem(src: VaultSource, tallies: Extracted['tallies']): ScoreItem |
       events.push({
         date: i.date,
         points: i.points ?? atlasPoints(i.text, g.heading),
-        lane: DEFAULT_LANE.atlas, kind: 'part', key: src.path, surface: 'atlas',
+        lane: laneOn(DEFAULT_LANE.atlas, ATLAS_LANE_WAS, i.date), kind: 'part', key: src.path, surface: 'atlas',
         label: `Field Atlas · ${i.text.split(' · ')[0]}`,
       });
     }
@@ -387,7 +390,7 @@ function atlasItem(src: VaultSource, tallies: Extracted['tallies']): ScoreItem |
   tallies.atlas = { done, total };
   return {
     key: src.path, table: 'living_entries', surface: 'atlas', slug: 'field-atlas',
-    title: 'The Field Atlas', href: '/field-atlas', lane: DEFAULT_LANE.atlas, laneWas: [],
+    title: 'The Field Atlas', href: '/field-atlas', lane: DEFAULT_LANE.atlas, laneWas: ATLAS_LANE_WAS,
     active: false, parked: false, private: false, hasBlock: false, needsSetup: null,
     parts: [], repeat: [], outcome: null, weeklyHours: null, paced: false, deadline: null, fixedDate: false, unbooked: false, remeasure: false, remeasured: null, practice: [], practiceRule: 0, events,
   };

@@ -142,7 +142,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
   /* What a tap is worth, worked out here from the same frozen numbers
      the server uses, so the effects can fire the instant the button goes
      down instead of after the commit. Null when it cannot be known. */
-  function predict(req: QuickRequest): { gained: number; lane: 'quest' | 'curiosity'; outing?: boolean; itemKey?: string; group?: number; qty?: number; repeatGroup?: number } | null {
+  function predict(req: QuickRequest): { gained: number; lane: 'quest' | 'curiosity'; itemKey?: string; group?: number; qty?: number; repeatGroup?: number } | null {
     if (!score) return null;
     if (req.target === 'score') {
       const it = score.items.find((i) => i.table === req.table && i.slug === req.slug);
@@ -176,7 +176,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
     if (req.target === 'atlas' && req.action === 'done') {
       for (const g of groups) {
         const i = g.items.find((x) => x.line === req.line);
-        if (i) return { gained: atlasPoints(i.text, g.heading), lane: 'curiosity', outing: true };
+        if (i) return { gained: atlasPoints(i.text, g.heading), lane: 'quest' };
       }
     }
     return null;
@@ -186,14 +186,10 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
     const w = { ...sl.week };
     if (p.lane === 'quest') w.quest += sign * p.gained;
     else w.curiosity += sign * p.gained;
-    if (p.outing) w.outings = (w.outings ?? 0) + sign * p.gained;
-    /* Outings count in full, outside the cap; a week with outings is full
-       only once quests meet the floor (the bar less the cap). */
-    const outings = w.outings ?? 0;
-    w.curiosityCounted = Math.min(w.curiosity - outings, capOf(sl)) + outings;
+    w.curiosityCounted = Math.min(w.curiosity, capOf(sl));
     w.bar = w.quest + w.curiosityCounted;
-    w.full = w.bar >= barOf(sl) && (w.bar - outings >= barOf(sl) || w.quest >= barOf(sl) - capOf(sl));
-    w.extra = w.full ? Math.max(0, w.bar - barOf(sl)) : 0;
+    w.full = w.bar >= barOf(sl);
+    w.extra = Math.max(0, w.bar - barOf(sl));
     const points = sl.lifetime.points + sign * p.gained;
     const items = p.itemKey === undefined ? sl.items : sl.items.map((i) => i.key !== p.itemKey ? i : {
       ...i,

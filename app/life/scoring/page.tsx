@@ -85,16 +85,15 @@ export default async function ScoringPage() {
       <ul className={styles.list}>
         <li><strong>Quest.</strong> Yes. A booked exam, a deadline, work, anything someone else depends on. Quests are uncapped.</li>
         <li>
-          <strong>Curiosity.</strong> No, and it does not have to. Reading, courses taken for interest,
-          the Field Atlas, The List, and anything I write about them. Curiosity fills whatever the
-          week has left after dated commitments: the bar less the floor{rule ? <> ({rule.cap} points this week, {hours(rule.cap)} hours)</> : null}.
-          Past that it still counts toward the lifetime total, never the week.
+          <strong>Field Atlas outings.</strong> The one exception: a quest by rule, though nobody holds me
+          to it. A day out counts in full, fills the bar and raises next week&rsquo;s like any quest, and is
+          never crowded out by study.
         </li>
         <li>
-          <strong>Field Atlas outings.</strong> Curiosity, but they count toward the week in full,
-          outside that room, so a day out always moves the week, however much study has filled it.
-          They cannot stand in for dated work: a week with outings is full only once quests meet the
-          floor. They are left out when next week&rsquo;s bar is set, so one long day does not raise it.
+          <strong>Curiosity.</strong> No, and it does not have to. Reading, courses taken for interest,
+          The List, and anything I write about them. Curiosity fills whatever the
+          week has left after dated commitments: the bar less the floor{rule ? <> ({rule.cap} points this week, {hours(rule.cap)} hours)</> : null}.
+          Past that it still counts toward the lifetime total, never the week.
         </li>
       </ul>
       <p>A textbook or reading takes the lane of whatever it belongs to. On its own, it is curiosity.</p>

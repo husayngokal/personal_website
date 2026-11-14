@@ -5,15 +5,14 @@
  * lib/content/streak.ts). A week's score is its quest points plus its
  * curiosity points up to that week's cap; its bar, cap and plate limit
  * come from week-rule.ts. Outcomes never fill a week; they go to the
- * lifetime total and the level. From OUTINGS_FROM, Field Atlas outings
- * count in full, outside the curiosity cap.
+ * lifetime total and the level.
  *
  * Pure module, no I/O.
  */
 
 import { authorDay, weekStart } from '../content/streak';
 import {
-  LEVEL_SIZE, OUTINGS_FROM, PRACTICE_FROM, SCORE_EPOCH, type Lane, type Source,
+  LEVEL_SIZE, PRACTICE_FROM, SCORE_EPOCH, type Lane, type Source,
 } from './rules';
 import { weekRules, type WeekRule } from './week-rule';
 import { extraLeftMinutes, extraMinutes, laneOn, partsDone, planOf, practiceIn, repeatCount } from './block';
@@ -26,9 +25,6 @@ export interface WeekTotals {
   quest: number;
   curiosity: number;            // all curiosity earned
   curiosityCounted: number;     // the part that fills the bar
-  /** Field Atlas outings, counted in full outside the cap (OUTINGS_FROM);
-   *  part of curiosity and curiosityCounted. */
-  outings?: number;
   bar: number;                  // the week's score toward its bar
   /** The week's own bar and curiosity cap (week-rule.ts). Absent on a
    *  score stored before the bar moved week to week: then 200 and 80. */
@@ -131,29 +127,23 @@ function addDays(isoDay: string, n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** A week's points by lane. `curiosity` is what shares the cap; from
- *  OUTINGS_FROM, Field Atlas outings are kept apart in `outings`. */
-function lanesFor(events: ScoreEvent[], start: string): { quest: number; curiosity: number; outings: number } {
-  let quest = 0, curiosity = 0, outings = 0;
+function lanesFor(events: ScoreEvent[]): { quest: number; curiosity: number } {
+  let quest = 0, curiosity = 0;
   for (const e of events) {
     if (e.kind === 'outcome') continue;
     if (e.lane === 'quest') quest += e.points;
-    else if (e.surface === 'atlas' && start >= OUTINGS_FROM) outings += e.points;
     else curiosity += e.points;
   }
-  return { quest, curiosity, outings };
+  return { quest, curiosity };
 }
 
 function totalsFor(rule: WeekRule, events: ScoreEvent[]): WeekTotals {
-  const { quest, curiosity, outings } = lanesFor(events, rule.start);
-  const curiosityCounted = Math.min(curiosity, rule.cap) + outings;
+  const { quest, curiosity } = lanesFor(events);
+  const curiosityCounted = Math.min(curiosity, rule.cap);
   const bar = quest + curiosityCounted;
-  /* Outings can lift the week past its bar, but a week is full only once
-     quests meet the floor too: a day out never stands in for dated work. */
-  const full = bar >= rule.bar && (bar - outings >= rule.bar || quest >= rule.floor);
   return {
-    start: rule.start, quest, curiosity: curiosity + outings, curiosityCounted, outings, bar, max: rule.bar, cap: rule.cap,
-    full, extra: full ? Math.max(0, bar - rule.bar) : 0,
+    start: rule.start, quest, curiosity, curiosityCounted, bar, max: rule.bar, cap: rule.cap,
+    full: bar >= rule.bar, extra: Math.max(0, bar - rule.bar),
   };
 }
 
@@ -240,8 +230,7 @@ export function computeScore(extracted: Extracted, today: string = authorDay()):
   const firstShown = addDays(thisWeek, -7 * 11);
   const epochWeek = weekStart(SCORE_EPOCH);
   const rules = weekRules(items, firstShown < epochWeek ? firstShown : epochWeek, addDays(thisWeek, 7), (start, cap) => {
-    /* Outings are left out, so a long day out does not raise the next bar. */
-    const l = lanesFor(byWeek.get(start) ?? [], start);
+    const l = lanesFor(byWeek.get(start) ?? []);
     return l.quest + Math.min(l.curiosity, cap);
   });
   const ruleOf = new Map(rules.map((r) => [r.start, r]));
