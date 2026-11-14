@@ -90,6 +90,12 @@ export default async function ScoringPage() {
           week has left after dated commitments: the bar less the floor{rule ? <> ({rule.cap} points this week, {hours(rule.cap)} hours)</> : null}.
           Past that it still counts toward the lifetime total, never the week.
         </li>
+        <li>
+          <strong>Field Atlas outings.</strong> Curiosity, but they count toward the week in full,
+          outside that room, so a day out always moves the week, however much study has filled it.
+          They cannot stand in for dated work: a week with outings is full only once quests meet the
+          floor. They are left out when next week&rsquo;s bar is set, so one long day does not raise it.
+        </li>
       </ul>
       <p>A textbook or reading takes the lane of whatever it belongs to. On its own, it is curiosity.</p>
       <p>

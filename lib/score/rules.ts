@@ -49,6 +49,16 @@ export const BOOKED_FROM = '2026-11-09';
  *  the week it was decided in, as a one-time exception. */
 export const RATIO_FROM = '2026-11-02';
 
+/** From this Monday, Field Atlas outings count toward the week in full,
+ *  outside curiosity's room: a day out always moves the week, even when
+ *  study has already filled the room. They still cannot stand in for
+ *  dated work (a week with outings is full only once quests meet the
+ *  floor), and they are left out when next week's bar is set, so one long
+ *  day does not raise the next target. Applied from the week before the
+ *  one it was decided in, so the Hatta outing of 8 November counts: a
+ *  logged one-time exception. */
+export const OUTINGS_FROM = '2026-11-02';
+
 /** From this Monday, an exam's practice hours are worked out, not
  *  guessed: the hours its parts are priced at, times PRACTICE_RATIO.
  *  Part prices learn from timed sessions every month (calibrate.ts), so
