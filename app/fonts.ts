@@ -10,34 +10,42 @@
  * (see "the paid-upgrade trigger" callout in BRIEF.md).
  */
 
-import {
-  Source_Serif_4,
-  IBM_Plex_Sans,
-  IBM_Plex_Mono,
-  Noto_Sans_Symbols_2,
-} from 'next/font/google';
+/*
+ * The files live in /fonts and are served from the site itself: the same
+ * Latin subsets Google Fonts serves, kept in the repo since 17 Nov 2026,
+ * when Google started answering the build machines in a form next/font/google
+ * could not read and every deploy failed. A build no longer depends on
+ * Google. All four families are under the SIL Open Font License (fonts/OFL).
+ */
+import localFont from 'next/font/local';
 
-export const sourceSerif = Source_Serif_4({
-  subsets: ['latin'],
-  weight: ['400', '600'],
-  style: ['normal', 'italic'],
+export const sourceSerif = localFont({
+  src: [
+    { path: '../fonts/source-serif-4-normal-400-600.woff2', weight: '400 600', style: 'normal' },
+    { path: '../fonts/source-serif-4-italic-400-600.woff2', weight: '400 600', style: 'italic' },
+  ],
   display: 'swap',
   variable: '--font-source-serif',
+  adjustFontFallback: 'Times New Roman',
 });
 
-export const plexSans = IBM_Plex_Sans({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
-  style: ['normal', 'italic'],
+export const plexSans = localFont({
+  src: [
+    { path: '../fonts/ibm-plex-sans-normal-400-600.woff2', weight: '400 600', style: 'normal' },
+    { path: '../fonts/ibm-plex-sans-italic-400-600.woff2', weight: '400 600', style: 'italic' },
+  ],
   display: 'swap',
   variable: '--font-plex-sans',
 });
 
-export const plexMono = IBM_Plex_Mono({
-  subsets: ['latin'],
-  weight: ['400', '500'],
+export const plexMono = localFont({
+  src: [
+    { path: '../fonts/ibm-plex-mono-normal-400.woff2', weight: '400', style: 'normal' },
+    { path: '../fonts/ibm-plex-mono-normal-500.woff2', weight: '500', style: 'normal' },
+  ],
   display: 'swap',
   variable: '--font-plex-mono',
+  adjustFontFallback: false,
 });
 
 /*
@@ -46,11 +54,14 @@ export const plexMono = IBM_Plex_Mono({
  * INDEX) as a real serif-adjacent glyph rather than as a colour emoji.
  *
  * Used only for the hero pointing-hand and any future typographic
- * gesture marks. Not for body text.
+ * gesture marks. Not for body text. Not preloaded: the file is large and
+ * only the hand needs it.
  */
-export const notoSymbols = Noto_Sans_Symbols_2({
-  subsets: ['symbols'],
+export const notoSymbols = localFont({
+  src: '../fonts/noto-sans-symbols-2-normal-400.woff2',
   weight: '400',
   display: 'swap',
   variable: '--font-symbols',
+  preload: false,
+  adjustFontFallback: false,
 });
