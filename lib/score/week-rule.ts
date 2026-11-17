@@ -48,6 +48,7 @@ export function floorFor(items: ScoreItem[], start: string): number {
     const extra = extraLeftMinutes(item, start) / MINUTES_PER_POINT;
     if (!item.fixedDate || !item.deadline || item.deadline < start || (!item.parts.length && !extra)) continue;
     if (item.unbooked && start >= BOOKED_FROM) continue;
+    if (item.finished && item.finished < start) continue;      // marked done before the week
     let left = extra;
     if (item.remeasured && start <= item.remeasured.on) left += item.remeasured.before - item.remeasured.after;
     for (const g of item.parts) {

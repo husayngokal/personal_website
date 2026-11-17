@@ -5,7 +5,7 @@ import {
   PRACTICE_FROM, PRACTICE_RATIO, READING_TIERS, RATIO_FROM, RECURRING_GUT_HOURS, SCORE_EPOCH, TASK_GUT_HOURS, WEEKLY_BAR, WEEKLY_HOURS,
   WORDS_PER_HOUR, estimate, pagesPerPoint, type Tier,
   ACTIVITIES, CALIBRATION, RETRIEVAL_FACTOR, SOURCES, STARTING_FACTORS, TIMED_FACTOR, TIMED_SESSION_CAP_MIN, TIMED_UNCAPPED_FROM, UNIT_CAP, BAR, VARIANCE,
-  activityRate, factorLabel, type ActivityKind, type Learning,
+  activityRate, examSittingPoints, factorLabel, type ActivityKind, type Learning,
 } from '@/lib/score/rules';
 import { shortDay } from '@/lib/score/format';
 import { getScoreState } from '@/lib/content/score';
@@ -108,6 +108,7 @@ export default async function ScoringPage() {
       <ul className={styles.list}>
         <li><strong>Parts.</strong> Work with a fixed end: chapters, modules, sections, pages, milestones. Each finished part is one tap. The parts of an item always add up to exactly its total.</li>
         <li><strong>Repeatables.</strong> Work that can be done any number of times: past papers, practice exams, revision passes. Every one earns the same points. No limit.</li>
+        <li><strong>Sitting an exam.</strong> The exam itself, sat, pass or fail: its official length at the retrieval rate ({RETRIEVAL_FACTOR}), with no marking, since someone else marks it. A 3-hour paper is {examSittingPoints(3)} points, paid to the week it was sat, as a quest. Never corrected: the length is the exam board&rsquo;s.</li>
         <li><strong>Outcomes.</strong> The result itself: an exam passed, an offer, a paid project. Worth the item&apos;s full estimate, set in advance and paid once. Outcomes go to the lifetime total and the level, never the week. Taking longer or retaking earns points for the extra work, but the outcome never grows.</li>
       </ul>
 
@@ -316,7 +317,9 @@ export default async function ScoringPage() {
       <p>
         An item reaches 100% when its last part is done. A task then closes as done and a course as
         completed, and both leave the plate. A book closes on its last page. An exam stays until it is
-        sat; the result pays its outcome. A new week starts at midnight on Monday, Dubai time, on its
+        sat; the result pays its outcome. Anything can also be marked done at any point, with one tap:
+        it leaves the plate for good, earns nothing, and its unfinished parts stay unfinished. If it is
+        done, it is done. A new week starts at midnight on Monday, Dubai time, on its
         own; past weeks are never stored separately, they are read back from the dated log in each
         item, so they cannot drift.
       </p>

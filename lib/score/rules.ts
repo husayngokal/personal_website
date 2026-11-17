@@ -357,6 +357,13 @@ export const ACTIVITIES: Record<ActivityKind, ActivitySpec> = {
   other: { label: 'Something else (your guess per unit)', unit: '', retrieval: false, asks: 'custom', basis: 'your gut minutes per unit, times the guess factor in force, at most 8 points a unit' },
 };
 
+/** The real exam, sat: its official length at the retrieval rate, and no
+ *  marking (someone else marks it). A 3-hour paper is 18 points. Paid to
+ *  the week it was sat, as a quest, pass or fail. */
+export function examSittingPoints(hours: number): number {
+  return hoursToPoints(hours * RETRIEVAL_FACTOR);
+}
+
 /** A past paper is marked as well as sat. */
 export const PAPER_MARKING_FACTOR = 1.5;
 

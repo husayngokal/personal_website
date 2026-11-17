@@ -80,6 +80,10 @@ export interface ScoreItem {
    *  are priced at, times PRACTICE_RATIO (rules.ts PRACTICE_FROM). 0 when
    *  the rule does not apply. */
   practiceRule: number;
+  /** The day it was marked done (block.ts): off the plate for good. */
+  finished: string | null;
+  /** An exam sat, and what sitting it earned (block.ts). */
+  sat: { on: string; points: number } | null;
   events: ScoreEvent[];
 }
 
@@ -239,6 +243,8 @@ function fromFile(src: VaultSource, today: string = authorDay()): ScoreItem | nu
       ? { on: block.remeasured.on, before: block.remeasured.before, after: block.remeasured.after }
       : null,
     practice: block?.practice ?? [],
+    finished: block?.finished ?? null,
+    sat: block?.sat ?? null,
   };
 
   switch (surface) {
@@ -251,7 +257,7 @@ function fromFile(src: VaultSource, today: string = authorDay()): ScoreItem | nu
            Obsidian): its single part counts as done on the completed day. */
         const g = block.parts.length === 1 ? block.parts[0] : null;
         const completed = day(row.completed);
-        if (g && g.count === 1 && g.done.length === 0 && g.prior === 0 && row.status === 'done' && completed) {
+        if (g && g.count === 1 && g.done.length === 0 && g.prior === 0 && row.status === 'done' && completed && !block.finished) {
           base.parts = [{ ...g, done: [completed] }];
         }
       } else {
@@ -348,9 +354,22 @@ function fromFile(src: VaultSource, today: string = authorDay()): ScoreItem | nu
     else base.parked = false;
   }
 
+  /* Marked done: off the plate for good, whatever its status says. */
+  if (base.finished && base.finished <= today) {
+    base.active = false;
+    base.parked = false;
+    base.needsSetup = null;
+  }
+
   const events: ScoreEvent[] = [];
   for (const g of base.parts) events.push(...partEvents(base, g));
   for (const g of base.repeat) events.push(...repeatEvents(base, g));
+  if (base.sat) {
+    events.push({
+      date: base.sat.on, points: base.sat.points, lane: laneOn(base.lane, base.laneWas, base.sat.on), kind: 'part',
+      key: base.key, surface, label: `${title} · sat`,
+    });
+  }
   if (base.outcome?.achieved) {
     events.push({
       date: base.outcome.achieved, points: base.outcome.points, lane: laneOn(base.lane, base.laneWas, base.outcome.achieved), kind: 'outcome',
@@ -394,7 +413,7 @@ function atlasItem(src: VaultSource, tallies: Extracted['tallies']): ScoreItem |
     key: src.path, table: 'living_entries', surface: 'atlas', slug: 'field-atlas',
     title: 'The Field Atlas', href: '/field-atlas', lane: DEFAULT_LANE.atlas, laneWas: ATLAS_LANE_WAS,
     active: false, parked: false, private: false, hasBlock: false, needsSetup: null,
-    parts: [], repeat: [], outcome: null, weeklyHours: null, paced: false, deadline: null, fixedDate: false, unbooked: false, remeasure: false, remeasured: null, practice: [], practiceRule: 0, events,
+    parts: [], repeat: [], outcome: null, weeklyHours: null, paced: false, deadline: null, fixedDate: false, unbooked: false, remeasure: false, remeasured: null, practice: [], practiceRule: 0, finished: null, sat: null, events,
   };
 }
 
@@ -429,6 +448,8 @@ export function effectiveBlock(item: ScoreItem): ScoreBlock {
     repeat: item.repeat.map((g) => ({ ...g, done: [...g.done], ...(g.plan ? { plan: [...g.plan] } : {}) })),
     ...(item.practice.length ? { practice: [...item.practice] } : {}),
     ...(item.laneWas.length ? { laneWas: [...item.laneWas] } : {}),
+    ...(item.finished ? { finished: item.finished } : {}),
+    ...(item.sat ? { sat: { ...item.sat } } : {}),
   };
 }
 

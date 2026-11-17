@@ -28,6 +28,9 @@
  *           the price came from (rules.ts), `why` the same in words.
  *   repeat  open-ended work. Every done entry earns `points`, no limit.
  *   outcome the reward for the result (an exam passed), paid once.
+ *   finished the day it was marked done: off the plate for good, no
+ *           points, its unfinished parts left as they are.
+ *   sat     an exam sat, and what sitting it earned: "2026-11-18 18".
  *
  * Pure module, no I/O.
  */
@@ -96,6 +99,13 @@ export interface ScoreBlock {
    *  latest counts. What is left counts toward the pace and, for a fixed
    *  date, the floor, in place of any per-activity plans. Never pays. */
   practice?: string[];
+  /** The day it was marked done (Done in Studio): off the plate for good.
+   *  Earns nothing and finishes none of its parts. */
+  finished?: string;
+  /** An exam sat: the day, and the points sitting it earned, frozen at
+   *  the time (rules.ts examSittingPoints). Paid to that week as a quest,
+   *  pass or fail; the result is the outcome, paid separately. */
+  sat?: { on: string; points: number };
   /** Lanes it had before a change ("2026-11-05 quest": quest until that
    *  day). Work logged before a change keeps the lane it was done in, so
    *  a lane change never rewrites a week that has already started. */
@@ -258,10 +268,22 @@ export function readBlock(fm: Record<string, unknown>): ScoreBlock | null {
       };
     })(),
     ...(planList(r.practice).length ? { practice: planList(r.practice) } : {}),
+    ...(isoDay(r.finished) ? { finished: isoDay(r.finished) } : {}),
+    ...(satOf(r.sat) ? { sat: satOf(r.sat) } : {}),
     ...(laneWasList(r['lane-was']).length ? { laneWas: laneWasList(r['lane-was']) } : {}),
     parts,
     repeat,
   };
+}
+
+function isoDay(v: unknown): string | undefined {
+  const s = v instanceof Date && !Number.isNaN(v.getTime()) ? v.toISOString().slice(0, 10) : typeof v === 'string' ? v.trim() : '';
+  return ISO_DAY.test(s) ? s : undefined;
+}
+
+function satOf(v: unknown): { on: string; points: number } | undefined {
+  const m = typeof v === 'string' ? v.trim().match(/^(\d{4}-\d{2}-\d{2}) (\d+)$/) : null;
+  return m ? { on: m[1], points: Number(m[2]) } : undefined;
 }
 
 /* -- Writing --------------------------------------------------------- */
@@ -280,6 +302,8 @@ export function serializeBlock(b: ScoreBlock): string[] {
   if (b.parked && b.parkedFrom) out.push(`  parked-from: ${JSON.stringify(b.parkedFrom)}`);
   if (b.remeasured) out.push(`  remeasured: ${JSON.stringify(b.remeasured)}`);
   if (b.practice?.length) out.push(`  practice: ${list(b.practice)}`);
+  if (b.finished) out.push(`  finished: ${q(b.finished)}`);
+  if (b.sat) out.push(`  sat: ${q(`${b.sat.on} ${b.sat.points}`)}`);
   if (b.laneWas?.length) out.push(`  lane-was: ${list(b.laneWas)}`);
   if (b.parts.length) {
     out.push('  parts:');

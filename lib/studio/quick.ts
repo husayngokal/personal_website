@@ -25,7 +25,7 @@ import { patchFrontmatter, type ScalarChange } from '../vault/frontmatter-patch'
 import { itemLabel, listDoneItems, setItemDone } from '../vault/done-items';
 import { parseFile } from '../vault/parse';
 import {
-  ACTIVITIES, READING_TIERS, STARTING_FACTORS, TEMPLATES, activityRate, countGain, estimate, factorLabel,
+  ACTIVITIES, READING_TIERS, STARTING_FACTORS, TEMPLATES, activityRate, countGain, estimate, examSittingPoints, factorLabel,
   type ActivityKind, type Content, type Factors, type TemplateId, type Tier,
 } from '../score/rules';
 import {
@@ -58,6 +58,17 @@ const PARK: Record<string, Record<string, string>> = {
   projects: { status: 'paused' },
 };
 
+/* Marking something done, per kind: the status its own surface uses for
+   finished. An exam's status (pending a result) is someone else's fact,
+   so it is marked done in its score block only. */
+const DONE: Record<string, (today: string) => Record<string, string>> = {
+  tasks: (today) => ({ status: 'done', completed: today }),
+  library_books: (today) => ({ status: 'finished', finished: today }),
+  courses: (today) => ({ status: 'completed', finished: today }),
+  projects: () => ({ status: 'concluded' }),
+  study_credentials: () => ({}),
+};
+
 export type QuickRequest =
   | { target: 'book'; slug: string; action: 'bump'; by: number }
   | { target: 'book'; slug: string; action: 'finish' | 'shelve' }
@@ -82,6 +93,8 @@ export type QuickRequest =
   | { target: 'score'; table: string; slug: string; action: 'edit-group'; group: number; name?: string; count?: number; prior?: number }
   | { target: 'score'; table: string; slug: string; action: 'remove-group'; group: number }
   | { target: 'score'; table: string; slug: string; action: 'park' }
+  | { target: 'score'; table: string; slug: string; action: 'finish' }
+  | { target: 'score'; table: string; slug: string; action: 'sat'; hours: number }
   | { target: 'score'; table: string; slug: string; action: 'unpark'; weeklyHours?: number }
   | { target: 'score'; table: string; slug: string; action: 'restore-block'; block: ScoreBlock | null; fields?: Record<string, ScalarChange> };
 
@@ -366,6 +379,31 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string,
       summary: `${title}: ${due ? `due ${due}${fixed ? ', a fixed date' : ''}` : `no due date, ${wh} hours a week`}`,
       undo: { target: 'score', table: req.table, slug: req.slug, action: 'restore-block', block: own, fields: prev },
     };
+  }
+
+  if (req.action === 'finish' || req.action === 'sat') {
+    /* Done: off the plate for good. No points, and its unfinished parts
+       stay unfinished. Sat (an exam): the same, plus the points for
+       sitting it, paid to today's week. The result is paid separately. */
+    const fields = DONE[req.table]?.(today);
+    if (!fields) throw new QuickError('bad-request', 'this cannot be marked done here');
+    const item = itemFromFile({ path, content: raw });
+    const base: ScoreBlock = own ?? (item ? effectiveBlock(item) : { parts: [], repeat: [] });
+    if (base.finished) throw new QuickError('bad-request', 'this is already done');
+    const block: ScoreBlock = { ...cloneBlock(base), finished: today, parked: undefined, parkedFrom: undefined };
+    let summary = `${title}: done`;
+    if (req.action === 'sat') {
+      if (req.table !== 'study_credentials') throw new QuickError('bad-request', 'only an exam is sat');
+      const hours = Number(req.hours);
+      if (!Number.isFinite(hours) || hours < 0.5 || hours > 8) throw new QuickError('bad-request', 'give the exam length in hours, between 0.5 and 8');
+      const points = examSittingPoints(hours);
+      block.sat = { on: today, points };
+      summary = `${title}: sat, +${points}`;
+    }
+    for (const k of Object.keys(fields)) prevFields[k] = scalar(fm[k]);
+    let next = setScoreBlock(raw, block);
+    if (Object.keys(fields).length) next = patchFrontmatter(next, fields);
+    return { raw: next, changed: next !== raw, row: {}, summary, undo: undo(prevFields) };
   }
 
   if (req.action === 'park' || req.action === 'unpark') {

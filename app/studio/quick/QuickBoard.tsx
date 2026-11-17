@@ -11,7 +11,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ScoreMeter } from '@/components/score/ScoreMeter';
 import { emitScoreFx, setSoundOn, soundOn, unlockAudio } from '@/lib/score/fx';
 import { getBrowserClient, isSupabaseConfigured } from '@/lib/supabase';
-import { ACTIVITIES, TASK_GUT_HOURS, atlasPoints, countGain, estimate, partGain, timedPoints, type ActivityKind } from '@/lib/score/rules';
+import { ACTIVITIES, TASK_GUT_HOURS, atlasPoints, examSittingPoints, countGain, estimate, partGain, timedPoints, type ActivityKind } from '@/lib/score/rules';
 
 /* Points an hour for time on work with no button of its own. */
 const TIMED_RATE = timedPoints(60);
@@ -21,6 +21,7 @@ import type { ItemView, ScoreState } from '@/lib/score/compute';
 import { MINUTES_PER_POINT, READING_TIERS, TEMPLATES, UNIT_CAP, type TemplateId, type Tier } from '@/lib/score/rules';
 import { IDLE, TIMER_KEY, elapsedMs, hms, hoursLabel, type TimerNow } from '@/lib/score/time';
 import { shortDay } from '@/lib/score/format';
+import { authorDay } from '@/lib/content/streak';
 import { needsYou, type Need } from '@/lib/score/needs';
 
 interface SwapPlateItem { table: string; slug: string; title: string; hours: number | null; parkable: boolean }
@@ -165,6 +166,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
         if (!g || req.page <= g.done) return null;
         return { gained: partGain(g.points, g.count, g.done, req.page), lane: it.lane, itemKey: it.key, group: g.index, qty: Math.min(g.count, req.page) - g.done };
       }
+      if (req.action === 'sat') return { gained: examSittingPoints(req.hours), lane: it.lane, itemKey: it.key };
       return null;
     }
     if (req.target === 'task' && req.action === 'done') {
@@ -527,6 +529,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
                 ))}
               </div>
             )}
+            <FinishRow item={i} busy={busy} send={(req, key) => send({ target: 'score', table: i.table, slug: i.slug, ...req } as QuickRequest, key)} />
             {i.remeasure && (
               <Remeasure
                 item={i}
@@ -1418,6 +1421,42 @@ function PaceForm({ deadline, fixedDate, weeklyHours, paced, busy, disabled, onS
 
 /* Hours a week for something with no deadline: what you plan to give it,
    and what counts toward the weekly limit. */
+/* Done, on everything: off the plate for good, no points, unfinished parts
+   left as they are. A task with a single part already has its own Done
+   (which pays its price), so it gets no second one. An exam, from its
+   date, can also be sat: the points for sitting it, then done. */
+function FinishRow({ item, busy, send }: {
+  item: ItemView; busy: string | null; send: (req: { action: 'finish' } | { action: 'sat'; hours: number }, key: string) => void;
+}) {
+  const [hours, setHours] = useState('3');
+  const singleTask = item.table === 'tasks' && item.parts.length === 1 && item.parts[0].count === 1;
+  const exam = item.table === 'study_credentials';
+  const canSit = exam && !!item.deadline && authorDay() >= item.deadline;
+  if (singleTask && !canSit) return null;
+  const h = Number(hours);
+  const valid = Number.isFinite(h) && h >= 0.5 && h <= 8;
+  return (
+    <div className={styles.rowActions}>
+      {canSit && (
+        <form className={styles.pageLog} onSubmit={(e) => { e.preventDefault(); if (valid) send({ action: 'sat', hours: h }, `${item.key}:sat`); }}>
+          <label className={styles.setupField}>
+            <span>Exam length, hours</span>
+            <input type="number" min={0.5} max={8} step="0.25" inputMode="decimal" value={hours} onChange={(e) => setHours(e.target.value)} />
+          </label>
+          <Btn primary submit busy={busy === `${item.key}:sat`} disabled={!!busy || !valid} onClick={() => undefined}>
+            Sat it{valid ? ` +${examSittingPoints(h)}` : ''}
+          </Btn>
+        </form>
+      )}
+      {!singleTask && (
+        <Btn busy={busy === `${item.key}:finish`} disabled={!!busy} onClick={() => send({ action: 'finish' }, `${item.key}:finish`)}>
+          Done
+        </Btn>
+      )}
+    </div>
+  );
+}
+
 function WeeklyHours({ value, busy, disabled, onSave }: {
   value: number | null; busy: boolean; disabled: boolean; onSave: (hours: number) => void;
 }) {
