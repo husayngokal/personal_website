@@ -14,7 +14,7 @@
 
 import 'server-only';
 import crypto from 'node:crypto';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { studio, STUDIO_SESSION_COOKIE } from './config';
 
 export interface StudioSession {
@@ -56,10 +56,13 @@ export function unseal(value: string): StudioSession | null {
   }
 }
 
-/** Read + validate the current Studio session. Returns null unless a valid
- *  cookie exists AND its login matches the single allowed account. */
+/** Read + validate the current Studio session: the browser's cookie, or an
+ *  Authorization: Bearer header carrying the same sealed value (the watch
+ *  app, signed in through /api/studio/device). Returns null unless it
+ *  unseals AND its login matches the single allowed account. */
 export async function getStudioSession(): Promise<StudioSession | null> {
-  const raw = (await cookies()).get(STUDIO_SESSION_COOKIE)?.value;
+  const bearer = (await headers()).get('authorization')?.match(/^Bearer\s+([\w-]+)$/i)?.[1];
+  const raw = bearer ?? (await cookies()).get(STUDIO_SESSION_COOKIE)?.value;
   if (!raw) return null;
   const s = unseal(raw);
   if (!s) return null;
