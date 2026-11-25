@@ -93,6 +93,7 @@ export type QuickRequest =
   | { target: 'score'; table: string; slug: string; action: 'edit-group'; group: number; name?: string; count?: number; prior?: number }
   | { target: 'score'; table: string; slug: string; action: 'remove-group'; group: number }
   | { target: 'score'; table: string; slug: string; action: 'park' }
+  | { target: 'score'; table: string; slug: string; action: 'backlog' }
   | { target: 'score'; table: string; slug: string; action: 'finish' }
   | { target: 'score'; table: string; slug: string; action: 'sat'; hours: number }
   | { target: 'score'; table: string; slug: string; action: 'unpark'; weeklyHours?: number }
@@ -165,7 +166,7 @@ function changesFor(req: QuickRequest, fm: Record<string, unknown>, today: strin
       if (req.action === 'done') return { changes: { status: 'done', completed: today }, verb: 'done' };
       if (req.action === 'reopen') return { changes: { status: 'open', completed: null }, verb: 'reopened' };
       if (req.action === 'this-week') return { changes: { scope: 'this-week' }, verb: 'moved to this week' };
-      if (req.action === 'later') return { changes: { scope: 'lifetime' }, verb: 'moved to later' };
+      if (req.action === 'later') return { changes: { scope: 'lifetime' }, verb: 'moved to the backlog' };
       break;
     case 'project':
       /* The one switch a project has: actively being worked on, or not.
@@ -406,9 +407,23 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string,
     return { raw: next, changed: next !== raw, row: {}, summary, undo: undo(prevFields) };
   }
 
+  if (req.action === 'backlog') {
+    /* From off the plate into the backlog: it stops waiting to come back
+       as it was. Its points stay frozen; the parked flag, what parking
+       changed and its hours a week go, so bringing it on again asks how it
+       will be paced, like anything else in the backlog. Tasks only: the
+       backlog is a list of tasks. */
+    if (req.table !== 'tasks') throw new QuickError('bad-request', 'only a task goes to the backlog');
+    if (!own?.parked) throw new QuickError('bad-request', 'this is not off the plate');
+    prevFields.scope = scalar(fm.scope);
+    let next = setScoreBlock(raw, { ...cloneBlock(own), parked: undefined, parkedFrom: undefined, weeklyHours: undefined });
+    next = patchFrontmatter(next, { scope: 'lifetime' });
+    return { raw: next, changed: next !== raw, row: {}, summary: `${title}: in the backlog`, undo: undo(prevFields) };
+  }
+
   if (req.action === 'park' || req.action === 'unpark') {
     /* Taking something off the plate changes its own status where it has
-       one (a course back to planned, a task to later, a book to planned, a
+       one (a course back to planned, a task to lifetime, a book to planned, a
        project paused) and records what it changed in the score block, so
        it shows in the Off the plate list and "Back on the plate" restores
        exactly that. An exam's status is someone else's fact: only the flag. */

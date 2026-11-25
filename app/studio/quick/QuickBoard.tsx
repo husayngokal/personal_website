@@ -74,9 +74,6 @@ interface ApiOk {
 
 type Note = { kind: 'ok'; text: string; undo: QuickRequest | null } | { kind: 'error'; text: string };
 
-const THIS_WEEK = new Set(['today', 'this-week']);
-const SOON = new Set(['this-month', 'this-quarter', 'this-year']);
-
 /* What the plate shows: everything active, plain tasks included (their
    one part is their Done button), except whole-surface items. */
 function onPlate(i: ItemView): boolean {
@@ -125,10 +122,21 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
   function reflect(req: QuickRequest, res: ApiOk) {
     const r = res.row;
     if (res.score) setScore(res.score);
-    if (req.target === 'task') {
+    if (req.target === 'task' || (req.target === 'score' && req.table === 'tasks')) {
+      /* Score actions on a task return its row too (scope moves when it
+         goes on or off the plate), so the backlog follows at once. */
       setTasks((list) => list.map((t) => t.slug !== req.slug ? t : {
         ...t, status: String(r.status ?? t.status), scope: String(r.scope ?? t.scope),
       }));
+      /* Into the backlog: it leaves Off the plate now, not when the
+         recompute lands. */
+      if (req.target === 'score' && req.action === 'backlog') {
+        setScore((sl) => sl && {
+          ...sl,
+          items: sl.items.flatMap((i) => i.table !== 'tasks' || i.slug !== req.slug ? [i]
+            : i.weekPoints > 0 ? [{ ...i, parked: false }] : []),
+        });
+      }
     } else if (req.target === 'project') {
       setProjects((list) => list.map((p) => p.slug !== req.slug ? p : { ...p, status: String(r.status ?? p.status) }));
     } else if (req.target === 'atlas' && res.line) {
@@ -282,10 +290,13 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
   }
 
   const plate = (score?.items ?? []).filter(onPlate);
-  const open = tasks.filter((t) => t.status !== 'done' && !t.recurrence);
-  const soon = open.filter((t) => SOON.has(t.scope));
-  const backlog = open.filter((t) => t.scope === 'lifetime' && t.category === 'backlog');
-  const later = open.filter((t) => !THIS_WEEK.has(t.scope) && !SOON.has(t.scope) && !(t.scope === 'lifetime' && t.category === 'backlog'));
+  const parked = (score?.items ?? []).filter((i) => i.parked);
+  /* Three lists: on the plate, off the plate, and the backlog. Any task
+     with a scope short of lifetime is on the plate already; the backlog is
+     every open task that is not, except those off the plate (listed there). */
+  const placed = new Set((score?.items ?? []).filter((i) => i.table === 'tasks' && (i.active || i.parked)).map((i) => i.slug));
+  const backlog = tasks.filter((t) =>
+    t.status !== 'done' && t.status !== 'dropped' && !t.recurrence && t.scope === 'lifetime' && !placed.has(t.slug));
 
   const taskRow = (t: Task) => {
     const sized = score?.items.find((i) => i.table === 'tasks' && i.slug === t.slug);
@@ -310,17 +321,12 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
       </details>)}
       <div className={styles.rowActions}>
         <Btn primary busy={busy === `${t.slug}:done`} disabled={!!busy} onClick={() => send({ target: 'task', slug: t.slug, action: 'done' }, `${t.slug}:done`)}>Done</Btn>
-        {THIS_WEEK.has(t.scope)
-          ? <Btn busy={busy === `${t.slug}:later`} disabled={!!busy} onClick={() => send({ target: 'task', slug: t.slug, action: 'later' }, `${t.slug}:later`)}>Not now</Btn>
-          : null}
       </div>
-      {!THIS_WEEK.has(t.scope) && (
-        <BringOn
-          busy={busy === `${t.slug}:on`}
-          disabled={!!busy}
-          onBring={(p) => send({ target: 'score', table: 'tasks', slug: t.slug, action: 'activate', ...p }, `${t.slug}:on`)}
-        />
-      )}
+      <BringOn
+        busy={busy === `${t.slug}:on`}
+        disabled={!!busy}
+        onBring={(p) => send({ target: 'score', table: 'tasks', slug: t.slug, action: 'activate', ...p }, `${t.slug}:on`)}
+      />
     </li>
     );
   };
@@ -606,19 +612,24 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
         ))}
       </Section>
 
-      {(score?.items ?? []).some((i) => i.parked) && (
+      {parked.length > 0 && (
         <details className={styles.fold}>
-          <summary className={styles.foldHead}>Off the plate <span className={styles.count}>{(score?.items ?? []).filter((i) => i.parked).length}</span></summary>
+          <summary className={styles.foldHead}>Off the plate <span className={styles.count}>{parked.length}</span></summary>
           <ul className={styles.rows}>
-            {(score?.items ?? []).filter((i) => i.parked).map((i) => (
-              <li key={i.key} className={`${styles.row} ${styles.rowSwitch}`}>
+            {parked.map((i) => (
+              <li key={i.key} className={styles.row}>
                 <div className={styles.rowText}>
                   <span className={styles.rowTitle}>{i.title}</span>
                   <span className={styles.rowMeta}>{liveSummary(i)}{i.weeklyHours ? ` · ${i.weeklyHours} h a week` : ''}</span>
                 </div>
-                {i.paced || i.weeklyHours
-                  ? <Btn busy={busy === `${i.key}:unpark`} disabled={!!busy} onClick={() => send({ target: 'score', table: i.table, slug: i.slug, action: 'unpark' }, `${i.key}:unpark`)}>Back on the plate</Btn>
-                  : <BackOn busy={busy === `${i.key}:unpark`} disabled={!!busy} onBack={(weeklyHours) => send({ target: 'score', table: i.table, slug: i.slug, action: 'unpark', weeklyHours }, `${i.key}:unpark`)} />}
+                <div className={styles.rowActions}>
+                  {i.paced || i.weeklyHours
+                    ? <Btn busy={busy === `${i.key}:unpark`} disabled={!!busy} onClick={() => send({ target: 'score', table: i.table, slug: i.slug, action: 'unpark' }, `${i.key}:unpark`)}>Back on the plate</Btn>
+                    : <BackOn busy={busy === `${i.key}:unpark`} disabled={!!busy} onBack={(weeklyHours) => send({ target: 'score', table: i.table, slug: i.slug, action: 'unpark', weeklyHours }, `${i.key}:unpark`)} />}
+                  {i.table === 'tasks' && (
+                    <Btn busy={busy === `${i.key}:backlog`} disabled={!!busy} onClick={() => send({ target: 'score', table: i.table, slug: i.slug, action: 'backlog' }, `${i.key}:backlog`)}>To the backlog</Btn>
+                  )}
+                </div>
               </li>
             ))}
           </ul>
@@ -655,22 +666,11 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
       </Section>
       )}
 
-      {/* -- Tasks ---------------------------------------------------- */}
-      {soon.length > 0 && (
-        <Section title="This month, quarter or year" count={soon.length}>
-          {soon.map(taskRow)}
-        </Section>
-      )}
+      {/* -- Backlog -------------------------------------------------- */}
       {backlog.length > 0 && (
         <details className={styles.fold}>
           <summary className={styles.foldHead}>Backlog <span className={styles.count}>{backlog.length}</span></summary>
           <ul className={styles.rows}>{backlog.map(taskRow)}</ul>
-        </details>
-      )}
-      {later.length > 0 && (
-        <details className={styles.fold}>
-          <summary className={styles.foldHead}>Later <span className={styles.count}>{later.length}</span></summary>
-          <ul className={styles.rows}>{later.map(taskRow)}</ul>
         </details>
       )}
 
@@ -1337,7 +1337,7 @@ function BackOn({ busy, disabled, onBack }: { busy: boolean; disabled: boolean; 
   );
 }
 
-/* From the backlog (or later) onto this week's plate: say how it is paced,
+/* From the backlog onto this week's plate: say how it is paced,
    a due date or hours a week. The 50-hour check runs on the way in. */
 function BringOn({ busy, disabled, onBring }: {
   busy: boolean; disabled: boolean; onBring: (p: { due?: string; weeklyHours?: number }) => void;
