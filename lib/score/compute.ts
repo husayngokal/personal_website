@@ -57,6 +57,7 @@ export interface ItemView {
   lane: Lane;
   active: boolean;
   parked: boolean;              // off the plate by its score block (an exam)
+  backlog?: boolean;            // parked into the backlog: listed there, not off the plate
   weekMinutes: number;          // time logged against it this week
   hasBlock: boolean;            // carries its own frozen score block
   needsSetup: string | null;
@@ -177,7 +178,7 @@ function itemView(item: ScoreItem, weekPoints: number, weekMinutes: number, toda
   return {
     key: item.key, table: item.table, slug: item.slug, surface: item.surface,
     title: item.title, href: item.href, lane: item.lane, active: item.active,
-    parked: item.parked, weekMinutes,
+    parked: item.parked, backlog: item.backlog, weekMinutes,
     hasBlock: item.hasBlock, needsSetup: item.needsSetup,
     earned, total, pct: total ? Math.round((earned / total) * 100) : 0, summary,
     extra: Math.round(extraMinutes(item, today)),

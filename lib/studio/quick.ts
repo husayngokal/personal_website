@@ -391,7 +391,7 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string,
     const item = itemFromFile({ path, content: raw });
     const base: ScoreBlock = own ?? (item ? effectiveBlock(item) : { parts: [], repeat: [] });
     if (base.finished) throw new QuickError('bad-request', 'this is already done');
-    const block: ScoreBlock = { ...cloneBlock(base), finished: today, parked: undefined, parkedFrom: undefined };
+    const block: ScoreBlock = { ...cloneBlock(base), finished: today, parked: undefined, parkedFrom: undefined, backlog: undefined };
     let summary = `${title}: done`;
     if (req.action === 'sat') {
       if (req.table !== 'study_credentials') throw new QuickError('bad-request', 'only an exam is sat');
@@ -409,16 +409,23 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string,
 
   if (req.action === 'backlog') {
     /* From off the plate into the backlog: it stops waiting to come back
-       as it was. Its points stay frozen; the parked flag, what parking
-       changed and its hours a week go, so bringing it on again asks how it
-       will be paced, like anything else in the backlog. Tasks only: the
-       backlog is a list of tasks. */
-    if (req.table !== 'tasks') throw new QuickError('bad-request', 'only a task goes to the backlog');
+       as it was. Its points stay frozen and its hours a week go, so
+       bringing it on again asks how it will be paced (unless a date paces
+       it), like anything else in the backlog. */
     if (!own?.parked) throw new QuickError('bad-request', 'this is not off the plate');
-    prevFields.scope = scalar(fm.scope);
-    let next = setScoreBlock(raw, { ...cloneBlock(own), parked: undefined, parkedFrom: undefined, weeklyHours: undefined });
-    next = patchFrontmatter(next, { scope: 'lifetime' });
-    return { raw: next, changed: next !== raw, row: {}, summary: `${title}: in the backlog`, undo: undo(prevFields) };
+    if (own.backlog) throw new QuickError('bad-request', 'this is in the backlog already');
+    if (req.table === 'tasks') {
+      /* A task's backlog is its own scope: lifetime, with no parked flag. */
+      prevFields.scope = scalar(fm.scope);
+      let next = setScoreBlock(raw, { ...cloneBlock(own), parked: undefined, parkedFrom: undefined, weeklyHours: undefined });
+      next = patchFrontmatter(next, { scope: 'lifetime' });
+      return { raw: next, changed: next !== raw, row: {}, summary: `${title}: in the backlog`, undo: undo(prevFields) };
+    }
+    /* Anything else has no scope to move: it stays parked, with its status
+       as parking left it and what to restore, and is marked as in the
+       backlog. Bringing it on is "Back on the plate" with new hours. */
+    const next = setScoreBlock(raw, { ...cloneBlock(own), backlog: true, weeklyHours: undefined });
+    return { raw: next, changed: next !== raw, row: {}, summary: `${title}: in the backlog`, undo: undo() };
   }
 
   if (req.action === 'park' || req.action === 'unpark') {
@@ -439,7 +446,7 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string,
         prevFields[k] = v;
         if (v !== null) from[k] = String(v);
       }
-      let next = setScoreBlock(raw, { ...cloneBlock(base), parked: true, parkedFrom: Object.keys(from).length ? from : undefined });
+      let next = setScoreBlock(raw, { ...cloneBlock(base), parked: true, parkedFrom: Object.keys(from).length ? from : undefined, backlog: undefined });
       if (Object.keys(park).length) next = patchFrontmatter(next, park);
       return {
         raw: next, changed: next !== raw, row: {}, summary: `${title}: off the plate`,
@@ -450,7 +457,7 @@ function applyScore(req: ScoreRequest, path: string, raw: string, today: string,
     const restore: Record<string, ScalarChange> = { ...(own.parkedFrom ?? {}) };
     const prevFields: Record<string, ScalarChange> = {};
     for (const k of Object.keys(restore)) prevFields[k] = scalar(fm[k]);
-    let next = setScoreBlock(raw, { ...cloneBlock(own), parked: undefined, parkedFrom: undefined });
+    let next = setScoreBlock(raw, { ...cloneBlock(own), parked: undefined, parkedFrom: undefined, backlog: undefined });
     if (Object.keys(restore).length) next = patchFrontmatter(next, restore);
     /* Nothing goes on the plate without hours a week: a deadline gives its
        own pace; anything else must say what it will get. */

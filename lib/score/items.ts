@@ -51,6 +51,7 @@ export interface ScoreItem {
   laneWas: string[];
   active: boolean;          // on the plate right now
   parked: boolean;          // taken off the plate by its score block
+  backlog: boolean;         // parked into the backlog (listed there, not off the plate)
   private: boolean;
   hasBlock: boolean;
   needsSetup: TemplateId | null;
@@ -226,6 +227,7 @@ function fromFile(src: VaultSource, today: string = authorDay()): ScoreItem | nu
     laneWas: block?.laneWas ?? [],
     active: false,
     parked: block?.parked === true,
+    backlog: block?.parked === true && block?.backlog === true,
     private: isPrivate,
     hasBlock: !!block,
     needsSetup: null,
@@ -360,6 +362,8 @@ function fromFile(src: VaultSource, today: string = authorDay()): ScoreItem | nu
     base.parked = false;
     base.needsSetup = null;
   }
+  /* In the backlog only while it is still parked. */
+  if (!base.parked) base.backlog = false;
 
   const events: ScoreEvent[] = [];
   for (const g of base.parts) events.push(...partEvents(base, g));
@@ -412,7 +416,7 @@ function atlasItem(src: VaultSource, tallies: Extracted['tallies']): ScoreItem |
   return {
     key: src.path, table: 'living_entries', surface: 'atlas', slug: 'field-atlas',
     title: 'The Field Atlas', href: '/field-atlas', lane: DEFAULT_LANE.atlas, laneWas: ATLAS_LANE_WAS,
-    active: false, parked: false, private: false, hasBlock: false, needsSetup: null,
+    active: false, parked: false, backlog: false, private: false, hasBlock: false, needsSetup: null,
     parts: [], repeat: [], outcome: null, weeklyHours: null, paced: false, deadline: null, fixedDate: false, unbooked: false, remeasure: false, remeasured: null, practice: [], practiceRule: 0, finished: null, sat: null, events,
   };
 }

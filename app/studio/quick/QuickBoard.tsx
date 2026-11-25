@@ -128,16 +128,20 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
       setTasks((list) => list.map((t) => t.slug !== req.slug ? t : {
         ...t, status: String(r.status ?? t.status), scope: String(r.scope ?? t.scope),
       }));
-      /* Into the backlog: it leaves Off the plate now, not when the
-         recompute lands. */
-      if (req.target === 'score' && req.action === 'backlog') {
-        setScore((sl) => sl && {
-          ...sl,
-          items: sl.items.flatMap((i) => i.table !== 'tasks' || i.slug !== req.slug ? [i]
-            : i.weekPoints > 0 ? [{ ...i, parked: false }] : []),
-        });
-      }
-    } else if (req.target === 'project') {
+    }
+    /* Into the backlog: it leaves Off the plate now, not when the
+       recompute lands. A task stops being parked (its scope is its
+       backlog); anything else stays parked, marked as in the backlog. */
+    if (req.target === 'score' && req.action === 'backlog') {
+      const task = req.table === 'tasks';
+      setScore((sl) => sl && {
+        ...sl,
+        items: sl.items.flatMap((i) => i.table !== req.table || i.slug !== req.slug ? [i]
+          : !task ? [{ ...i, backlog: true }]
+          : i.weekPoints > 0 ? [{ ...i, parked: false }] : []),
+      });
+    }
+    if (req.target === 'project') {
       setProjects((list) => list.map((p) => p.slug !== req.slug ? p : { ...p, status: String(r.status ?? p.status) }));
     } else if (req.target === 'atlas' && res.line) {
       const next = res.line;
@@ -290,10 +294,12 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
   }
 
   const plate = (score?.items ?? []).filter(onPlate);
-  const parked = (score?.items ?? []).filter((i) => i.parked);
   /* Three lists: on the plate, off the plate, and the backlog. Any task
      with a scope short of lifetime is on the plate already; the backlog is
-     every open task that is not, except those off the plate (listed there). */
+     every open task that is not, except those off the plate (listed there),
+     plus anything else parked into it (a course, a book, an exam). */
+  const parked = (score?.items ?? []).filter((i) => i.parked && !i.backlog);
+  const shelved = (score?.items ?? []).filter((i) => i.parked && i.backlog);
   const placed = new Set((score?.items ?? []).filter((i) => i.table === 'tasks' && (i.active || i.parked)).map((i) => i.slug));
   const backlog = tasks.filter((t) =>
     t.status !== 'done' && t.status !== 'dropped' && !t.recurrence && t.scope === 'lifetime' && !placed.has(t.slug));
@@ -626,9 +632,7 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
                   {i.paced || i.weeklyHours
                     ? <Btn busy={busy === `${i.key}:unpark`} disabled={!!busy} onClick={() => send({ target: 'score', table: i.table, slug: i.slug, action: 'unpark' }, `${i.key}:unpark`)}>Back on the plate</Btn>
                     : <BackOn busy={busy === `${i.key}:unpark`} disabled={!!busy} onBack={(weeklyHours) => send({ target: 'score', table: i.table, slug: i.slug, action: 'unpark', weeklyHours }, `${i.key}:unpark`)} />}
-                  {i.table === 'tasks' && (
-                    <Btn busy={busy === `${i.key}:backlog`} disabled={!!busy} onClick={() => send({ target: 'score', table: i.table, slug: i.slug, action: 'backlog' }, `${i.key}:backlog`)}>To the backlog</Btn>
-                  )}
+                  <Btn busy={busy === `${i.key}:backlog`} disabled={!!busy} onClick={() => send({ target: 'score', table: i.table, slug: i.slug, action: 'backlog' }, `${i.key}:backlog`)}>To the backlog</Btn>
                 </div>
               </li>
             ))}
@@ -667,10 +671,28 @@ export function QuickBoard({ initial }: { initial: QuickData }) {
       )}
 
       {/* -- Backlog -------------------------------------------------- */}
-      {backlog.length > 0 && (
+      {backlog.length + shelved.length > 0 && (
         <details className={styles.fold}>
-          <summary className={styles.foldHead}>Backlog <span className={styles.count}>{backlog.length}</span></summary>
-          <ul className={styles.rows}>{backlog.map(taskRow)}</ul>
+          <summary className={styles.foldHead}>Backlog <span className={styles.count}>{backlog.length + shelved.length}</span></summary>
+          <ul className={styles.rows}>
+            {shelved.map((i) => (
+              <li key={i.key} className={styles.row}>
+                <div className={styles.rowText}>
+                  <span className={styles.rowTitle}>{i.title}</span>
+                  <span className={styles.rowMeta}>
+                    {[liveSummary(i), i.lane, i.paced && i.deadline ? `${i.weeklyHours ?? 0} h a week to be ready by ${shortDay(i.deadline)}` : null].filter(Boolean).join(' · ')}
+                  </span>
+                </div>
+                <div className={styles.rowActions}>
+                  {/* A date paces it; anything else says what hours it gets. */}
+                  {i.paced
+                    ? <Btn busy={busy === `${i.key}:unpark`} disabled={!!busy} onClick={() => send({ target: 'score', table: i.table, slug: i.slug, action: 'unpark' }, `${i.key}:unpark`)}>Bring onto the plate</Btn>
+                    : <BackOn label="Bring onto the plate" busy={busy === `${i.key}:unpark`} disabled={!!busy} onBack={(weeklyHours) => send({ target: 'score', table: i.table, slug: i.slug, action: 'unpark', weeklyHours }, `${i.key}:unpark`)} />}
+                </div>
+              </li>
+            ))}
+            {backlog.map(taskRow)}
+          </ul>
         </details>
       )}
 
@@ -1324,7 +1346,7 @@ function PartsEditor({ item, busy, send }: {
 
 /* Back on the plate for something with no deadline and no hours a week of
    its own: it must say what it will get. */
-function BackOn({ busy, disabled, onBack }: { busy: boolean; disabled: boolean; onBack: (hours: number) => void }) {
+function BackOn({ busy, disabled, onBack, label = 'Back on the plate' }: { busy: boolean; disabled: boolean; onBack: (hours: number) => void; label?: string }) {
   const [v, setV] = useState('');
   return (
     <form className={styles.pageLog} onSubmit={(e) => { e.preventDefault(); const n = Number(v); if (n > 0) onBack(n); }}>
@@ -1332,7 +1354,7 @@ function BackOn({ busy, disabled, onBack }: { busy: boolean; disabled: boolean; 
         <span className={styles.srOnly}>Hours a week it will get</span>
         <input required type="number" min={0.5} step="any" inputMode="decimal" placeholder="hours a week" value={v} onChange={(e) => setV(e.target.value)} />
       </label>
-      <Btn busy={busy} disabled={disabled || !(Number(v) > 0)} onClick={() => undefined} submit>Back on the plate</Btn>
+      <Btn busy={busy} disabled={disabled || !(Number(v) > 0)} onClick={() => undefined} submit>{label}</Btn>
     </form>
   );
 }

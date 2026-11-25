@@ -91,6 +91,10 @@ export interface ScoreBlock {
   /** What taking it off the plate changed (e.g. { status: 'studying' }),
    *  so bringing it back restores exactly that. */
   parkedFrom?: Record<string, string>;
+  /** Parked into the backlog rather than off the plate: listed under
+   *  Backlog, with no hours a week kept, so bringing it back asks how it
+   *  will be paced. Only with `parked` (a task goes by its scope instead). */
+  backlog?: boolean;
   /** The one content re-measure of its unstarted parts (rules.ts): when,
    *  and whether anything could be counted. */
   remeasured?: { on: string; counted: boolean; before?: number; after?: number };
@@ -245,6 +249,7 @@ export function readBlock(fm: Record<string, unknown>): ScoreBlock | null {
     weeklyHours: num(r['weekly-hours']),
     outcome: num(r.outcome),
     parked: r.parked === true ? true : undefined,
+    backlog: r.parked === true && r.backlog === true ? true : undefined,
     parkedFrom: (() => {
       const v = r['parked-from'];
       if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
@@ -299,6 +304,7 @@ export function serializeBlock(b: ScoreBlock): string[] {
   if (b.weeklyHours !== undefined) out.push(`  weekly-hours: ${b.weeklyHours}`);
   if (b.outcome !== undefined) out.push(`  outcome: ${b.outcome}`);
   if (b.parked) out.push('  parked: true');
+  if (b.parked && b.backlog) out.push('  backlog: true');
   if (b.parked && b.parkedFrom) out.push(`  parked-from: ${JSON.stringify(b.parkedFrom)}`);
   if (b.remeasured) out.push(`  remeasured: ${JSON.stringify(b.remeasured)}`);
   if (b.practice?.length) out.push(`  practice: ${list(b.practice)}`);
